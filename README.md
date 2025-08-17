@@ -10,9 +10,6 @@
 
 
 ## 安装教程
-### 数据库搭建
-
-CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_0900_ai_ci';
 
 ### 服务器部署（腾讯云服务器OpenCloudOS9）
 * 安装开发工具组
@@ -53,11 +50,57 @@ source ~/.bashrc
 
 ln -s /usr/local/python3.12/bin/pip3.12 /usr/bin/pip
 
-## 使用说明
+* 配置数据库
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+dnf update -y
+
+dnf install mariadb-server -y
+
+systemctl start mariadb
+
+systemctl enable mariadb
+
+* 设置数据库安全配置
+
+mysql_secure_installation
+
+1. #验证当前root密码
+2. n #不启用 unix_socket 认证
+3. y #修改数据库root用户密码
+4. 输入和确认新密码
+5. y #删除匿名用户
+6. y #禁止root远程登录
+7. y #删除测试数据库
+8. y #重新加载数据库
+
+* 数据库权限管理配置（创建专门管理web数据库的用户，避免直接使用root用户）
+
+1. 创建允许本地登录的用户（localhost）
+
+CREATE USER 'admin'@'localhost' IDENTIFIED BY '密码';
+
+2. 创建允许远程登录的用户（%表示所有IP，也可指定具体IP如'192.168.1.%'）
+
+CREATE USER 'admin'@'%' IDENTIFIED BY '密码';
+
+3. 授予对webproject数据库的所有权限（本地用户）
+
+GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'localhost';
+
+4. 授予对webproject数据库的所有权限（远程用户）
+
+GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
+
+5. 刷新权限使配置生效
+
+FLUSH PRIVILEGES;
+
+
+
+### 数据库搭建
+
+CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
+
 
 ## 参与贡献
 1. 李远博
