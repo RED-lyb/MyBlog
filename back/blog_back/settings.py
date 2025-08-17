@@ -25,7 +25,7 @@ SECRET_KEY = 'SECRET_KEY_REMOVED_FROM_HISTORY'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]# 允许所有域名
 
 
 # Application definition
@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'home',
 
 ]
-#允许所有域名跨域
+#允许指定域名跨域
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173"
 ]
@@ -81,12 +81,15 @@ WSGI_APPLICATION = 'blog_back.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'webproject',
+#         'USER': 'root',
+#         'PASSWORD': '123456',#生产环境建议修改密码
+#         'HOST': '127.0.0.1',
+#     }
+# }
 
 
 # Password validation
@@ -129,3 +132,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+#配置环境检测
+CURRENT_ENV = 'dev'#实际运行时根据环境修改
+if CURRENT_ENV == 'dev':
+    from set_dev import *
+elif CURRENT_ENV == 'prod':
+    from set_prod import *
