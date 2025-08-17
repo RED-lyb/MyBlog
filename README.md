@@ -12,6 +12,15 @@
 ## 安装教程
 
 ### 服务器部署（腾讯云服务器OpenCloudOS9）
+
+* 创建项目文件夹并clone仓库源代码
+
+mkdir /webproject
+
+cd /webproject
+
+git clone https://gitee.com/REDlyb/my-blog.git
+
 * 安装开发工具组
 
 dnf groupinstall "Development Tools" -y
@@ -95,8 +104,19 @@ GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
 
 FLUSH PRIVILEGES;
 
+* 安装数据库开发工具组和要所用到的依赖
 
+dnf install mariadb-devel -y
 
+cd /webproject/my-blog/back/prod_manage
+
+pip install -r requirements.txt
+
+* 安装uwsgi容器
+
+pip install uwsgi
+
+uwsgi --ini uwsgi.ini
 ### 数据库搭建
 
 CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';

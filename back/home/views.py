@@ -7,9 +7,9 @@ from .models import Test
 class TheHome(View):
     def get(self, request):
         print("来了一个get请求")
-        data=Test.objects.raw(
-            "select * from test"
-        )
-        for x in data:
-            print(x.data)
+        # data=Test.objects.raw(
+        #     "select * from test"
+        # )
+        # for x in data:
+        #     print(x.data)
         return HttpResponse("get请求成功")
