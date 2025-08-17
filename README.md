@@ -10,7 +10,11 @@
 
 
 ## 安装教程
-### 服务器部署（腾讯云OpenCloudOS9）
+### 数据库搭建
+
+CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_0900_ai_ci';
+
+### 服务器部署（腾讯云服务器OpenCloudOS9）
 * 安装开发工具组
 
 dnf groupinstall "Development Tools" -y
