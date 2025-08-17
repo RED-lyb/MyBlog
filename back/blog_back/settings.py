@@ -137,6 +137,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #配置环境检测
 CURRENT_ENV = 'dev'#实际运行时根据环境修改
 if CURRENT_ENV == 'dev':
-    from set_dev import *
+    from .set_dev import *
 elif CURRENT_ENV == 'prod':
-    from set_prod import *
+    from .set_prod import *
