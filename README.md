@@ -204,9 +204,7 @@ cp -r /webproject/my-blog/front/blog_front/dist/ /usr/share/nginx/html/
 
 systemctl start nginx
 
-* 添加开机启动
-
-systemctl enable nginx
+* 执行上述步骤后即可完成部署
 
 ## 参与贡献
 1. 李远博
