@@ -110,13 +110,42 @@ dnf install mariadb-devel -y
 
 cd /webproject/my-blog/back/prod_manage
 
+* 安装依赖
+
 pip install -r requirements.txt
 
 * 安装uwsgi容器
 
 pip install uwsgi
 
+* 运行uwsgi
+
 uwsgi --ini uwsgi.ini
+
+* 安装nginx
+dnf install nginx
+
+systemctl status nginx.service
+
+cd /
+
+* 安装nodejs
+
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+
+\. "$HOME/.nvm/nvm.sh"
+
+nvm install 20
+
+cd /webproject/my-blog/front/blog_front
+
+* 安装项目依赖
+
+
+npm install
+
+npm run build
+
 ### 数据库搭建
 
 CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';

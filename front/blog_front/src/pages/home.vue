@@ -5,7 +5,8 @@ import axios from 'axios'
 const stores = useStore()
 const data = ref("")
 const status = ref("")
-axios.get("http://localhost:8000/").then(res => { 
+const apiUrl = import.meta.env.VITE_API_URL
+axios.get(apiUrl).then(res => { 
     data.value = res.data
     status.value = res.status
 })
@@ -13,5 +14,5 @@ axios.get("http://localhost:8000/").then(res => {
 </script>
 <template>
     <h1>目前正处于测试部署状态，还未正式部署相关内容</h1>
-    <p>测试后端返回信息：data:{{data}},status:{{status}}</p>
+    <p>测试后端返回的信息：data:{{data}},status:{{status}}</p>
 </template>
