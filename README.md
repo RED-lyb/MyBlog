@@ -82,6 +82,12 @@ mysql_secure_installation
 7. y #删除测试数据库
 8. y #重新加载数据库
 
+* 登录数据库
+
+mysql -u root -p
+
+CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
+
 * 数据库权限管理配置（创建专门管理web数据库的用户，避免直接使用root用户）
 
 1. 创建允许本地登录的用户（localhost）
@@ -104,11 +110,27 @@ GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
 
 FLUSH PRIVILEGES;
 
+quit
+
+* 修改后端生产环境配置
+
+vim /webproject/my-blog/back/blog_back/settings.py
+
+将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
+
+vim /webproject/my-blog/back/blog_back/set_prod.py
+
+将PASSWORD与HOST改为实际数据库的密码与服务器地址
+
 * 安装数据库开发工具组和要所用到的依赖
 
 dnf install mariadb-devel -y
 
 cd /webproject/my-blog/back/prod_manage
+
+* 修改socket以便与nginx通信
+
+添加socket=xxx:8000 #改为nginx代理的ip及端口，如前后端运行在同一台服务器上，则socket=127.0.0.1:8000
 
 * 安装依赖
 
@@ -123,11 +145,38 @@ pip install uwsgi
 uwsgi --ini uwsgi.ini
 
 * 安装nginx
+
 dnf install nginx
 
-systemctl status nginx.service
+vim /etc/nginx/nginx.conf
 
-cd /
+找到server的位置，并在其中做修改
+
+有域名可以在server_name后添加
+
+修改：
+
+root         /usr/share/nginx/html/dist;
+
+添加：
+
+location / {            
+        try_files $uri $uri/ /index.html;
+}
+
+location /api/ {
+        proxy_pass http://127.0.0.1:8000/;#如果前后端不在同一台服务器，则需要修改为对应服务器的ip
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+* 配置生产环境请求
+
+vim /webproject/my-blog/front/blog_front/.env.production
+
+修改VITE_API_URL=http://xxx:8000/为对应的后端地址
 
 * 安装nodejs
 
@@ -141,15 +190,23 @@ cd /webproject/my-blog/front/blog_front
 
 * 安装项目依赖
 
-
 npm install
+
+* 构建项目
 
 npm run build
 
-### 数据库搭建
+* 拷贝打包后的文件到nginx目录下
 
-CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
+cp -r /webproject/my-blog/front/blog_front/dist/ /usr/share/nginx/html/
 
+* 启动nginx
+
+systemctl start nginx
+
+* 添加开机启动
+
+systemctl enable nginx
 
 ## 参与贡献
 1. 李远博
