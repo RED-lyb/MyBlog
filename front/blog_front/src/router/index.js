@@ -3,13 +3,21 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes=[
   {
     path: '/',
+    name: 'index',
+    component: () => import('../pages/index.vue'),
+    meta:{
+      title: 'Index'
+    }
+  },
+
+  {
+    path: '/home',
     name: 'home',
     component: () => import('../pages/home.vue'),
     meta:{
       title: 'Home'
     }
-  },
-
+  }
 ]
 
 const router = createRouter({
