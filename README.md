@@ -76,6 +76,7 @@ mysql_secure_installation
 ```bash
 mysql -u root -p
 ```
+* 创建项目数据库
 ```sql
 CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
 ```
