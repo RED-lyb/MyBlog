@@ -41,9 +41,10 @@ INSTALLED_APPS = [
     'home',
 
 ]
-#允许指定域名跨域
+#允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
 ]
 #允许携带cookie
 CORS_ALLOW_CREDENTIALS = True

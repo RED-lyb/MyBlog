@@ -128,10 +128,6 @@ dnf install mariadb-devel -y
 
 cd /webproject/my-blog/back/prod_manage
 
-* 修改socket以便与nginx通信
-
-添加socket=xxx:8000 #改为nginx代理的ip及端口，如前后端运行在同一台服务器上，则socket=127.0.0.1:8000
-
 * 安装依赖
 
 pip install -r requirements.txt
@@ -165,18 +161,12 @@ location / {
 }
 
 location /api/ {
-        proxy_pass http://127.0.0.1:8000/;#如果前后端不在同一台服务器，则需要修改为对应服务器的ip
+        proxy_pass http://127.0.0.1:8000; #如果前后端不在同一台服务器，则需要修改为对应服务器的ip
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 }
-
-* 配置生产环境请求
-
-vim /webproject/my-blog/front/blog_front/.env.production
-
-修改VITE_API_URL=http://xxx:8000/为对应的后端地址
 
 * 安装nodejs
 

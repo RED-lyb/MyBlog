@@ -6,7 +6,7 @@ const stores = useStore()
 const data = ref("")
 const status = ref("")
 const apiUrl = import.meta.env.VITE_API_URL
-axios.get(apiUrl).then(res => { 
+axios.get(apiUrl+"home/").then(res => { 
     data.value = res.data
     status.value = res.status
 })
