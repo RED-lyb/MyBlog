@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: dark --default, light --prefersdark;/* 默认黑暗主题，备选光亮主题*/
+  root: ":root";
+  include: ;
+  exclude: ;
+  prefix: "dsi-";/*增加前缀，避免和别的组件库冲突*/
+  logs: true;
+}
