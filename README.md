@@ -10,9 +10,21 @@
 
 
 ## 安装教程
-
+* 强烈建议按照对应系统版本开始部署，并下载对应版本软件，未尝试跨平台部署，可能存在兼容性问题
+### 开发环境安装（Windows10 x64）
+* 点击安装node.js
+```url
+https://nodejs.org/dist/v20.19.4/node-v20.19.4-x64.msi
+```
+* 点击链接安装Python3.12.9
+```url
+https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
+```
+* 点击链接安装Mysql
+```url
+https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.43.0.msi
+```
 ### 服务器部署（腾讯云服务器OpenCloudOS9）
-
 * 创建项目文件夹并clone仓库源代码
 ```bash
 mkdir /webproject
@@ -114,10 +126,10 @@ vim /webproject/my-blog/back/blog_back/set_prod.py
 * 安装数据库开发工具组和要所用到的依赖
 ```bash
 dnf install mariadb-devel -y
-cd /webproject/my-blog/back/prod_manage
 ```
 * 安装依赖
 ```bash
+cd /webproject/my-blog/back/prod_manage
 pip install -r requirements.txt
 ```
 * 安装uwsgi容器
@@ -162,10 +174,10 @@ location /api/ {
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 \. "$HOME/.nvm/nvm.sh"
 nvm install 20
-cd /webproject/my-blog/front/blog_front
 ```
 * 安装项目依赖
 ```bash
+cd /webproject/my-blog/front/blog_front
 npm install
 ```
 * 构建项目

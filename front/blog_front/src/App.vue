@@ -1,10 +1,11 @@
 <script setup>
-import home from './pages/home.vue'
-import router from './router'
+import bg from './pages/backgroud/bg.vue'
 </script>
-
 <template>
+  <bg />
+  <div class="relative z-index:10 bg-white/0">
   <router-view />
+  </div>
 </template>
 
 <style scoped></style>
