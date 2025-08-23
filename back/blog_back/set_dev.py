@@ -1,4 +1,5 @@
 #开发环境配置
+DEBUG = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',

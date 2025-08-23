@@ -1,4 +1,5 @@
 #生产环境配置
+DEBUG = False
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
