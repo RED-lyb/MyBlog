@@ -115,14 +115,14 @@ FLUSH PRIVILEGES;
 quit;
 ```
 * 修改后端生产环境配置
+将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
 ```bash
 vim /webproject/my-blog/back/blog_back/settings.py
 ```
-将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
+将PASSWORD与HOST改为实际数据库的密码与服务器地址
 ```bash
 vim /webproject/my-blog/back/blog_back/set_prod.py
 ```
-将PASSWORD与HOST改为实际数据库的密码与服务器地址
 * 安装数据库开发工具组和要所用到的依赖
 ```bash
 dnf install mariadb-devel -y
@@ -192,7 +192,7 @@ cp -r /webproject/my-blog/front/blog_front/dist/ /usr/share/nginx/html/
 ```bash
 systemctl start nginx
 ```
-* 执行上述步骤后即可完成部署
+* 执行上述步骤后即可完成部署，可通过访问服务器IP或域名进行访问。
 
 ## 参与贡献
 1. 李远博

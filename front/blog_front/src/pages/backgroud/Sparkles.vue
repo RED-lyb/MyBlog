@@ -36,7 +36,7 @@ interface Particle {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  background: "#0d47a1",
+  background: "#000000",
   particleColor: "#ffffff",
   minSize: 1,
   maxSize: 3,
