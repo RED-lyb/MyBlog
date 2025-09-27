@@ -1,5 +1,5 @@
 <template>
-  <div class="flex justify-center">
+  <div class="flex flex-wrap justify-center">
     <div
       v-for="(letter, index) in letters"
       :key="letter"
