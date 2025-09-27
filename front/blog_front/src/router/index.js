@@ -12,7 +12,7 @@ const routes=[
   {
     path: '/login',
     name: 'login',
-    component: () => import('../pages/develop.vue'),//全部异步加载，可以加快首屏加载速度
+    component: () => import('../pages/login.vue'),//全部异步加载，可以加快首屏加载速度
     meta:{
       title: '登录|L-BLOG'
     }
@@ -24,7 +24,15 @@ const routes=[
     meta:{
       title: '主页|L-BLOG'
     }
+  },
+  {
+  path: '/develop',
+  name: 'develop',
+  component: () => import('../pages/develop.vue'),
+  meta: {
+    title: '开发中|L-BLOG'
   }
+}
 ]
 //创建路由器实例
 const router = createRouter({

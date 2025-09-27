@@ -1,5 +1,5 @@
 <script setup>
-import bg from './pages/backgroud/bg.vue'
+import bg from './pages/inspira/backgroud/bg.vue'
 </script>
 <template>
   <bg />
