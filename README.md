@@ -5,7 +5,7 @@
 
 ## 软件介绍
 1. Vue3
-2. Django5.2
+2. Django5.2.6
 3. Python3.12.9
 
 
@@ -23,6 +23,15 @@ https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
 * 点击链接安装Mysql
 ```url
 https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.43.0.msi
+```
+* 安装Django5.2.6
+```bash
+pip install Django==5.2.6
+```
+* 安装项目依赖包
+```bash
+cd my-blog/front/blog_front  #找到项目根目录并进入前端目录
+npm install
 ```
 ### 服务器部署（腾讯云服务器OpenCloudOS9）
 * 创建项目文件夹并clone仓库源代码
