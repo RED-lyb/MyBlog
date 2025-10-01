@@ -27,7 +27,7 @@ watch(theme_type, (new_val) => {//监听主题状态，为html的class属性更�
   }
 })
 const size_val=defineProps({'size':{default: '50'}})
-const size=ref('width:'+size_val.size+'px;height:'+size_val.size+'px;')
+const size=ref('width:'+size_val.size+'rem;height:'+size_val.size+'rem;')
 
 </script>
 <template>

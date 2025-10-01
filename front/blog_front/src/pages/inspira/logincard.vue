@@ -21,6 +21,18 @@ const register = () => {
 const forgot = () => {
   router.push({ path: '/develop' })
 }
+
+import { reactive } from 'vue'
+
+const login = reactive({
+  name: '',
+  password: '',
+  type: []
+})
+
+const onSubmit = () => {
+  console.log('submit!',login.name,login.password,login.type)
+}
 </script>
 <template>
     <div class="flex items-center justify-center" style="height: 100%;">
@@ -37,15 +49,31 @@ const forgot = () => {
                                 @click="toggleFlip">切换注册</button>
                         </div>
                     </template>
+                   
                     <div class="card-body">
-                    <p v-for="o in 4" :key="o" class="text item">{{ 'List item ' + o }}</p>
+                         <el-form :model="login" label-width="auto" label-position="top" style="max-width: 600px">
+                        <el-form-item label="用户名">
+                        <el-input v-model="login.name" />
+                        </el-form-item>
+                        <el-form-item label="密码">
+                        <el-input v-model="login.password" type="password" />
+                        </el-form-item>
+                        <el-form-item>
+                        <el-checkbox-group v-model="login.type">
+                            <el-checkbox value="true" name="type">
+                            阅读并接受开源博客相关协议
+                            </el-checkbox>
+                        </el-checkbox-group>
+                        </el-form-item>
+                        </el-form>
                     </div>
                     <template #footer>
                         <div class="footer-container">
-                            <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="gohome()">登 录</button>
-                            <a @click="forgot()" class="dsi-link dsi-link-info" style="margin: 5px;">忘记密码</a>
+                            <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="onSubmit">登 录</button>
+                            <a @click="forgot" class="dsi-link dsi-link-info" style="margin: 5px;">忘记密码</a>
                         </div>
                     </template>
+                    
                 </el-card>
             </template>
             <template #back>
@@ -65,7 +93,7 @@ const forgot = () => {
                     </div>
                     <template #footer>
                         <div class="footer-container">
-                            <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn shadow" @click="register()">注 册</button>
+                            <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="register()">注 册</button>
                         </div>
                     </template>
                 </el-card>
