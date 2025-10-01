@@ -8,7 +8,7 @@ const bgcolor=computed(()=>(colorMode.value==="dark"?"dark:bg-black":"dark:bg-wh
 </script>
 <template>
   <div :class="bgcolor"
-    class="fixed inset-0 h-full w-full overflow-hidden rounded-md z-index:-10"
+    class="fixed inset-0 h-full w-full overflow-hidden z-[0]"
   >
       <Sparkles
         background="transparent"
@@ -21,7 +21,3 @@ const bgcolor=computed(()=>(colorMode.value==="dark"?"dark:bg-black":"dark:bg-wh
       />
     </div>
 </template>
-
-
-<style scoped>
-</style>

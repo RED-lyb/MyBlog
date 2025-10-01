@@ -37,23 +37,23 @@ const login = () => {
 <template>
 
   <BlurReveal :delay="0.3" :duration="0.75">
-    <div  style="display: flex; justify-content: center; margin-top:50px;">
-      <theme size="100" />
+    <div  style="display: flex; justify-content: center; padding-top:3.125rem;">
+      <theme size="6.25" />
     </div>
     <h3 class="text-pretty text-xl tracking-tighter xl:text-4xl/none sm:text-3xl"
-      style="text-align: center;margin-top: 10px;">
+      style="text-align: center;padding-top: 0.625rem;">
       <span>切换</span><el-icon>
-        <ArrowUpBold style="position: relative; bottom: 1px;" />
+        <ArrowUpBold style="position: relative; bottom: 0.0625rem;" />
       </el-icon><span>主题</span>
     </h3>
     <h1 class="text-3xl font-bold tracking-tighter xl:text-6xl/none sm:text-5xl"
-      style="text-align: center;font-size: 100px; margin: 40px; letter-spacing:7px">欢迎来到我的博客</h1>
+      style="text-align: center;font-size: 6.25rem; padding: 2.5rem; letter-spacing:0.4375rem">欢迎来到我的博客</h1>
     <h3 class="text-pretty text-xl tracking-tighter xl:text-4xl/none sm:text-3xl" style="text-align: center;">
       <span>点击按钮</span><el-icon>
-        <ArrowDownBold style="position: relative; top: 12px;" />
+        <ArrowDownBold style="position: relative; top: 0.75rem;" />
       </el-icon><span>进入博客</span>
     </h3>
-    <indexbutton @click="login()" style="margin-top: 10px;margin-bottom: 5px;" />
+    <indexbutton @click="login()" style="padding-top: 0.625rem;padding-bottom: 0.3125rem;" />
   </BlurReveal>
 <LetterPullup v-if="showComponents.first"
     words="该网站是由李远博编写的技术网站，会不定期分享个人的计算机学习经验，也欢迎各路大神发布知识与补充，大家一起交流学习"

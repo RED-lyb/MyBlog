@@ -14,6 +14,7 @@
 <script setup lang="ts">
 import { useRafFn, templateRef } from "@vueuse/core";
 import { ref, onMounted, onBeforeUnmount } from "vue";
+import { useEventListener } from '@vueuse/core';
 
 interface Props {
   background?: string;
@@ -53,14 +54,14 @@ const ctx = ref<CanvasRenderingContext2D | null>(null);
 function resizeCanvas() {
   if (!canvasRef.value || !containerRef.value) return;
 
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
   const rect = containerRef.value.getBoundingClientRect();
 
   canvasRef.value.width = rect.width * dpr;
   canvasRef.value.height = rect.height * dpr;
-
+  
   if (ctx.value) {
-    ctx.value.scale(dpr, dpr);
+    ctx.value.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }
 
@@ -91,6 +92,7 @@ function updateAndDrawParticles() {
   if (!ctx.value || !canvasRef.value) return;
 
   const canvas = canvasRef.value;
+  const rect = canvas.getBoundingClientRect();
   ctx.value.clearRect(0, 0, canvas.width, canvas.height);
 
   particles.value = particles.value.map((particle) => {
@@ -108,8 +110,8 @@ function updateAndDrawParticles() {
     // Draw particle
     ctx.value!.beginPath();
     ctx.value!.arc(
-      (newX * canvas.width) / 100,
-      (newY * canvas.height) / 100,
+      (newX * rect.width) / 100,
+      (newY * rect.height) / 100,
       particle.size,
       0,
       Math.PI * 2,
@@ -146,7 +148,12 @@ onMounted(() => {
   if (containerRef.value) {
     resizeObserver.observe(containerRef.value);
   }
-
+  // 添加窗口大小变化监听
+  useEventListener(window, 'resize', () => {
+    resizeCanvas()
+    // 重新生成粒子以适应新尺寸
+    generateParticles()
+  })
   resume();
 });
 
