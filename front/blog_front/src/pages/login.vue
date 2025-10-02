@@ -15,21 +15,25 @@ import logincard from './inspira/logincard.vue';
 </template>
 <style scoped>
 #out {
-    /* background-color: rgba(255, 208, 132, 0.804); */
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
-    gap: 20px;
+    width: 100%;
+    overflow-x: auto;
 }
 
 #left {
-    margin: 40px;
-    width: 800px;
+    flex: 1;
+    margin-left: 50px;
+    max-width: 800px;
     height: 500px;
 }
 
 #right {
-    width: 500px;
+    flex: 1;
+    margin-right: 50px;
+    max-width: 500px;
+    min-width: 500px;
     height: 500px;
 }
 </style>
