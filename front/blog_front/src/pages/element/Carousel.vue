@@ -1,5 +1,5 @@
 <template>
-    <el-carousel :interval=2000 height="500px" motion-blur style="width: 800px;border-radius: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">
+    <el-carousel :interval=2000 height="500px" motion-blur style="width: 800px;border-radius: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);border: 1px solid rgba(154, 157, 163, 0.2)">
       <el-carousel-item v-for="item of 3" :key="item">
 <img :src="`/images/login${item}.jpg`" class= "pic" alt="网络不好，请重新加载">
       </el-carousel-item>
