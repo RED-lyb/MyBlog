@@ -44,6 +44,7 @@ const register = reactive({
 
 
 const agreement_show = () => {
+  console.log('用户协议')
   ElMessageBox.confirm(
     `1.这是一个开源博客系统，仅供用户交流学习<br/>
     2.请勿以任何形式对本站进行网络攻击，如影响本站正常使用，本站有权采取相应措施<br/>
@@ -213,7 +214,7 @@ const onRegister = () => {
                         <el-form ref="registerFormRef" :model="register" :rules="registerRules" label-width="auto"
                             label-position="left" status-icon hide-required-asterisk
                             style="max-width: 300px;width: 300px;">
-                            <el-form-item label="用户昵称" prop="name">
+                            <el-form-item label="用户名称" prop="name">
                                 <el-input v-model="register.name" :prefix-icon="User" />
                             </el-form-item>
                             <el-form-item label="登录密码" prop="password">
@@ -246,7 +247,7 @@ const onRegister = () => {
                                     style="display:flex; justify-content:center; width:100%;">
                                     <el-checkbox value="choice">
                                         <span class="checkbox-text">阅读并接受</span>
-                                        <a href="#" class="dsi-link-info" @click.stop="agreement_show">《博客协议》</a>
+                                        <a href="javascript:void(0)" class="dsi-link-info" @click.stop="agreement_show">《博客协议》</a>
                                     </el-checkbox>
                                 </el-checkbox-group>
 
