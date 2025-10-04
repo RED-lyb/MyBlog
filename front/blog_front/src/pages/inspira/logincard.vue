@@ -5,6 +5,7 @@ import FlipCard from './FlipCard.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
 const isFlipped = ref(false)// 控制翻转状态的响应式变量
+const loginFormRef = ref()//登录表单引用
 const registerFormRef = ref()//注册表单引用
 const router = useRouter()//创建路由实例
 const isAdding = ref(false)
@@ -26,17 +27,25 @@ const register = reactive({
 })
 const questions = ref([
     {
-        value: '你父亲的名字',
-        label: '你父亲的名字',
+        "value": "你父亲的名字",
+        "label": "你父亲的名字"
     },
     {
-        value: '你母亲的名字',
-        label: '你母亲的名字',
+        "value": "你母亲的名字",
+        "label": "你母亲的名字"
     },
     {
-        value: '你对象的名字',
-        label: '你对象的名字',
+        "value": "你的小学名称",
+        "label": "你的小学名称"
     },
+    {
+        "value": "你最喜欢的老师",
+        "label": "你最喜欢的老师"
+    },
+    {
+        "value": "你童年最好的朋友",
+        "label": "你童年最好的朋友"
+    }
 ])
 const onAddOption = () => {
     isAdding.value = true
@@ -153,13 +162,32 @@ const validateAnswer = (_, value, callback) => {
     callback()
 }
 
+
+const validateQuestion = (_, value, callback) => {
+    if (!value) return callback(new Error('请输入问题'))
+    // 纯中文 + 英文 + 数字，无符号
+    if (!/^[\u4e00-\u9fa5A-Za-z0-9]+$/.test(value)) {
+        return callback(new Error('问题只能包含中文、英文和数字'))
+    }
+    callback()
+}
+
 const optionRules = reactive({
     optionName: [
-        { required: true, message: '请输入自定义问题', trigger: 'blur' },
-        { validator: validateAnswer, trigger: ['blur', 'change'] }   // 直接复用
+        { required: true, message: '请输入问题', trigger: 'blur' },
+        { validator: validateQuestion, trigger: ['blur', 'change'] }   // 直接复用
     ]
 })
-
+const loginRules = {
+    name: [
+        { required: true, message: '请输入用户名', trigger: 'blur' },
+        { validator: validateUserName, trigger: ['blur', 'change'] }
+    ],
+    password: [
+        { required: true, message: '请输入密码', trigger: 'blur' },
+        { validator: validatePass, trigger: ['blur', 'change'] }
+    ]
+}
 // 定义注册表单的验证规则
 const registerRules = {
     name: [
@@ -172,7 +200,7 @@ const registerRules = {
     ],
     confirm: [
         { required: true, message: '请确认密码', trigger: 'blur' },
-        { validator: validatePass2, trigger: 'blur' }
+        { validator: validatePass2, trigger: ['blur', 'change'] }
     ],
     protect: [
         { required: true, message: '请选择密保问题', trigger: 'change' }
@@ -187,7 +215,17 @@ const registerRules = {
 }
 
 const onLogin = () => {
-    console.log('login!', login.name, login.password)
+    if (!loginFormRef.value) return
+    loginFormRef.value.validate((valid) => {
+        if (valid) {
+            console.log('login!', login.name, login.password)
+        } else {
+            console.log('登录表单验证失败!')
+            return false
+        }
+    }).catch(error => {
+        console.error('表单验证出错:', error)
+    })
 }
 
 // 修改注册提交函数
@@ -224,13 +262,13 @@ const onRegister = () => {
                     </template>
 
                     <div class="card-body">
-                        <el-form :model="login" label-width="auto" label-position="top"
+                        <el-form ref="loginFormRef" :model="login" label-width="auto" label-position="top" :rules="loginRules" hide-required-asterisk
                             style="max-width: 300px ;width: 300px;">
-                            <el-form-item label="用户名">
+                            <el-form-item label="用户名" prop="name">
                                 <el-input v-model="login.name" :prefix-icon="User" />
                             </el-form-item>
-                            <el-form-item label="密码">
-                                <el-input v-model="login.password" type="password" show-password :prefix-icon="Lock" />
+                            <el-form-item label="密码" prop="password">
+                                <el-input v-model="login.password" type="password" show-password :prefix-icon="Lock"/>
                             </el-form-item>
                         </el-form>
                     </div>
@@ -462,10 +500,12 @@ const onRegister = () => {
 .el-form-item.is-error :deep(.el-select__caret) {
     color: var(--el-color-danger) !important;
 }
+
 .compact-error .el-form-item__error {
-  line-height: 1;
+    line-height: 1;
 }
-.option-input{
+
+.option-input {
     margin-bottom: 0px;
 }
 </style>

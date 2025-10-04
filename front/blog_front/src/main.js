@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-
+import { useDark } from '@vueuse/core'
 import App from './App.vue'
 import router from './router'
 import '@/assets/main.css'
@@ -18,5 +18,13 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(ElementPlus)
 app.use(createPinia())
 app.use(router)
+
+useDark({
+  selector: 'html',
+  attribute: 'data-theme',
+  valueDark: 'dark',
+  valueLight: 'light',
+  initialValue: 'dark',
+})
 
 app.mount('#app')
