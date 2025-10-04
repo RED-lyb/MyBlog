@@ -3,10 +3,9 @@
 ## 项目介绍
 个人搭建的blog项目
 
-## 软件介绍
+## 主要软件介绍
 1. Vue3
-2. Django5.2.6
-3. Python3.12.9
+2. Django5.2
 
 
 ## 安装教程
@@ -59,7 +58,7 @@ GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
 FLUSH PRIVILEGES;
 quit;
 ```
-* 导入数据库字段
+* 导入数据库结构
 ```bash
 cd my-blog/back/depend_manage
 mysql -u admin -p webproject < ./webproject.sql
