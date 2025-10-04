@@ -28,6 +28,11 @@ SECRET_KEY = 'django-insecure-x5kgp0=n)=w7yc=$^!=5*8qznng+$*9!h-$e5v9iqp3*%nj-@u
 ALLOWED_HOSTS = ["*"]# 允许所有域名
 
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -39,7 +44,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'home',
-
+    'register',
+    'all_database',
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [

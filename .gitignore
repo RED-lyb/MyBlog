@@ -1,0 +1,43 @@
+# Python 虚拟环境和依赖
+blog_env/
+venv/
+env/
+.venv/
+
+# IDE 配置文件
+.vscode/
+.idea/
+*.iml
+
+# Python 编译文件
+__pycache__/
+*.pyc
+*.pyo
+
+# Django/Migrations
+**/migrations/
+!**/migrations/__init__.py
+
+# 前端依赖和构建产物
+node_modules/
+dist/
+front/blog_front/node_modules/
+front/blog_front/dist/
+
+# 环境变量
+*.env
+*.env.*
+front/blog_front/.env.development
+front/blog_front/.env.production
+
+# 日志和临时文件
+*.log
+*.tmp
+
+# 静态资源上传目录（如有用户上传文件）
+static/uploads/
+media/
+
+# 其他
+.DS_Store
+Thumbs.db

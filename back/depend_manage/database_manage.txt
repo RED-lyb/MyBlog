@@ -1,0 +1,4 @@
+#导出数据库
+mysqldump -u admin -p webproject > webproject.sql
+#导入数据库
+mysql -u admin -p webproject < webproject.sql
