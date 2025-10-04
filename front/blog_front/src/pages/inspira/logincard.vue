@@ -10,6 +10,7 @@ const router = useRouter()//创建路由实例
 const isAdding = ref(false)
 const optionName = ref('')
 const optionFormRef = ref()
+const emit = defineEmits(['register-success'])   // 1. 声明事件
 const login = reactive({
     name: '',
     password: '',
@@ -63,6 +64,8 @@ const register_success = () => {
         message: '恭喜你，注册成功，可以登录啦！',
         type: 'success',
     })
+    emit('register-success')   // 2. 抛出事件
+    registerFormRef.value?.resetFields()
     toggleFlip()
 }
 // 切换翻转状态的函数
