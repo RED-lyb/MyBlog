@@ -17,7 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from home.views import TheHome
+from register.views import register
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/home/',TheHome.as_view())
+    path('api/home/',TheHome.as_view()),
+    path('api/register/',register),
 ]

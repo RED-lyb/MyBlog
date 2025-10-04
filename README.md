@@ -24,11 +24,47 @@ https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
 ```url
 https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.43.0.msi
 ```
-* 安装Django5.2.6
+* 安装后端依赖
 ```bash
-pip install Django==5.2.6
+cd my-blog/back/depend_manage
+pip install -r requirements.txt
 ```
-* 安装项目依赖包
+* 登录数据库
+```bash
+mysql -u root -p
+```
+* 创建项目数据库
+```sql
+CREATE DATABASE `webproject` CHARACTER SET 'utf8mb4' COLLATE 'utf8mb4_general_ci';
+```
+* 数据库权限管理配置（创建专门管理web数据库的用户，避免直接使用root用户）
+1. 创建允许本地登录的用户（localhost）
+```sql
+CREATE USER 'admin'@'localhost' IDENTIFIED BY '密码';
+```
+2. 创建允许远程登录的用户（%表示所有IP，也可指定具体IP如'192.168.1.%'）
+```sql
+CREATE USER 'admin'@'%' IDENTIFIED BY '密码';
+```
+3. 授予对webproject数据库的所有权限（本地用户）
+```sql
+GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'localhost';
+```
+4. 授予对webproject数据库的所有权限（远程用户）
+```sql
+GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
+```
+5. 刷新权限使配置生效
+```sql
+FLUSH PRIVILEGES;
+quit;
+```
+* 导入数据库字段
+```bash
+cd my-blog/back/depend_manage
+mysql -u admin -p webproject < ./webproject.sql
+```
+* 安装前端依赖
 ```bash
 cd my-blog/front/blog_front  #找到项目根目录并进入前端目录
 npm install
@@ -85,13 +121,13 @@ systemctl enable mariadb
 mysql_secure_installation
 ```
 1. #验证当前root密码
-2. n #不启用 unix_socket 认证
-3. y #修改数据库root用户密码
+2. N  #不启用 unix_socket 认证
+3. Y  #修改数据库root用户密码
 4. 输入和确认新密码
-5. y #删除匿名用户
-6. y #禁止root远程登录
-7. y #删除测试数据库
-8. y #重新加载数据库
+5. Y  #删除匿名用户
+6. Y  #禁止root远程登录
+7. Y  #删除测试数据库
+8. Y  #重新加载数据库
 
 * 登录数据库
 ```bash
@@ -123,6 +159,10 @@ GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
 FLUSH PRIVILEGES;
 quit;
 ```
+* 导入数据库字段
+```bash
+mysql -u admin -p webproject < ./webproject.sql
+```
 * 修改后端生产环境配置
 将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
 ```bash
@@ -138,7 +178,7 @@ dnf install mariadb-devel -y
 ```
 * 安装依赖
 ```bash
-cd /webproject/my-blog/back/prod_manage
+cd /webproject/my-blog/back/depend_manage
 pip install -r requirements.txt
 ```
 * 安装uwsgi容器

@@ -4,12 +4,15 @@ import { useRouter } from 'vue-router'
 import FlipCard from './FlipCard.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
+import axios from 'axios'
+const apiUrl = import.meta.env.VITE_API_URL
 const isFlipped = ref(false)// 控制翻转状态的响应式变量
 const loginFormRef = ref()//登录表单引用
 const registerFormRef = ref()//注册表单引用
 const router = useRouter()//创建路由实例
 const isAdding = ref(false)
 const optionName = ref('')
+const res_data = ref("")//响应信息
 const optionFormRef = ref()
 const emit = defineEmits(['register-success'])   // 1. 声明事件
 const login = reactive({
@@ -231,6 +234,14 @@ const onLogin = () => {
 // 修改注册提交函数
 const onRegister = () => {
     if (!registerFormRef.value) return
+    axios.post(apiUrl + "register/", {
+        username: register.name,
+        password: register.password,
+        protect: register.protect,
+        answer: register.answer,
+    }).then(res => {
+        res_data.value = res.data//响应信息
+    })
     registerFormRef.value.validate((valid) => {
         if (valid) {
             console.log('register!', register.name, register.password, register.confirm, register.protect, register.answer, register.choice)
@@ -262,13 +273,13 @@ const onRegister = () => {
                     </template>
 
                     <div class="card-body">
-                        <el-form ref="loginFormRef" :model="login" label-width="auto" label-position="top" :rules="loginRules" hide-required-asterisk
-                            style="max-width: 300px ;width: 300px;">
+                        <el-form ref="loginFormRef" :model="login" label-width="auto" label-position="top"
+                            :rules="loginRules" hide-required-asterisk style="max-width: 300px ;width: 300px;">
                             <el-form-item label="用户名" prop="name">
                                 <el-input v-model="login.name" :prefix-icon="User" />
                             </el-form-item>
                             <el-form-item label="密码" prop="password">
-                                <el-input v-model="login.password" type="password" show-password :prefix-icon="Lock"/>
+                                <el-input v-model="login.password" type="password" show-password :prefix-icon="Lock" />
                             </el-form-item>
                         </el-form>
                     </div>
