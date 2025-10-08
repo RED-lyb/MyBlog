@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive,nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import FlipCard from './FlipCard.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -16,12 +16,12 @@ const res_data = ref("")//响应信息
 const optionFormRef = ref()
 const emit = defineEmits(['register-success'])   // 1. 声明事件
 const login = reactive({
-    name: '',
+    username: '',
     password: '',
 })
 
 const register = reactive({
-    name: '',
+    username: '',
     password: '',
     confirm: '',
     protect: '',
@@ -30,16 +30,16 @@ const register = reactive({
 })
 const questions = ref([
     {
-        "value": "你父亲的名字",
-        "label": "你父亲的名字"
+        "value": "你的人生目标",
+        "label": "你的人生目标"
     },
     {
-        "value": "你母亲的名字",
-        "label": "你母亲的名字"
+        "value": "你最向往的地方",
+        "label": "你最向往的地方"
     },
     {
-        "value": "你的小学名称",
-        "label": "你的小学名称"
+        "value": "你最喜欢的食物",
+        "label": "你最喜欢的食物"
     },
     {
         "value": "你最喜欢的老师",
@@ -182,7 +182,7 @@ const optionRules = reactive({
     ]
 })
 const loginRules = {
-    name: [
+    username: [
         { required: true, message: '请输入用户名', trigger: 'blur' },
         { validator: validateUserName, trigger: ['blur', 'change'] }
     ],
@@ -193,7 +193,7 @@ const loginRules = {
 }
 // 定义注册表单的验证规则
 const registerRules = {
-    name: [
+    username: [
         { required: true, message: '请输入用户名', trigger: 'blur' },
         { validator: validateUserName, trigger: ['blur', 'change'] }
     ],
@@ -221,7 +221,7 @@ const onLogin = () => {
     if (!loginFormRef.value) return
     loginFormRef.value.validate((valid) => {
         if (valid) {
-            console.log('login!', login.name, login.password)
+            console.log('login!', login.username, login.password)
         } else {
             console.log('登录表单验证失败!')
             return false
@@ -231,29 +231,45 @@ const onLogin = () => {
     })
 }
 
-// 修改注册提交函数
-const onRegister = () => {
-    if (!registerFormRef.value) return
-    axios.post(apiUrl + "register/", {
-        username: register.name,
-        password: register.password,
-        protect: register.protect,
-        answer: register.answer,
-    }).then(res => {
-        res_data.value = res.data//响应信息
-    })
-    registerFormRef.value.validate((valid) => {
-        if (valid) {
-            console.log('register!', register.name, register.password, register.confirm, register.protect, register.answer, register.choice)
-            register_success()
-        } else {
-            console.log('注册表单验证失败!')
-            return false
-        }
-    }).catch(error => {
-        console.error('表单验证出错:', error)
-    })
-}
+// 注册提交函数
+const onRegister = async () => {
+  const valid = await registerFormRef.value.validate().catch(() => false);
+  if (!valid) return;
+
+  try {
+    const res = await axios.post(apiUrl + 'register/', {
+      username: register.username,
+      password: register.password,
+      protect: register.protect,
+      answer: register.answer,
+    }, {
+      // 配置validateStatus，使得400状态码不抛出错误
+      validateStatus: (status) => status < 500
+    });
+
+    // 根据状态码处理
+    if (res.status === 200) {
+      register_success();
+    } else if (res.status === 400) {
+      const data = res.data;
+      if (data?.field_errors) {
+        ElMessage.error('注册失败');
+        nextTick(() => {
+          Object.keys(data.field_errors).forEach(field => {
+            const fieldInstance = registerFormRef.value.fields?.find(f => f.prop === field);
+            if (fieldInstance) {
+              fieldInstance.validateState = 'error';
+              fieldInstance.validateMessage = data.field_errors[field];
+            }
+          });
+        });
+      }
+    }
+  } catch (err) {
+    // 这里只会捕获网络错误或500以上的错误
+    ElMessage.error('网络错误或服务器内部错误');
+  }
+};
 </script>
 <template>
     <div class="flex items-center justify-center" style="height: 100%;">
@@ -267,16 +283,19 @@ const onRegister = () => {
                                 <Edit />
                             </el-icon>
                             <span class="title-text">登 录</span>
+                            <div style="display: flex;flex-direction: column;align-items: center;justify-content: space-between;gap: 4px;">
                             <button class="dsi-btn dsi-btn-soft dsi-btn-info choice-btn"
                                 @click="toggleFlip">切换注册</button>
+                            <a @click="gohome" class="dsi-link dsi-link-info" style="font-size: 12px;">游客登录</a>
+                            </div>
                         </div>
                     </template>
 
                     <div class="card-body">
                         <el-form ref="loginFormRef" :model="login" label-width="auto" label-position="top"
                             :rules="loginRules" hide-required-asterisk style="max-width: 300px ;width: 300px;">
-                            <el-form-item label="用户名" prop="name">
-                                <el-input v-model="login.name" :prefix-icon="User" />
+                            <el-form-item label="用户名" prop="username">
+                                <el-input v-model="login.username" :prefix-icon="User" />
                             </el-form-item>
                             <el-form-item label="密码" prop="password">
                                 <el-input v-model="login.password" type="password" show-password :prefix-icon="Lock" />
@@ -309,9 +328,9 @@ const onRegister = () => {
 
                         <el-form ref="registerFormRef" :model="register" :rules="registerRules" label-width="auto"
                             label-position="left" status-icon hide-required-asterisk
-                            style="max-width: 300px;width: 300px;">
-                            <el-form-item label="用户名称" prop="name">
-                                <el-input v-model="register.name" :prefix-icon="User" />
+                            style="max-width: 320px;width: 320px;">
+                            <el-form-item label="用户名称" prop="username">
+                                <el-input v-model="register.username" :prefix-icon="User" />
                             </el-form-item>
                             <el-form-item label="登录密码" prop="password">
                                 <el-input v-model="register.password" type="password" show-password
@@ -326,7 +345,7 @@ const onRegister = () => {
                                     style="position: absolute;left: 11px;top: 50%;transform: translateY(-50%);z-index: 10;color: #9A9DA3;">
                                     <EditPen />
                                 </el-icon>
-                                <el-select v-model="register.protect" placeholder="选择你的密保问题">
+                                <el-select v-model="register.protect" placeholder="密保问题只能自己知道答案">
                                     <template #prefix>
                                         <span style="display:inline-block;width:15px;"></span>
                                     </template>
@@ -359,7 +378,7 @@ const onRegister = () => {
                                 <el-checkbox-group v-model="register.choice"
                                     style="display:flex; justify-content:center; width:100%;">
                                     <el-checkbox value="choice">
-                                        <span class="checkbox-text">阅读并接受</span>
+                                        <span class="checkbox-text">我已阅读并接受</span>
                                         <a href="javascript:void(0)" class="dsi-link-info"
                                             @click.stop="agreement_show">《博客协议》</a>
                                     </el-checkbox>
