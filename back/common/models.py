@@ -11,8 +11,8 @@ from django.db import models
 class Users(models.Model):
     username = models.CharField(unique=True, max_length=50, db_comment='登录名，全局唯一')
     password = models.CharField(max_length=255, db_comment='加密后的登录密码')
-    security_question = models.CharField(max_length=255, db_comment='密保问题原文')
-    security_answer = models.CharField(max_length=255, db_comment='密保答案')
+    protect = models.CharField(max_length=255, db_comment='密保问题原文')
+    answer = models.CharField(max_length=255, db_comment='密保答案')
     registered_time = models.DateTimeField(db_comment='注册时间，默认当前时间')
     avatar = models.CharField(max_length=500, blank=True, null=True, db_comment='头像 URL，空表示未上传')
     bg_color = models.CharField(max_length=20, blank=True, null=True, db_comment='个人中心背景色，CSS 合法值')

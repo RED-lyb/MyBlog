@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class AllDatabaseConfig(AppConfig):
+class CommonConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'all_database'
+    name = 'common'

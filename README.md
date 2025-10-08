@@ -160,7 +160,7 @@ quit;
 ```
 * 导入数据库字段
 ```bash
-mysql -u admin -p webproject < ./webproject.sql
+mysql -u admin -p webproject < /webproject/my-blog/back/depend_manage/webproject.sql
 ```
 * 修改后端生产环境配置
 将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
@@ -177,8 +177,7 @@ dnf install mariadb-devel -y
 ```
 * 安装依赖
 ```bash
-cd /webproject/my-blog/back/depend_manage
-pip install -r requirements.txt
+pip install -r /webproject/my-blog/back/depend_manage/requirements.txt
 ```
 * 安装uwsgi容器
 ```bash
@@ -186,7 +185,7 @@ pip install uwsgi
 ```
 * 运行uwsgi
 ```bash
-uwsgi --ini uwsgi.ini
+uwsgi --ini /webproject/my-blog/back/depend_manage/uwsgi.ini
 ```
 * 安装nginx
 ```bash
