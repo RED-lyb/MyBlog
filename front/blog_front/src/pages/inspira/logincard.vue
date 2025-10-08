@@ -393,6 +393,7 @@ const onRegister = async () => {
                     </div>
                     <template #footer>
                         <div class="footer-container">
+                        <span class="dsi-loading dsi-loading-ring dsi-loading-xl"></span>
                             <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="onRegister">注
                                 册</button>
                         </div>
