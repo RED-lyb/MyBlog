@@ -2,6 +2,7 @@
 import { ref, reactive,nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import FlipCard from './FlipCard.vue'
+import FullScreenLoading from '../FullScreenLoading.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
 import axios from 'axios'
@@ -15,6 +16,7 @@ const optionName = ref('')
 const res_data = ref("")//响应信息
 const optionFormRef = ref()
 const emit = defineEmits(['register-success'])   // 1. 声明事件
+const isLoading = ref(false)
 const login = reactive({
     username: '',
     password: '',
@@ -221,6 +223,10 @@ const onLogin = () => {
     if (!loginFormRef.value) return
     loginFormRef.value.validate((valid) => {
         if (valid) {
+          isLoading.value = true
+          setTimeout(() => {
+            isLoading.value = false
+          }, 2000)
             console.log('login!', login.username, login.password)
         } else {
             console.log('登录表单验证失败!')
@@ -235,8 +241,8 @@ const onLogin = () => {
 const onRegister = async () => {
   const valid = await registerFormRef.value.validate().catch(() => false);
   if (!valid) return;
-
   try {
+    isLoading.value = true
     const res = await axios.post(apiUrl + 'register/', {
       username: register.username,
       password: register.password,
@@ -268,13 +274,15 @@ const onRegister = async () => {
   } catch (err) {
     // 这里只会捕获网络错误或500以上的错误
     ElMessage.error('网络错误或服务器内部错误');
+  } finally {
+    isLoading.value = false;
   }
 };
 </script>
 <template>
     <div class="flex items-center justify-center" style="height: 100%;">
-        <FlipCard :flipped="isFlipped">
-
+      <FullScreenLoading :visible="isLoading" />
+      <FlipCard :flipped="isFlipped">
             <template #default>
                 <el-card style="max-width: 100%;border-radius: 20px; height: 100%;" class="login-el-card">
                     <template #header>
@@ -286,7 +294,7 @@ const onRegister = async () => {
                             <div style="display: flex;flex-direction: column;align-items: center;justify-content: space-between;gap: 4px;">
                             <button class="dsi-btn dsi-btn-soft dsi-btn-info choice-btn"
                                 @click="toggleFlip">切换注册</button>
-                            <a @click="gohome" class="dsi-link dsi-link-info" style="font-size: 12px;">游客登录</a>
+                            <a @click="gohome" class="dsi-link dsi-link-info" style="">游客登录</a>
                             </div>
                         </div>
                     </template>
@@ -393,7 +401,6 @@ const onRegister = async () => {
                     </div>
                     <template #footer>
                         <div class="footer-container">
-                        <span class="dsi-loading dsi-loading-ring dsi-loading-xl"></span>
                             <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="onRegister">注
                                 册</button>
                         </div>

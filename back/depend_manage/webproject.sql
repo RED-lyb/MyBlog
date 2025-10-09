@@ -1,14 +1,13 @@
-/*M!999999\- enable the sandbox mode */ 
--- MariaDB dump 10.19  Distrib 10.11.13-MariaDB, for debian-linux-gnu (x86_64)
+-- MySQL dump 10.13  Distrib 8.0.39, for Win64 (x86_64)
 --
 -- Host: localhost    Database: webproject
 -- ------------------------------------------------------
--- Server version	10.11.13-MariaDB-0ubuntu0.24.04.1
+-- Server version	8.0.39
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
+/*!50503 SET NAMES utf8mb4 */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
 /*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
@@ -22,33 +21,22 @@
 
 DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8mb4 */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
-  `username` varchar(50) NOT NULL COMMENT '登录名，全局唯一',
-  `password` varchar(255) NOT NULL COMMENT '加密后的登录密码',
-  `security_question` varchar(255) NOT NULL COMMENT '密保问题原文',
-  `security_answer` varchar(255) NOT NULL COMMENT '密保答案',
-  `registered_time` datetime NOT NULL DEFAULT current_timestamp() COMMENT '注册时间，默认当前时间',
-  `avatar` varchar(500) DEFAULT NULL COMMENT '头像 URL，空表示未上传',
-  `bg_color` varchar(20) DEFAULT NULL COMMENT '个人中心背景色，CSS 合法值',
-  `bg_pattern` varchar(50) DEFAULT NULL COMMENT '背景点缀样式名或 URL',
-  `corner_radius` varchar(10) DEFAULT NULL COMMENT '卡片圆角大小，单位 px 或百分比',
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `username` varchar(50) COLLATE utf8mb4_general_ci NOT NULL COMMENT '登录名，全局唯一',
+  `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL COMMENT '加密后的登录密码',
+  `protect` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '密保问题原文',
+  `answer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '密保答案',
+  `registered_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间，默认当前时间',
+  `avatar` varchar(500) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '头像 URL，空表示未上传',
+  `bg_color` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '个人中心背景色，CSS 合法值',
+  `bg_pattern` varchar(50) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '背景点缀样式名或 URL',
+  `corner_radius` varchar(10) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT '卡片圆角大小，单位 px 或百分比',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `users`
---
-
-LOCK TABLES `users` WRITE;
-/*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES
-(1,'aA123456','aA123456','你的小学名称','aA123456','2025-10-04 18:27:38',NULL,NULL,NULL,NULL);
-/*!40000 ALTER TABLE `users` ENABLE KEYS */;
-UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -59,4 +47,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-04 18:33:49
+-- Dump completed on 2025-10-09 23:25:38
