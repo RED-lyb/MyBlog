@@ -15,7 +15,6 @@
 </template>
 
 <script setup>
-import { defineProps } from 'vue'
 
 // 接收外部控制显示/隐藏的 props
 const props = defineProps({
