@@ -1,11 +1,12 @@
 <script setup>
-import { ref, reactive,nextTick } from 'vue'
+import { ref, reactive, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import FlipCard from './FlipCard.vue'
-import FullScreenLoading from '../FullScreenLoading.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
 import axios from 'axios'
+import FlipCard from './FlipCard.vue'
+import FullScreenLoading from '../FullScreenLoading.vue'
+import ForgotPassword from './ForgotPassword.vue'
 const apiUrl = import.meta.env.VITE_API_URL
 const isFlipped = ref(false)// 控制翻转状态的响应式变量
 const loginFormRef = ref()//登录表单引用
@@ -17,6 +18,7 @@ const res_data = ref("")//响应信息
 const optionFormRef = ref()
 const emit = defineEmits(['register-success'])   // 1. 声明事件
 const isLoading = ref(false)
+const showForgotDialog = ref(false)//忘记密码弹窗
 const login = reactive({
     username: '',
     password: '',
@@ -92,13 +94,12 @@ const gohome = () => {
 }
 
 const forgot = () => {
-    router.push({ path: '/develop' })
+    showForgotDialog.value = true
 }
 
 
 
 const agreement_show = () => {
-    console.log('用户协议')
     ElMessageBox.confirm(
         `1.这是一个开源博客系统，仅供用户交流学习<br/>
     2.请勿以任何形式对本站进行网络攻击，如影响本站正常使用，本站有权采取相应措施<br/>
@@ -223,10 +224,10 @@ const onLogin = () => {
     if (!loginFormRef.value) return
     loginFormRef.value.validate((valid) => {
         if (valid) {
-          isLoading.value = true
-          setTimeout(() => {
-            isLoading.value = false
-          }, 2000)
+            isLoading.value = true
+            setTimeout(() => {
+                isLoading.value = false
+            }, 2000)
             console.log('login!', login.username, login.password)
         } else {
             console.log('登录表单验证失败!')
@@ -239,50 +240,54 @@ const onLogin = () => {
 
 // 注册提交函数
 const onRegister = async () => {
-  const valid = await registerFormRef.value.validate().catch(() => false);
-  if (!valid) return;
-  try {
-    isLoading.value = true
-    const res = await axios.post(apiUrl + 'register/', {
-      username: register.username,
-      password: register.password,
-      protect: register.protect,
-      answer: register.answer,
-    }, {
-      // 配置validateStatus，使得400状态码不抛出错误
-      validateStatus: (status) => status < 500
-    });
-
-    // 根据状态码处理
-    if (res.status === 200) {
-      register_success();
-    } else if (res.status === 400) {
-      const data = res.data;
-      if (data?.field_errors) {
-        ElMessage.error('注册失败');
-        nextTick(() => {
-          Object.keys(data.field_errors).forEach(field => {
-            const fieldInstance = registerFormRef.value.fields?.find(f => f.prop === field);
-            if (fieldInstance) {
-              fieldInstance.validateState = 'error';
-              fieldInstance.validateMessage = data.field_errors[field];
-            }
-          });
+    const valid = await registerFormRef.value.validate().catch(() => false);
+    if (!valid) return;
+    try {
+        isLoading.value = true
+        const res = await axios.post(apiUrl + 'register/', {
+            username: register.username,
+            password: register.password,
+            protect: register.protect,
+            answer: register.answer,
+        }, {
+            // 配置validateStatus，使得400状态码不抛出错误
+            validateStatus: (status) => status < 500
         });
-      }
+
+        // 根据状态码处理
+        if (res.status === 200) {
+            register_success();
+        } else if (res.status === 400) {
+            const data = res.data;
+            if (data?.field_errors) {
+                ElMessage.error('注册失败');
+                nextTick(() => {
+                    Object.keys(data.field_errors).forEach(field => {
+                        const fieldInstance = registerFormRef.value.fields?.find(f => f.prop === field);
+                        if (fieldInstance) {
+                            fieldInstance.validateState = 'error';
+                            fieldInstance.validateMessage = data.field_errors[field];
+                        }
+                    });
+                });
+            }
+        }
+    } catch (err) {
+        // 这里只会捕获网络错误或500以上的错误
+        ElMessage.error('网络错误或服务器内部错误');
+    } finally {
+        isLoading.value = false;
     }
-  } catch (err) {
-    // 这里只会捕获网络错误或500以上的错误
-    ElMessage.error('网络错误或服务器内部错误');
-  } finally {
-    isLoading.value = false;
-  }
 };
 </script>
 <template>
+
     <div class="flex items-center justify-center" style="height: 100%;">
-      <FullScreenLoading :visible="isLoading" />
-      <FlipCard :flipped="isFlipped">
+        <FullScreenLoading :visible="isLoading" />
+        <el-dialog v-model="showForgotDialog" title="忘记密码" width="500px" height=100%>
+            <ForgotPassword />
+        </el-dialog>
+        <FlipCard :flipped="isFlipped">
             <template #default>
                 <el-card style="max-width: 100%;border-radius: 20px; height: 100%;" class="login-el-card">
                     <template #header>
@@ -291,10 +296,11 @@ const onRegister = async () => {
                                 <Edit />
                             </el-icon>
                             <span class="title-text">登 录</span>
-                            <div style="display: flex;flex-direction: column;align-items: center;justify-content: space-between;gap: 4px;">
-                            <button class="dsi-btn dsi-btn-soft dsi-btn-info choice-btn"
-                                @click="toggleFlip">切换注册</button>
-                            <a @click="gohome" class="dsi-link dsi-link-info" style="">游客登录</a>
+                            <div
+                                style="display: flex;flex-direction: column;align-items: center;justify-content: space-between;gap: 4px;">
+                                <button class="dsi-btn dsi-btn-soft dsi-btn-info choice-btn"
+                                    @click="toggleFlip">切换注册</button>
+                                <a @click="gohome" class="dsi-link dsi-link-info" style="">游客登录</a>
                             </div>
                         </div>
                     </template>
@@ -314,7 +320,8 @@ const onRegister = async () => {
                         <div class="footer-container">
                             <button class="dsi-btn dsi-btn-outline dsi-btn-success sub-btn" @click="onLogin">登
                                 录</button>
-                            <a @click="forgot" class="dsi-link dsi-link-info" style="margin: 5px;">忘记密码</a>
+                            <a @click.stop="forgot" class="dsi-link dsi-link-info" style="margin: 5px;"
+                                href="javascript:void(0)">忘记密码</a>
                         </div>
                     </template>
 
