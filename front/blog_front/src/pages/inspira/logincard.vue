@@ -90,7 +90,7 @@ const toggleFlip = () => {
 }
 
 const gohome = () => {
-    router.push({ path: '/develop' })
+    router.push({ path: '/home' })
 }
 
 const forgot = () => {
@@ -105,7 +105,7 @@ const agreement_show = () => {
     2.请勿以任何形式对本站进行网络攻击，如影响本站正常使用，本站有权采取相应措施<br/>
     3.请勿在本站发布任何违法违规内容，如有发现，本站有权删除违规内容并封禁用户账号<br/>
     4.本站不对用户发布的内容承担任何责任，用户需对其发布的内容负责<br/>
-    5.本站尊重并保护用户隐私，除用户名外，其余任何注册信息都将加密存储<br/>
+    5.本站尊重并保护用户隐私，除用户名及密保问题外，其余任何注册信息都将加密存储<br/>
     6.未经用户同意，不会向第三方披露用户信息<br/>
     7.本站可能会不定期更新本协议`,
         '用户协议',
@@ -349,11 +349,11 @@ const onRegister = async () => {
                             </el-form-item>
                             <el-form-item label="登录密码" prop="password">
                                 <el-input v-model="register.password" type="password" show-password
-                                    :prefix-icon="Lock" />
+                                    :prefix-icon="Lock"/>
                             </el-form-item>
                             <el-form-item label="确认密码" prop="confirm">
                                 <el-input v-model="register.confirm" type="password" show-password
-                                    :prefix-icon="Lock" />
+                                    :prefix-icon="Lock"/>
                             </el-form-item>
                             <el-form-item label="密保问题" prop="protect">
                                 <el-icon :size="14"
