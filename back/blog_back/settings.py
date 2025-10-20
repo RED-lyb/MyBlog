@@ -43,9 +43,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'common',
     'home',
     'register',
-    'common',
+    'forgot',
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [
