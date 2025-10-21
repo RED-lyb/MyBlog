@@ -285,7 +285,7 @@ const onRegister = async () => {
     <div class="flex items-center justify-center" style="height: 100%;">
         <FullScreenLoading :visible="isLoading" />
         <el-dialog v-model="showForgotDialog" title="忘记密码" width="500px" height=100%>
-            <ForgotPassword />
+            <ForgotPassword @close-dialog="showForgotDialog = false"/>
         </el-dialog>
         <FlipCard :flipped="isFlipped">
             <template #default>
