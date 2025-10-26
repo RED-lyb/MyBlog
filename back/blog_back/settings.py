@@ -37,16 +37,16 @@ CSRF_TRUSTED_ORIGINS = [
 
 INSTALLED_APPS = [
     'corsheaders',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
+    'django.contrib.contenttypes',  # 验证码需要
+    'django.contrib.sessions',      # 会话管理
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'captcha',                      # 验证码
     'common',
     'home',
     'register',
     'forgot',
+    'login',
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [
@@ -61,9 +61,9 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'common.middleware.LoginLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'blog_back.urls'
@@ -139,11 +139,24 @@ STATICFILES_DIRS = [
     BASE_DIR / "static"
 ]
 
+# 媒体文件配置（用于验证码图片）
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# 验证码配置
+CAPTCHA_CHALLENGE_FUNCT = 'captcha.helpers.random_char_challenge'
+CAPTCHA_LENGTH = 4
+CAPTCHA_TIMEOUT = 5  # 验证码有效期（分钟）
+CAPTCHA_IMAGE_SIZE = (120, 40)
+CAPTCHA_FONT_SIZE = 20
+CAPTCHA_BACKGROUND_COLOR = '#ffffff'
+CAPTCHA_FOREGROUND_COLOR = '#001100'
+CAPTCHA_NOISE_FUNCTIONS = ('captcha.helpers.noise_arcs', 'captcha.helpers.noise_dots',)
 
 #配置环境检测
 CURRENT_ENV = 'dev'#实际运行时根据环境修改
@@ -151,3 +164,5 @@ if CURRENT_ENV == 'dev':
     from .set_dev import *
 elif CURRENT_ENV == 'prod':
     from .set_prod import *
+# 会话设置
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'

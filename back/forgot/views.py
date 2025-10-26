@@ -2,19 +2,32 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
+from common.captcha_utils import CaptchaUtils, captcha_required, LoginLimitUtils, login_limit_required
 
 # Create your views here.
 @csrf_exempt
+@login_limit_required
 def forgot(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body.decode())
             username = data.get('username', '').strip()
             answer = data.get('answer', '').strip()
-
-            # 如果提供了密保答案，则进行验证
+            
+            # 如果提供了密保答案，则进行验证（需要验证码）
             if answer:
-                return verify_security_answer(username, answer)
+                # 验证验证码
+                captcha_key = data.get('captcha_key', '')
+                captcha_value = data.get('captcha_value', '')
+                
+                is_valid, message = CaptchaUtils.verify_captcha(captcha_key, captcha_value)
+                if not is_valid:
+                    return JsonResponse({
+                        'status': 'false',
+                        'message': message
+                    })
+                
+                return verify_security_answer(username, answer, request)
             # 否则只是检查用户是否存在
             else:
                 return check_user_exists(username)
@@ -54,7 +67,7 @@ def check_user_exists(username):
         return JsonResponse({'status': 'false', 'message': '验证异常，请稍后再试'}, status=500)
 
 
-def verify_security_answer(username, answer):
+def verify_security_answer(username, answer, request=None):
     """
     验证密保答案
     """
@@ -72,15 +85,33 @@ def verify_security_answer(username, answer):
                 # 用户存在，验证密保答案
                 stored_answer = row[0]
                 if check_password(answer, stored_answer):
+                    # 验证成功，清除登录失败记录
+                    if request:
+                        LoginLimitUtils.clear_login_failure(request, username)
                     return JsonResponse({
                         'status': 'true',
                         'message': '密保验证成功'
                     })
                 else:
-                    return JsonResponse({
-                        'status': 'false',
-                        'message': '密保答案错误'
-                    }, status=400)
+                    # 验证失败，记录失败次数
+                    if request:
+                        fail_count = LoginLimitUtils.record_login_failure(request, username)
+                        remaining = 5 - fail_count
+                        if remaining <= 0:
+                            return JsonResponse({
+                                'status': 'false',
+                                'message': '密保答案错误次数过多，账户已被锁定1小时'
+                            }, status=429)
+                        else:
+                            return JsonResponse({
+                                'status': 'false',
+                                'message': f'密保答案错误，还有{remaining}次机会'
+                            }, status=400)
+                    else:
+                        return JsonResponse({
+                            'status': 'false',
+                            'message': '密保答案错误'
+                        }, status=400)
             else:
                 # 用户不存在
                 return JsonResponse({'status': 'false', 'message': '用户不存在'}, status=404)
