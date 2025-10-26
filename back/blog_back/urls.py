@@ -14,14 +14,25 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from home.views import home
 from register.views import register
 from forgot.views import forgot
+from login.views import login
+from common.captcha_views import get_captcha, verify_captcha
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('captcha/', include('captcha.urls')),
     path('api/home/',home),
     path('api/register/',register),
     path('api/forgot/',forgot),
+    path('api/login/',login),
+    path('api/captcha/', get_captcha),
+    path('api/captcha/verify/', verify_captcha),
 ]
+
+# 开发环境下提供媒体文件访问
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, nextTick } from 'vue'
+import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
@@ -7,6 +7,7 @@ import axios from 'axios'
 import FlipCard from './FlipCard.vue'
 import FullScreenLoading from '../FullScreenLoading.vue'
 import ForgotPassword from './ForgotPassword.vue'
+import CaptchaDialog from '../../components/CaptchaDialog.vue'
 const apiUrl = import.meta.env.VITE_API_URL
 const isFlipped = ref(false)// 控制翻转状态的响应式变量
 const loginFormRef = ref()//登录表单引用
@@ -19,9 +20,13 @@ const optionFormRef = ref()
 const emit = defineEmits(['register-success'])   // 1. 声明事件
 const isLoading = ref(false)
 const showForgotDialog = ref(false)//忘记密码弹窗
+const showCaptchaDialog = ref(false)//验证码弹窗
+const captchaData = ref(null)//验证码数据
+const captchaType = ref('login')//验证码类型：login 或 register
+const captchaError = ref(false)//验证码错误状态
 const login = reactive({
     username: '',
-    password: '',
+    password: ''
 })
 
 const register = reactive({
@@ -220,28 +225,160 @@ const registerRules = {
     ]
 }
 
-const onLogin = () => {
+const onLogin = async () => {
     if (!loginFormRef.value) return
-    loginFormRef.value.validate((valid) => {
-        if (valid) {
-            isLoading.value = true
-            setTimeout(() => {
-                isLoading.value = false
-            }, 2000)
-            console.log('login!', login.username, login.password)
-        } else {
+    
+    try {
+        const valid = await loginFormRef.value.validate()
+        if (!valid) {
             console.log('登录表单验证失败!')
             return false
         }
-    }).catch(error => {
-        console.error('表单验证出错:', error)
-    })
+
+        // 弹出验证码对话框
+        captchaType.value = 'login'
+        showCaptchaDialog.value = true
+    } catch (error) {
+        console.error('登录表单验证出错:', error)
+    }
 }
+
+// 验证码验证成功后的登录处理
+const handleLoginWithCaptcha = async (captchaInfo) => {
+    try {
+        isLoading.value = true
+        
+        const response = await axios.post(`${apiUrl}login/`, {
+            username: login.username,
+            password: login.password,
+            captcha_key: captchaInfo.captcha_key,
+            captcha_value: captchaInfo.captcha_value
+        }, {
+            validateStatus: (status) => status < 500
+        })
+
+        if (response.status === 200) {
+            if (response.data.success) {
+                ElMessage.success('登录成功')
+                // 这里可以添加登录成功后的逻辑，比如跳转到首页
+                router.push('/')
+            } else {
+                // 验证码错误或其他业务错误
+                ElMessage.error(response.data.error || '登录失败')
+                
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (response.data.error && response.data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
+            }
+        } else if (response.status === 400) {
+            const data = response.data
+            if (data?.field_errors) {
+                ElMessage.error('登录失败')
+                nextTick(() => {
+                    Object.keys(data.field_errors).forEach(field => {
+                        const fieldInstance = loginFormRef.value.fields?.find(f => f.prop === field)
+                        if (fieldInstance) {
+                            fieldInstance.validateState = 'error'
+                            fieldInstance.validateMessage = data.field_errors[field]
+                        }
+                    })
+                })
+                
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (data.error && data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
+            } else {
+                ElMessage.error(data.error || '登录失败')
+                
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (data.error && data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
+            }
+        } else if (response.status === 429) {
+            ElMessage.error(response.data.error || '登录失败次数过多，请稍后再试')
+        }
+    } catch (error) {
+        console.error('登录请求失败:', error)
+        ElMessage.error('网络错误或服务器内部错误')
+    } finally {
+        isLoading.value = false
+    }
+}
+
+// 验证码验证成功
+const onCaptchaSuccess = (captchaInfo) => {
+    captchaData.value = captchaInfo
+    showCaptchaDialog.value = false
+    captchaError.value = false
+    
+    if (captchaType.value === 'login') {
+        handleLoginWithCaptcha(captchaInfo)
+    } else if (captchaType.value === 'register') {
+        handleRegisterWithCaptcha(captchaInfo)
+    }
+}
+
+// 验证码验证取消
+const onCaptchaCancel = () => {
+    showCaptchaDialog.value = false
+    captchaError.value = false
+}
+
+// 键盘事件处理
+const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+        // 如果验证码弹窗打开，不处理回车事件
+        if (showCaptchaDialog.value) {
+            return
+        }
+        
+        // 如果忘记密码弹窗打开，不处理回车事件
+        if (showForgotDialog.value) {
+            return
+        }
+        
+        event.preventDefault()
+        
+        // 根据翻转状态触发对应的提交函数
+        if (isFlipped.value) {
+            // 注册页面
+            onRegister()
+        } else {
+            // 登录页面
+            onLogin()
+        }
+    }
+}
+
+
+// 组件挂载时添加键盘事件监听
+onMounted(() => {
+    document.addEventListener('keydown', handleKeyPress)
+})
+
+// 组件卸载时移除键盘事件监听
+onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyPress)
+})
 
 // 注册提交函数
 const onRegister = async () => {
     const valid = await registerFormRef.value.validate().catch(() => false);
     if (!valid) return;
+    
+    // 弹出验证码对话框
+    captchaType.value = 'register'
+    showCaptchaDialog.value = true
+};
+
+// 验证码验证成功后的注册处理
+const handleRegisterWithCaptcha = async (captchaInfo) => {
     try {
         isLoading.value = true
         const res = await axios.post(apiUrl + 'register/', {
@@ -249,6 +386,8 @@ const onRegister = async () => {
             password: register.password,
             protect: register.protect,
             answer: register.answer,
+            captcha_key: captchaInfo.captcha_key,
+            captcha_value: captchaInfo.captcha_value,
         }, {
             // 配置validateStatus，使得400状态码不抛出错误
             validateStatus: (status) => status < 500
@@ -256,7 +395,18 @@ const onRegister = async () => {
 
         // 根据状态码处理
         if (res.status === 200) {
-            register_success();
+            if (res.data.success) {
+                register_success();
+            } else {
+                // 验证码错误或其他业务错误
+                ElMessage.error(res.data.error || '注册失败')
+                
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (res.data.error && res.data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
+            }
         } else if (res.status === 400) {
             const data = res.data;
             if (data?.field_errors) {
@@ -270,6 +420,18 @@ const onRegister = async () => {
                         }
                     });
                 });
+                
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (data.error && data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
+            } else {
+                // 如果是验证码错误，重新弹出验证码对话框
+                if (data.error && data.error.includes('验证码')) {
+                    captchaError.value = true
+                    showCaptchaDialog.value = true
+                }
             }
         }
     } catch (err) {
@@ -278,14 +440,15 @@ const onRegister = async () => {
     } finally {
         isLoading.value = false;
     }
-};
+}
+
 </script>
 <template>
 
     <div class="flex items-center justify-center" style="height: 100%;">
         <FullScreenLoading :visible="isLoading" />
-        <el-dialog v-model="showForgotDialog" title="忘记密码" width="500px" height=100%>
-            <ForgotPassword @close-dialog="showForgotDialog = false"/>
+        <el-dialog v-model="showForgotDialog" title="忘记密码" width="500px" top="10%">
+            <ForgotPassword :visible="showForgotDialog" @close-dialog="showForgotDialog = false"/>
         </el-dialog>
         <FlipCard :flipped="isFlipped">
             <template #default>
@@ -415,6 +578,14 @@ const onRegister = async () => {
                 </el-card>
             </template>
         </FlipCard>
+        
+        <!-- 验证码弹窗 -->
+        <CaptchaDialog 
+            v-model="showCaptchaDialog"
+            :has-error="captchaError"
+            @success="onCaptchaSuccess"
+            @cancel="onCaptchaCancel"
+        />
     </div>
 </template>
 <style scoped>

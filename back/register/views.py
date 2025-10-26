@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, IntegrityError
 from django.contrib.auth.hashers import make_password
+from common.captcha_utils import CaptchaUtils, captcha_required
 
 # 与前端完全一致的校验规则（copy 自 logincard.vue）
 DB_KEYWORDS = [
@@ -43,6 +44,7 @@ def _validate_answer(value: str) -> str:
     return ''
 
 @csrf_exempt
+@captcha_required
 def register(request):
     if request.method != 'POST':
         return JsonResponse({'error': '只支持POST'}, status=405)
@@ -53,6 +55,9 @@ def register(request):
         password = data.get('password', '')
         protect = data.get('protect', '').strip()
         answer = data.get('answer', '').strip()
+        captcha_key = data.get('captcha_key', '')
+        captcha_value = data.get('captcha_value', '')
+
 
         # 1. 二次校验
         errors = {}
@@ -81,7 +86,7 @@ def register(request):
                 "INSERT INTO users (username, password, protect, answer) VALUES (%s, %s, %s, %s)",
                 [username, make_password(password), protect, make_password(answer)]
             )
-        return JsonResponse({'msg': '注册成功'})
+        return JsonResponse({'success': True, 'msg': '注册成功'})
     except IntegrityError as e:
         # 理论上唯一索引二次保护
         print('[REGISTER] IntegrityError:', e)

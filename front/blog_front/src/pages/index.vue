@@ -4,7 +4,7 @@ import theme from './theme.vue';
 import BlurReveal from './inspira/BlurReveal.vue';
 import indexbutton from './inspira/indexbutton.vue';
 import LetterPullup from './inspira/LetterPullup.vue';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router'
 const showComponents = ref({
   first: false,
@@ -30,9 +30,22 @@ onMounted(async () => {
   showComponents.value.fourth = true;
 })
 const router=useRouter()
-const login = () => {
+const go = () => {
   router.push({ path: '/login' })
 }
+const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+        go()
+    }
+}
+onMounted(() => {
+    document.addEventListener('keydown', handleKeyPress)
+})
+
+// 组件卸载时移除键盘事件监听
+onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeyPress)
+})
 </script>
 <template>
 
@@ -53,7 +66,7 @@ const login = () => {
         <ArrowDownBold style="position: relative; top: 0.75rem;" />
       </el-icon><span>进入博客</span>
     </h3>
-    <indexbutton @click="login()" style="padding-top: 0.625rem;padding-bottom: 0.3125rem;" />
+    <indexbutton @click="go()" style="padding-top: 0.625rem;padding-bottom: 0.3125rem;" />
   </BlurReveal>
 <LetterPullup v-if="showComponents.first"
     words="该网站是由李远博编写的技术网站，会不定期分享个人的计算机学习经验，也欢迎各路大神发布知识与补充，大家一起交流学习"
