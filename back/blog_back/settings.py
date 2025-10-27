@@ -64,6 +64,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'common.middleware.LoginLimitMiddleware',
+    'common.jwt_middleware.JWTAuthenticationMiddleware',  # JWT认证中间件
+    'common.jwt_middleware.JWTAuthRequiredMiddleware',    # JWT强制认证中间件
 ]
 
 ROOT_URLCONF = 'blog_back.urls'
