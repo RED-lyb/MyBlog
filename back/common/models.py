@@ -6,6 +6,8 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from django.utils import timezone
+import datetime
 
 
 class Users(models.Model):
@@ -22,3 +24,37 @@ class Users(models.Model):
     class Meta:
         managed = False
         db_table = 'users'
+
+
+class RefreshToken(models.Model):
+    """
+    Refresh Token模型
+    用于存储用户的刷新令牌
+    """
+    id = models.AutoField(primary_key=True)
+    user_id = models.IntegerField(db_comment='用户ID')
+    token_hash = models.CharField(max_length=64, db_comment='Refresh Token的哈希值')
+    expires_at = models.DateTimeField(db_comment='过期时间')
+    created_at = models.DateTimeField(auto_now_add=True, db_comment='创建时间')
+    last_used_at = models.DateTimeField(null=True, blank=True, db_comment='最后使用时间')
+    
+    class Meta:
+        managed = True
+        db_table = 'refresh_tokens'
+        indexes = [
+            models.Index(fields=['user_id']),
+            models.Index(fields=['token_hash']),
+            models.Index(fields=['expires_at']),
+        ]
+    
+    def __str__(self):
+        return f"RefreshToken for user {self.user_id}"
+    
+    def is_expired(self):
+        """检查token是否过期"""
+        return timezone.now() > self.expires_at
+    
+    def update_last_used(self):
+        """更新最后使用时间"""
+        self.last_used_at = timezone.now()
+        self.save(update_fields=['last_used_at'])

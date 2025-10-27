@@ -22,15 +22,19 @@ from register.views import register
 from forgot.views import forgot
 from login.views import login
 from common.captcha_views import get_captcha, verify_captcha
+from common.auth_views import refresh_token, logout
 
 urlpatterns = [
     path('captcha/', include('captcha.urls')),
-    path('api/home/',home),
-    path('api/register/',register),
-    path('api/forgot/',forgot),
-    path('api/login/',login),
+    path('api/home/', home),
+    path('api/register/', register),
+    path('api/forgot/', forgot),
+    path('api/login/', login),
     path('api/captcha/', get_captcha),
     path('api/captcha/verify/', verify_captcha),
+    # JWT认证相关接口
+    path('api/auth/refresh/', refresh_token),
+    path('api/auth/logout/', logout),
 ]
 
 # 开发环境下提供媒体文件访问

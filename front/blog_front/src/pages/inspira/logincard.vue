@@ -260,8 +260,16 @@ const handleLoginWithCaptcha = async (captchaInfo) => {
         if (response.status === 200) {
             if (response.data.success) {
                 ElMessage.success('登录成功')
-                // 这里可以添加登录成功后的逻辑，比如跳转到首页
-                router.push('/')
+                
+                // 存储JWT token
+                if (response.data.data) {
+                    localStorage.setItem('access_token', response.data.data.access_token)
+                    localStorage.setItem('refresh_token', response.data.data.refresh_token)
+                    localStorage.setItem('user_info', JSON.stringify(response.data.data.user))
+                }
+                
+                // 跳转到首页
+                router.push('/home')
             } else {
                 // 验证码错误或其他业务错误
                 ElMessage.error(response.data.error || '登录失败')

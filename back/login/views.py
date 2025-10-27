@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from django.contrib.auth.hashers import check_password
 from common.captcha_utils import CaptchaUtils, captcha_required, LoginLimitUtils, login_limit_required
+from common.jwt_utils import JWTUtils, RefreshTokenManager
 
 
 @csrf_exempt
@@ -38,17 +39,33 @@ def login(request):
 
         # 验证用户凭据
         with connection.cursor() as cursor:
-            cursor.execute("SELECT password FROM users WHERE username=%s", [username])
+            cursor.execute("SELECT id, password FROM users WHERE username=%s", [username])
             row = cursor.fetchone()
 
             if row:
-                stored_password = row[0]
+                user_id, stored_password = row
                 if check_password(password, stored_password):
                     # 登录成功，清除登录失败记录
                     LoginLimitUtils.clear_login_failure(request, username)
+                    
+                    # 生成JWT令牌
+                    access_token = JWTUtils.generate_access_token(user_id, username)
+                    refresh_token = JWTUtils.generate_refresh_token(user_id, username)
+                    
+                    # 存储refresh token到数据库
+                    RefreshTokenManager.store_refresh_token(user_id, refresh_token)
+                    
                     return JsonResponse({
                         'success': True,
-                        'message': '登录成功'
+                        'message': '登录成功',
+                        'data': {
+                            'access_token': access_token,
+                            'refresh_token': refresh_token,
+                            'user': {
+                                'id': user_id,
+                                'username': username
+                            }
+                        }
                     })
                 else:
                     # 密码错误，记录失败次数
