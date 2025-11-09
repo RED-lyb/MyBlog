@@ -1,11 +1,12 @@
 #开发环境配置
+import os
 DEBUG = True
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'webproject',
-        'USER': 'admin',
-        'PASSWORD': '123456',#生产环境建议修改密码
-        'HOST': '127.0.0.1',
+        'NAME': os.environ.get('DB_NAME', 'webproject'),
+        'USER': os.environ.get('DB_USER', 'admin'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', '123456'),  # 从环境变量读取，默认值仅用于开发
+        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
     }
 }

@@ -3,8 +3,37 @@ import datetime
 from django.utils import timezone
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 import secrets
 import hashlib
+import threading
+import time
+
+
+def get_db_naive_time():
+    """
+    获取数据库服务器时间（naive datetime，无时区信息）
+    与数据库存储的时间格式保持一致（与 users.registered_time 一致）
+    """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT NOW()")
+        db_now = cursor.fetchone()[0]
+        # 确保返回的是 naive datetime（去掉时区信息）
+        if hasattr(db_now, 'tzinfo') and db_now.tzinfo is not None:
+            db_now = timezone.localtime(db_now).replace(tzinfo=None)
+        return db_now
+
+
+def ensure_naive_datetime(dt):
+    """
+    确保 datetime 是 naive（无时区信息）
+    如果是有时区的 aware datetime，转换为 naive
+    """
+    if dt is None:
+        return None
+    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
+        return timezone.localtime(dt).replace(tzinfo=None)
+    return dt
 
 
 class JWTUtils:
@@ -18,8 +47,10 @@ class JWTUtils:
     ALGORITHM = 'HS256'
     
     # Token过期时间
-    ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Access Token 30分钟
-    REFRESH_TOKEN_EXPIRE_DAYS = 7     # Refresh Token 7天
+    ACCESS_TOKEN_EXPIRE_MINUTES = 0.5  # Access Token 30秒（测试用）
+    # 测试时临时设置为 2 分钟，测试完成后恢复为 7
+    REFRESH_TOKEN_EXPIRE_DAYS = 2 / (24 * 60)  # Refresh Token 2分钟（测试用，约等于 0.00139 天）
+    # REFRESH_TOKEN_EXPIRE_DAYS = 7     # Refresh Token 7天（正常值）
     
     @classmethod
     def generate_access_token(cls, user_id, username):
@@ -116,58 +147,136 @@ class RefreshTokenManager:
         RefreshToken.objects.filter(user_id=user_id).delete()
         
         # 创建新的refresh token记录
-        RefreshToken.objects.create(
-            user_id=user_id,
-            token_hash=token_hash,
-            expires_at=timezone.now() + datetime.timedelta(days=JWTUtils.REFRESH_TOKEN_EXPIRE_DAYS)
-        )
+        # 改为完全由数据库计算时间，避免Python与ORM时区转换造成的偏移
+        lifetime_seconds = int(JWTUtils.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO refresh_tokens (user_id, token_hash, expires_at, created_at)
+                VALUES (%s, %s, DATE_ADD(NOW(), INTERVAL %s SECOND), NOW())
+                """,
+                [user_id, token_hash, lifetime_seconds]
+            )
     
     @classmethod
     def verify_refresh_token(cls, user_id, refresh_token):
         """
         验证Refresh Token
         """
-        from .models import RefreshToken
-        
         token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-        
-        try:
-            refresh_token_obj = RefreshToken.objects.get(
-                user_id=user_id,
-                token_hash=token_hash,
-                expires_at__gt=timezone.now()
+
+        # 完全用 SQL 校验并读取，直接用数据库时间判断过期，避免ORM时区歧义
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, user_id, token_hash, expires_at, created_at, last_used_at,
+                       (expires_at > NOW()) AS is_valid
+                FROM refresh_tokens
+                WHERE user_id = %s AND token_hash = %s
+                """,
+                [user_id, token_hash]
             )
-            return True, refresh_token_obj
-        except RefreshToken.DoesNotExist:
+            row = cursor.fetchone()
+
+        if not row:
             return False, None
+
+        rec_id, rec_user_id, rec_hash, rec_expires_at, rec_created_at, rec_last_used_at, is_valid = row
+        if not bool(is_valid):
+            # 已过期：不在此处删除，交给后台清理任务；这里只返回无效
+            return False, None
+
+        # 构造一个轻量对象，附带 update_last_used 方法（使用 SQL 的 NOW()）
+        class SimpleRefreshToken:
+            def __init__(self, _id, _user_id, _expires_at, _created_at, _last_used_at):
+                self.id = _id
+                self.user_id = _user_id
+                self.expires_at = _expires_at
+                self.created_at = _created_at
+                self.last_used_at = _last_used_at
+
+            def update_last_used(self):
+                with connection.cursor() as c:
+                    c.execute(
+                        "UPDATE refresh_tokens SET last_used_at = NOW() WHERE id = %s",
+                        [self.id]
+                    )
+
+        return True, SimpleRefreshToken(
+            rec_id, rec_user_id, rec_expires_at, rec_created_at, rec_last_used_at
+        )
     
     @classmethod
     def revoke_refresh_token(cls, user_id):
         """
         撤销用户的Refresh Token
+        返回删除的记录数
         """
         from .models import RefreshToken
         
-        RefreshToken.objects.filter(user_id=user_id).delete()
+        deleted_count, _ = RefreshToken.objects.filter(user_id=user_id).delete()
+        return deleted_count
     
     @classmethod
     def revoke_refresh_token_by_token(cls, refresh_token):
         """
         通过token撤销Refresh Token
+        返回删除的记录数
         """
         from .models import RefreshToken
         
         token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-        RefreshToken.objects.filter(token_hash=token_hash).delete()
+        deleted_count, _ = RefreshToken.objects.filter(token_hash=token_hash).delete()
+        return deleted_count
+    
+    @classmethod
+    def delete_refresh_token(cls, user_id, refresh_token):
+        """
+        删除指定用户的特定Refresh Token
+        返回删除的记录数
+        """
+        from .models import RefreshToken
+        
+        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        deleted_count, _ = RefreshToken.objects.filter(user_id=user_id, token_hash=token_hash).delete()
+        return deleted_count
     
     @classmethod
     def cleanup_expired_tokens(cls):
         """
         清理过期的Refresh Token
+        使用本地时间进行比较
         """
-        from .models import RefreshToken
-        
-        RefreshToken.objects.filter(expires_at__lte=timezone.now()).delete()
+        # 直接用数据库时间删除，避免ORM时区转换
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM refresh_tokens WHERE expires_at <= NOW()")
+
+
+# 简单的后台清理任务：定期删除已过期的 refresh_tokens
+class _RefreshTokenCleaner:
+    _started = False
+    _interval_seconds = 60
+
+    @classmethod
+    def start(cls):
+        if cls._started:
+            return
+        cls._started = True
+
+        def _loop():
+            while True:
+                try:
+                    RefreshTokenManager.cleanup_expired_tokens()
+                except Exception:
+                    pass
+                time.sleep(cls._interval_seconds)
+
+        t = threading.Thread(target=_loop, name="RefreshTokenCleanup", daemon=True)
+        t.start()
+
+
+# 在模块加载时启动后台清理任务
+_RefreshTokenCleaner.start()
 
 
 def jwt_required(view_func):

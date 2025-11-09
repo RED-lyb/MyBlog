@@ -30,11 +30,13 @@ class RefreshToken(models.Model):
     """
     Refresh Token模型
     用于存储用户的刷新令牌
+    使用数据库服务器时间（与 users 表的 registered_time 保持一致）
     """
     id = models.AutoField(primary_key=True)
     user_id = models.IntegerField(db_comment='用户ID')
     token_hash = models.CharField(max_length=64, db_comment='Refresh Token的哈希值')
     expires_at = models.DateTimeField(db_comment='过期时间')
+    # 使用数据库的 CURRENT_TIMESTAMP，与 users.registered_time 保持一致
     created_at = models.DateTimeField(auto_now_add=True, db_comment='创建时间')
     last_used_at = models.DateTimeField(null=True, blank=True, db_comment='最后使用时间')
     
@@ -51,10 +53,24 @@ class RefreshToken(models.Model):
         return f"RefreshToken for user {self.user_id}"
     
     def is_expired(self):
-        """检查token是否过期"""
-        return timezone.now() > self.expires_at
+        """
+        检查token是否过期
+        使用数据库服务器时间进行比较（与 users.registered_time 保持一致）
+        """
+        from common.jwt_utils import get_db_naive_time, ensure_naive_datetime
+        db_now = get_db_naive_time()
+        expires_at = ensure_naive_datetime(self.expires_at)
+        return db_now > expires_at
     
     def update_last_used(self):
-        """更新最后使用时间"""
-        self.last_used_at = timezone.now()
-        self.save(update_fields=['last_used_at'])
+        """
+        更新最后使用时间
+        使用数据库服务器时间（CURRENT_TIMESTAMP），与 users.registered_time 保持一致
+        """
+        from django.db import connection
+        with connection.cursor() as cursor:
+            # 使用数据库的 NOW() 函数获取服务器时间
+            cursor.execute(
+                "UPDATE refresh_tokens SET last_used_at = NOW() WHERE id = %s",
+                [self.id]
+            )

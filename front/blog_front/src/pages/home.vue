@@ -1,91 +1,82 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useStore } from '../stores/counter.js'
-import apiClient from '../lib/api.js'
-
-const stores = useStore()
-const data = ref("")
-const status = ref("")
-const userInfo = ref(null)
-const isAuthenticated = ref(false)
-const loading = ref(true)
-
-const fetchHomeData = async () => {
-    try {
-        loading.value = true
-        const response = await apiClient.get(`${import.meta.env.VITE_API_URL}home/`)
-        
-        data.value = response.data
-        status.value = response.status
-        
-        // 处理用户信息
-        if (response.data.success && response.data.data) {
-            isAuthenticated.value = response.data.data.is_authenticated
-            userInfo.value = response.data.data.user
+import { onMounted } from 'vue'
+import Logout from '../components/Logout.vue'
+import { useAuthState, useUserInfo } from '../lib/authState.js'
+import { useAuthStore } from '../stores/user_info.js'
+import { ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+const authState = useAuthState()
+const { loading, fetchUserInfo } = useUserInfo()
+const router=useRouter()
+const guest_info_show = () => {
+    ElMessageBox.confirm(
+        `您当前正在以游客身份访问，仅可进行博客文档内容阅读，<br/>
+        无个人主页，无法撰写与上传内容，无法与其他用户进行互动，
+        如需获得完整体验，请进行登录<br/>`,
+        '游客须知',
+        {
+            dangerouslyUseHTMLString: true,
+            cancelButtonText: '继续访问',
+            confirmButtonText: '去登录',
+            type: 'info',
+            center: true,
         }
-    } catch (error) {
-        console.error('获取首页数据失败:', error)
-        data.value = error.response?.data || error.message
-        status.value = error.response?.status || 'error'
-    } finally {
-        loading.value = false
-    }
+    )
+        .then(() => {
+            router.push({ path: '/login' })
+        })
+        .catch(() => {
+        })
 }
-
-const logout = async () => {
-    try {
-        const refreshToken = localStorage.getItem('refresh_token')
-        if (refreshToken) {
-            await apiClient.post(`${import.meta.env.VITE_API_URL}auth/logout/`, {
-                refresh_token: refreshToken
-            })
+// 页面挂载时刷新用户信息（确保数据最新）
+// 注意：应用启动时已自动获取，这里作为刷新机制
+onMounted(async () => {
+    const authStore = useAuthStore()
+    
+    // 如果已经标记为过期，不要再次调用fetchUserInfo，避免清空用户信息
+    if (authStore.tokenExpired) {
+        // token已过期，等待路由守卫处理
+    } else {
+        try {
+            await fetchUserInfo()
+        } catch (error) {
+            // 如果是token过期错误，不显示错误消息，让路由守卫处理
+            if (error.message !== 'TOKEN_EXPIRED') {
+                // 其他错误可以在这里处理
+            }
         }
-    } catch (error) {
-        console.error('退出登录失败:', error)
-    } finally {
-        // 清除本地存储的token
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('user_info')
-        
-        // 重新加载页面或跳转到登录页
-        window.location.href = '/login'
     }
-}
-
-// 页面挂载时获取数据
-onMounted(() => {
-    fetchHomeData()
+    
+    // 只有在不是过期状态且未认证时才显示游客提示
+    // 如果是过期状态，路由守卫会处理
+    if (!authState.isAuthenticated && !authStore.tokenExpired) {
+        guest_info_show()
+    }
 })
 </script>
 
 <template>
     <div>
         <h1>目前正处于测试部署状态，还未正式部署相关内容</h1>
-        
+
         <div v-if="loading">
             <p>加载中...</p>
         </div>
-        
+
         <div v-else>
-            <div v-if="isAuthenticated && userInfo">
-                <h2>欢迎回来，{{ userInfo.username }}！</h2>
-                <p>用户ID: {{ userInfo.id }}</p>
-                <p>注册时间: {{ userInfo.registered_time }}</p>
-                <p>密保问题: {{ userInfo.protect }}</p>
-                <button @click="logout" style="margin-top: 10px; padding: 8px 16px; background-color: #f56c6c; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    退出登录
-                </button>
+            <div v-if="authState.isAuthenticated && authState.user">
+                <h2>欢迎回来，{{ authState.user.username }}！</h2>
+                <p>用户ID: {{ authState.user.id }}</p>
+                <p>注册时间: {{ authState.user.registered_time }}</p>
+                <p>密保问题: {{ authState.user.protect }}</p>
+                <Logout />
             </div>
-            
+
             <div v-else>
                 <h2>访客模式</h2>
-                <p>{{ data?.data?.guest_message || '您当前以访客身份访问，请登录以获得完整功能' }}</p>
+                <p>您当前以访客身份访问，请登录以获得完整功能</p>
             </div>
-            
-            <hr>
-            <h3>调试信息：</h3>
-            <p>测试后端返回的信息：data:{{ data }}, status:{{ status }}</p>
+
         </div>
     </div>
 </template>

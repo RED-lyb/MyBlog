@@ -11,8 +11,18 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# 加载 .env 文件（如果存在）
+# 使用 try-except 确保在没有安装 python-dotenv 时不会报错
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # 从 .env 文件加载环境变量
+except ImportError:
+    # 如果没有安装 python-dotenv，跳过（可以使用系统环境变量）
+    pass
+
+# 构建项目内部路径，例如：BASE_DIR / 'subdir'
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -20,7 +30,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'SECRET_KEY_REMOVED_FROM_HISTORY'
+# 从环境变量读取 SECRET_KEY，如果不存在则使用默认值（仅用于开发环境）
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'SECRET_KEY_REMOVED_FROM_HISTORY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 #DEBUG = True

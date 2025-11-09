@@ -42,7 +42,7 @@ const api: Api = { fire };
 
 provide("ConfettiContext", api);
 
-// Initialize confetti when mounted
+// 挂载时初始化彩纸效果
 onMounted(() => {
   if (canvasRef.value) {
     instanceRef.value = create(canvasRef.value, {
@@ -56,7 +56,7 @@ onMounted(() => {
   }
 });
 
-// Cleanup when unmounted
+// 卸载时清理
 onUnmounted(() => {
   if (instanceRef.value) {
     instanceRef.value.reset();

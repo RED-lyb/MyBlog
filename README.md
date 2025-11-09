@@ -162,15 +162,51 @@ quit;
 ```bash
 mysql -u admin -p webproject < /webproject/my-blog/back/depend_manage/webproject.sql
 ```
-* 修改后端生产环境配置
-将CURRENT_ENV = 'dev'改为CURRENT_ENV = 'prod'
-```bash
-vim /webproject/my-blog/back/blog_back/settings.py
-```
-将PASSWORD与HOST改为实际数据库的密码与服务器地址
-```bash
-vim /webproject/my-blog/back/blog_back/set_prod.py
-```
+* **配置环境变量（重要！生产环境必须配置）**
+  
+  1. 在 `back/blog_back/` 目录下创建 `.env` 文件：
+  ```bash
+  cd /webproject/my-blog/back/blog_back
+  touch .env
+  ```
+  
+  2. 编辑 `.env` 文件，填入生产环境配置：
+  ```env
+  # Django Secret Key（必须修改！）
+  # 生成方式：python3.12 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+  DJANGO_SECRET_KEY=your-production-secret-key-here
+  
+  # 数据库配置（必须设置实际值）
+  DB_NAME=webproject
+  DB_USER=admin
+  DB_PASSWORD=your-actual-database-password
+  DB_HOST=127.0.0.1  # 或数据库服务器的实际IP
+  ```
+  
+  3. 生成 Secret Key：
+  ```bash
+  python3.12 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+  ```
+  
+  4. 安装依赖（已包含 python-dotenv）：
+  ```bash
+  pip install -r /webproject/my-blog/back/depend_manage/requirements.txt
+  ```
+  
+  > 💡 **提示**：`settings.py` 已自动配置为加载 `.env` 文件，无需手动修改代码。
+  
+  5. 修改后端生产环境配置：
+  ```bash
+  vim /webproject/my-blog/back/blog_back/settings.py
+  ```
+  将 `CURRENT_ENV = 'dev'` 改为 `CURRENT_ENV = 'prod'`
+  
+  > ⚠️ **重要提示**：
+  > - 生产环境必须设置所有环境变量，不能使用默认值
+  > - `.env` 文件不会被提交到 Git，请妥善保管
+  > - 不要在生产服务器上使用默认的 Secret Key
+  
+  详细配置说明请参考：[环境变量配置说明](back/blog_back/ENV_SETUP.md)
 * 安装数据库开发工具组和要所用到的依赖
 ```bash
 dnf install mariadb-devel -y

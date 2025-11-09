@@ -23,6 +23,7 @@ from forgot.views import forgot
 from login.views import login
 from common.captcha_views import get_captcha, verify_captcha
 from common.auth_views import refresh_token, logout
+from common.views import get_user_info
 
 urlpatterns = [
     path('captcha/', include('captcha.urls')),
@@ -35,6 +36,8 @@ urlpatterns = [
     # JWT认证相关接口
     path('api/auth/refresh/', refresh_token),
     path('api/auth/logout/', logout),
+    # 全局用户信息接口
+    path('api/user/info/', get_user_info),
 ]
 
 # 开发环境下提供媒体文件访问

@@ -47,7 +47,7 @@ const slots = useSlots();
 const children = ref<any>([]);
 
 onMounted(() => {
-  // This will reactively capture all content provided in the default slot
+  // 响应式地捕获默认插槽中提供的所有内容
   watchEffect(() => {
     children.value = slots.default ? slots.default() : [];
   });

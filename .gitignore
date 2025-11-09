@@ -27,6 +27,11 @@ front/blog_front/dist/
 # 环境变量
 *.env
 *.env.*
+.env
+.env.local
+.env.*.local
+back/blog_back/.env
+back/.env
 front/blog_front/.env.development
 front/blog_front/.env.production
 

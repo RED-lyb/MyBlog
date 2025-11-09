@@ -9,14 +9,16 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
-const app = createApp(App)
+import { useAuthStore } from './stores/user_info.js'
 
+const app = createApp(App)
+const pinia = createPinia()
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
 app.use(ElementPlus)
-app.use(createPinia())
+app.use(pinia)
 app.use(router)
 
 useDark({
@@ -28,3 +30,8 @@ useDark({
 })
 
 app.mount('#app')
+
+// 应用启动后只同步localStorage中的状态，不发起网络请求
+// 让路由守卫和页面组件来处理用户信息的获取和token过期检查
+const authStore = useAuthStore()
+authStore.syncFromLocalStorage()

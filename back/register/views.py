@@ -1,6 +1,5 @@
 import json
 import re
-import traceback
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, IntegrityError
@@ -89,9 +88,7 @@ def register(request):
         return JsonResponse({'success': True, 'msg': '注册成功'})
     except IntegrityError as e:
         # 理论上唯一索引二次保护
-        print('[REGISTER] IntegrityError:', e)
         return JsonResponse({'field_errors': {'username': '当前用户名已注册'}}, status=400)
     except Exception as e:
         # 其它任何数据库/编码异常
-        print('[REGISTER] 未知异常:', traceback.format_exc())
         return JsonResponse({'field_errors': {'non_field': '服务器异常，请稍后重试'}}, status=500)

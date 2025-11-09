@@ -55,7 +55,6 @@ def home(request):
                     }, status=404)
                     
         except Exception as e:
-            print(f"[HOME] 获取用户信息异常: {e}")
             return JsonResponse({
                 'success': False,
                 'error': '获取用户信息失败',

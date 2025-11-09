@@ -1,9 +1,9 @@
 import json
-import traceback
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection
 from django.contrib.auth.hashers import check_password
+from django.conf import settings
 from common.captcha_utils import CaptchaUtils, captcha_required, LoginLimitUtils, login_limit_required
 from common.jwt_utils import JWTUtils, RefreshTokenManager
 
@@ -55,18 +55,36 @@ def login(request):
                     # 存储refresh token到数据库
                     RefreshTokenManager.store_refresh_token(user_id, refresh_token)
                     
-                    return JsonResponse({
+                    # 仅返回access_token与用户信息，refresh_token通过HttpOnly Cookie下发
+                    response = JsonResponse({
                         'success': True,
                         'message': '登录成功',
                         'data': {
                             'access_token': access_token,
-                            'refresh_token': refresh_token,
                             'user': {
                                 'id': user_id,
                                 'username': username
                             }
                         }
                     })
+
+                    # 设置HttpOnly刷新令牌Cookie（开发环境非HTTPS可不设secure）
+                    # path 设置为 '/' 确保所有路径都能携带这个 Cookie
+                    # 注意：httponly=True 确保 JavaScript 无法访问这个 Cookie（只能在开发者工具中看到名称，无法读取值）
+                    secure_flag = False if getattr(settings, 'DEBUG', True) else True
+                    response.set_cookie(
+                        key='refresh_token',
+                        value=refresh_token,
+                        httponly=True,  # HttpOnly Cookie，JavaScript 无法访问
+                        secure=secure_flag,
+                        samesite='Lax',
+                        max_age=JWTUtils.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+                        path='/',
+                        # 显式设置 domain 为 None，使用默认值（当前域名）
+                        domain=None
+                    )
+
+                    return response
                 else:
                     # 密码错误，记录失败次数
                     fail_count = LoginLimitUtils.record_login_failure(request, username)
@@ -102,8 +120,7 @@ def login(request):
                         'field_errors': {'username': f'用户不存在，还有{remaining}次机会'}
                     }, status=400)
 
-    except Exception as e:
-        print('[LOGIN] 未知异常:', traceback.format_exc())
+    except Exception:
         return JsonResponse({
             'success': False,
             'error': '登录异常，请稍后重试',

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock, User, EditPen, Notebook } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { useAuthStore } from '../../stores/user_info.js'
 import FlipCard from './FlipCard.vue'
 import FullScreenLoading from '../FullScreenLoading.vue'
 import ForgotPassword from './ForgotPassword.vue'
@@ -231,7 +232,6 @@ const onLogin = async () => {
     try {
         const valid = await loginFormRef.value.validate()
         if (!valid) {
-            console.log('登录表单验证失败!')
             return false
         }
 
@@ -239,7 +239,6 @@ const onLogin = async () => {
         captchaType.value = 'login'
         showCaptchaDialog.value = true
     } catch (error) {
-        console.error('登录表单验证出错:', error)
     }
 }
 
@@ -247,6 +246,7 @@ const onLogin = async () => {
 const handleLoginWithCaptcha = async (captchaInfo) => {
     try {
         isLoading.value = true
+        const auth = useAuthStore()
         
         const response = await axios.post(`${apiUrl}login/`, {
             username: login.username,
@@ -254,18 +254,19 @@ const handleLoginWithCaptcha = async (captchaInfo) => {
             captcha_key: captchaInfo.captcha_key,
             captcha_value: captchaInfo.captcha_value
         }, {
-            validateStatus: (status) => status < 500
+            validateStatus: (status) => status < 500,
+            withCredentials: true  // 确保登录请求能接收和发送 Cookie
         })
 
         if (response.status === 200) {
             if (response.data.success) {
                 ElMessage.success('登录成功')
                 
-                // 存储JWT token
+                // 存储JWT token（仅access_token与用户信息）
                 if (response.data.data) {
                     localStorage.setItem('access_token', response.data.data.access_token)
-                    localStorage.setItem('refresh_token', response.data.data.refresh_token)
                     localStorage.setItem('user_info', JSON.stringify(response.data.data.user))
+                    auth.setUser(response.data.data.user)
                 }
                 
                 // 跳转到首页
@@ -312,7 +313,6 @@ const handleLoginWithCaptcha = async (captchaInfo) => {
             ElMessage.error(response.data.error || '登录失败次数过多，请稍后再试')
         }
     } catch (error) {
-        console.error('登录请求失败:', error)
         ElMessage.error('网络错误或服务器内部错误')
     } finally {
         isLoading.value = false

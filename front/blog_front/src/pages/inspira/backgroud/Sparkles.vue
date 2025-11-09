@@ -50,7 +50,7 @@ const canvasRef = templateRef<HTMLCanvasElement | null>("canvasRef");
 const particles = ref<Particle[]>([]);
 const ctx = ref<CanvasRenderingContext2D | null>(null);
 
-// Adjust canvas size on mount and resize
+// 在挂载和调整大小时调整画布尺寸
 function resizeCanvas() {
   if (!canvasRef.value || !containerRef.value) return;
 
@@ -107,7 +107,7 @@ function updateAndDrawParticles() {
     const newPhase = (particle.phase + particle.phaseSpeed) % (Math.PI * 2);
     const opacity = 0.3 + (Math.sin(newPhase) * 0.3 + 0.3);
 
-    // Draw particle
+    // 绘制粒子
     ctx.value!.beginPath();
     ctx.value!.arc(
       (newX * rect.width) / 100,
@@ -133,7 +133,7 @@ function updateAndDrawParticles() {
 
 const { pause, resume } = useRafFn(updateAndDrawParticles, { immediate: false });
 
-// Handle window resize
+// 处理窗口大小调整
 let resizeObserver: ResizeObserver | undefined;
 
 onMounted(() => {
@@ -143,7 +143,7 @@ onMounted(() => {
   resizeCanvas();
   generateParticles();
 
-  // Set up resize observer
+  // 设置大小调整观察器
   resizeObserver = new ResizeObserver(resizeCanvas);
   if (containerRef.value) {
     resizeObserver.observe(containerRef.value);
