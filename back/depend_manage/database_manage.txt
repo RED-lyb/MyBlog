@@ -1,6 +1,6 @@
 #导出数据库
-mysqldump -u admin -p webproject > webproject.sql
+mysqldump -u 用户名 -p 数据库名 --default-character-set=utf8mb4 > webproject.sql
 #导出数据库结构不导出数据
-mysqldump -u 用户名 -p 数据库名 --no-data > webproject.sql
+mysqldump -u 用户名 -p 数据库名 --no-data --default-character-set=utf8mb4 > webproject.sql
 #导入数据库
 mysql -u admin -p webproject < webproject.sql
