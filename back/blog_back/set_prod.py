@@ -1,7 +1,8 @@
 #生产环境配置
 import os
 from dotenv import load_dotenv
-load_dotenv()
+env_path = '/webproject/my-blog/back/blog_back/.env'  #由于运行环境uwsgi与.env不在同一目录，因此使用绝对路径，如部署服务器时未按照README.md文件配置，请自行修改
+load_dotenv(env_path)
 # 从环境变量加载配置，生产环境必须设置所有配置项
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')  # 生产环境必须设置，无默认值
 if not SECRET_KEY:
