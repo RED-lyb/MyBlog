@@ -15,7 +15,12 @@ DATABASES = {
         'USER': os.environ.get('DB_USER', 'admin'),
         'PASSWORD': os.environ.get('DB_PASSWORD', '密码'),
         'HOST': os.environ.get('DB_HOST', '127.0.0.1'), #如前后端服务器不在同一台服务器，需要修改为实际IP
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', default_storage_engine=INNODB, collation_connection=utf8mb4_unicode_ci"
+        }
     }
+
 }
 # 验证生产环境必需的数据库密码是否已设置
 if not DATABASES['default']['PASSWORD']:
