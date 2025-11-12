@@ -134,11 +134,17 @@ const pre = () => {
 }
 
 const next = async () => {
+  // 防止重复提交
+  if (isLoading.value) return
+  
   if (active.value === 0) {
     // 验证用户名
     formRef.value.validateField('username', async (valid) => {
       if (!valid) return; // 验证失败，直接返回
-
+      
+      // 防止重复提交
+      if (isLoading.value) return
+      
       // 验证通过，发送请求
       try {
         setFieldSuccess('username')
@@ -167,6 +173,9 @@ const next = async () => {
     formRef.value.validateField('answer', async (valid) => {
       if (!valid) return; // 验证失败，直接返回
       
+      // 防止重复提交
+      if (isLoading.value) return
+      
       // 验证通过，弹出验证码对话框
       setFieldSuccess('answer')
       showCaptchaDialog.value = true
@@ -186,6 +195,9 @@ const next = async () => {
 
 const submit = async () => {
   if (active.value !== 2) return
+  
+  // 防止重复提交
+  if (isLoading.value) return
 
   // 先进行表单验证
   const valid = await new Promise((resolve) => {
@@ -195,6 +207,9 @@ const submit = async () => {
   })
   
   if (!valid) return // 表单验证失败，直接返回
+  
+  // 再次检查，防止在验证过程中重复提交
+  if (isLoading.value) return
   
   try {
     isLoading.value = true
@@ -368,7 +383,7 @@ watch(() => props.visible, (newValue) => {
           style="margin-top: 50px; padding: 0 20px;">
           <el-form-item prop="username" :class="[`is-${fieldStates.username.validateState}`]">
             <el-input ref="usernameInputRef" v-model="form.username" :prefix-icon="User" placeholder="请输入用户名"
-              @input="clearFieldState('username')" @keyup.enter="next" />
+              @input="clearFieldState('username')" />
             <div v-if="fieldStates.username.validateMessage" class="el-form-item__error">
               {{ fieldStates.username.validateMessage }}
             </div>
@@ -382,7 +397,7 @@ watch(() => props.visible, (newValue) => {
           style="margin-top: 50px; padding: 0 20px;">
           <el-form-item prop="answer" :class="[`is-${fieldStates.answer.validateState}`]">
             <el-input ref="answerInputRef" v-model="form.answer" :prefix-icon="Notebook" placeholder="请输入密保答案"
-              @input="clearFieldState('answer')" @keyup.enter="next" />
+              @input="clearFieldState('answer')" />
             <div v-if="fieldStates.answer.validateMessage" class="el-form-item__error">
               {{ fieldStates.answer.validateMessage }}
             </div>
@@ -396,7 +411,7 @@ watch(() => props.visible, (newValue) => {
           style="margin-top: 20px; padding: 0 20px;">
           <el-form-item prop="password" :class="[`is-${fieldStates.password.validateState}`]">
             <el-input ref="passwordInputRef" v-model="form.password" type="password" show-password :prefix-icon="Lock" placeholder="请输入新密码"
-              @input="clearFieldState('password')" @keyup.enter="submit" />
+              @input="clearFieldState('password')" />
             <div v-if="fieldStates.password.validateMessage" class="el-form-item__error">
               {{ fieldStates.password.validateMessage }}
             </div>
@@ -404,7 +419,7 @@ watch(() => props.visible, (newValue) => {
 
           <el-form-item prop="confirm" :class="[`is-${fieldStates.confirm.validateState}`]">
             <el-input ref="confirmInputRef" v-model="form.confirm" type="password" show-password :prefix-icon="Lock" placeholder="请再次输入新密码"
-              @input="clearFieldState('confirm')" @keyup.enter="submit" />
+              @input="clearFieldState('confirm')" />
             <div v-if="fieldStates.confirm.validateMessage" class="el-form-item__error">
               {{ fieldStates.confirm.validateMessage }}
             </div>
