@@ -21,7 +21,7 @@ from home.views import home
 from register.views import register
 from forgot.views import forgot
 from login.views import login
-from common.captcha_views import get_captcha, verify_captcha
+from common.captcha_views import get_captcha, verify_captcha, get_captcha_image
 from common.auth_views import refresh_token, logout
 from common.views import get_user_info
 
@@ -32,6 +32,7 @@ urlpatterns = [
     path('api/forgot/', forgot),
     path('api/login/', login),
     path('api/captcha/', get_captcha),
+    path('api/captcha/image/<str:key>/', get_captcha_image, name='captcha-image'),
     path('api/captcha/verify/', verify_captcha),
     # JWT认证相关接口
     path('api/auth/refresh/', refresh_token),

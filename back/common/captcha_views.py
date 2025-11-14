@@ -36,6 +36,17 @@ def get_captcha(request):
 
 
 @csrf_exempt
+@require_http_methods(["GET"])
+def get_captcha_image(request, key):
+    """
+    获取验证码图片
+    GET /api/captcha/image/<key>/
+    """
+    from captcha.views import captcha_image
+    return captcha_image(request, key)
+
+
+@csrf_exempt
 @require_http_methods(["POST"])
 def verify_captcha(request):
     """

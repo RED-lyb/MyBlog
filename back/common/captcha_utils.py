@@ -8,7 +8,6 @@ from django.http import JsonResponse
 from django.core.cache import cache
 from django.utils import timezone
 from captcha.models import CaptchaStore
-from captcha.helpers import captcha_image_url
 import hashlib
 
 
@@ -24,7 +23,8 @@ class CaptchaUtils:
         try:
             # 生成新的验证码
             captcha_key = CaptchaStore.generate_key()
-            captcha_image = captcha_image_url(captcha_key)
+            # 使用 /api/captcha/image/ 路径，而不是 captcha_image_url
+            captcha_image = f'/api/captcha/image/{captcha_key}/'
             
             # 如果是相对路径，需要转换为完整URL
             if captcha_image.startswith('/'):
