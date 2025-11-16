@@ -9,6 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     CaptchaDialog: typeof import('./src/components/CaptchaDialog.vue')['default']
+    Footer: typeof import('./src/components/Footer.vue')['default']
     FullScreenLoading: typeof import('./src/components/FullScreenLoading.vue')['default']
     Head: typeof import('./src/components/Head.vue')['default']
     Logout: typeof import('./src/components/Logout.vue')['default']

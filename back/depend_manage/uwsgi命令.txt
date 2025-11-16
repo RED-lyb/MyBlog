@@ -1,0 +1,9 @@
+uwsgi --ini xxx.ini #运行ini文件配置
+
+ps -ef |grep uwsgi #查看uwsgi运行情况
+
+uwsgi --stop /xxx/xxx.pid #停止uwsgi运行
+
+kill -9 xxx #输入进程号，可以强制杀死
+
+uwsgi --reload /xxx/xxx.pid #重新运行uwsgi

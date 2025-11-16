@@ -66,7 +66,6 @@ const router = createRouter({
 })
 
 // 检查认证状态并区分三种情况
-// 注意：不再在这里调用syncFromLocalStorage，因为路由守卫已经调用过了
 function checkAuthStatus() {
   const authStore = useAuthStore()
   
