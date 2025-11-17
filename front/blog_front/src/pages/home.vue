@@ -72,7 +72,7 @@ onMounted(async () => {
                 <el-header style="padding: 0"><Head /></el-header>
                 <el-container>
                   <el-aside width="200px">Aside</el-aside>
-                  <el-main style="height: 600px">Main</el-main>
+                  <el-main style="height: 600px"><Logout /></el-main>
                   <el-aside width="200px">Aside</el-aside>
                 </el-container>
                 <el-footer style="padding: 0"><Footer /></el-footer>

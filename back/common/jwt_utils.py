@@ -8,6 +8,7 @@ import secrets
 import hashlib
 import threading
 import time
+from .captcha_utils import CaptchaUtils
 
 
 def get_db_naive_time():
@@ -250,8 +251,8 @@ class RefreshTokenManager:
             cursor.execute("DELETE FROM refresh_tokens WHERE expires_at <= NOW()")
 
 
-# 简单的后台清理任务：定期删除已过期的 refresh_tokens
-class _RefreshTokenCleaner:
+# 简单的后台清理任务：定期删除已过期的 refresh_tokens 和验证码
+class _BackgroundCleaner:
     _started = False
     _interval_seconds = 60
 
@@ -267,14 +268,18 @@ class _RefreshTokenCleaner:
                     RefreshTokenManager.cleanup_expired_tokens()
                 except Exception:
                     pass
+                try:
+                    CaptchaUtils.cleanup_expired_captcha()
+                except Exception:
+                    pass
                 time.sleep(cls._interval_seconds)
 
-        t = threading.Thread(target=_loop, name="RefreshTokenCleanup", daemon=True)
+        t = threading.Thread(target=_loop, name="BackgroundCleanup", daemon=True)
         t.start()
 
 
 # 在模块加载时启动后台清理任务
-_RefreshTokenCleaner.start()
+_BackgroundCleaner.start()
 
 
 def jwt_required(view_func):

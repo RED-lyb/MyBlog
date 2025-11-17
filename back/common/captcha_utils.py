@@ -7,12 +7,40 @@ import time
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.utils import timezone
+from django.conf import settings
+from django.db import connection
 from captcha.models import CaptchaStore
 import hashlib
 
 
 class CaptchaUtils:
     """验证码工具类"""
+    
+    CAPTCHA_TIMEOUT_SECONDS = int(getattr(settings, 'CAPTCHA_TIMEOUT', 5) * 60)
+
+    @classmethod
+    def _sync_expiration_with_db(cls, hashkey):
+        """
+        使用数据库时间为 captcha_captchastore.expiration 赋值
+        避免 Python 与 ORM 时区转换造成的偏移
+        """
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE captcha_captchastore
+                SET expiration = DATE_ADD(NOW(), INTERVAL %s SECOND)
+                WHERE hashkey = %s
+                """,
+                [cls.CAPTCHA_TIMEOUT_SECONDS, hashkey]
+            )
+
+    @classmethod
+    def cleanup_expired_captcha(cls):
+        """
+        清理已过期的验证码记录
+        """
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM captcha_captchastore WHERE expiration <= NOW()")
     
     @staticmethod
     def generate_captcha(request=None):
@@ -23,6 +51,10 @@ class CaptchaUtils:
         try:
             # 生成新的验证码
             captcha_key = CaptchaStore.generate_key()
+            try:
+                CaptchaUtils._sync_expiration_with_db(captcha_key)
+            except Exception:
+                pass
             # 使用 /api/captcha/image/ 路径，而不是 captcha_image_url
             captcha_image = f'/api/captcha/image/{captcha_key}/'
             
