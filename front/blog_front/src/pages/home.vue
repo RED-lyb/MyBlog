@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
@@ -26,6 +26,14 @@ const {
 const { loading, fetchUserInfo } = useUserInfo()
 const router = useRouter()
 const isLoading = ref(true)
+const layoutReady = ref(false)
+const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
+
+const markLayoutReady = async () => {
+  if (layoutReady.value) return
+  await nextTick()
+  layoutReady.value = true
+}
 const guest_info_show = () => {
   ElMessageBox.confirm(
     `您当前正在以游客身份访问，仅可进行博客文档内容阅读，<br/>
@@ -54,6 +62,7 @@ onMounted(async () => {
   if (tokenExpired.value) {
     // token已过期，等待路由守卫处理
     isLoading.value = false
+    await markLayoutReady()
     return
   }
 
@@ -62,6 +71,7 @@ onMounted(async () => {
   if (!accessToken) {
     // 游客模式：没有 token，直接结束 loading，并提示
     isLoading.value = false
+    await markLayoutReady()
     if (!isAuthenticated.value) {
       guest_info_show()
     }
@@ -81,20 +91,20 @@ onMounted(async () => {
     if (!isAuthenticated.value && !tokenExpired.value) {
       guest_info_show()
     }
+    await markLayoutReady()
   }
 })
 </script>
 
 <template>
-  <FullScreenLoading :visible="isLoading" />
-  <div v-if="loading">
+  <FullScreenLoading :visible="showPageLoading" />
+  <div v-if="showPageLoading">
   </div>
   <div v-else>
 
     <div class="common-layout">
       <el-container>
         <el-header style="padding: 0">
-
           <Head />
         </el-header>
         <el-container>

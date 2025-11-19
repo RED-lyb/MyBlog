@@ -17,7 +17,7 @@ Including another URLconf
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from home.views import home
+from home.views import home, avatar_resource
 from register.views import register
 from forgot.views import forgot
 from login.views import login
@@ -28,15 +28,14 @@ from common.views import get_user_info
 urlpatterns = [
     path('captcha/', include('captcha.urls')),
     path('api/home/', home),
+    path('api/home/avatar/', avatar_resource),
     path('api/register/', register),
     path('api/forgot/', forgot),
     path('api/login/', login),
     path('api/captcha/', get_captcha),
     path('api/captcha/image/<str:key>/', get_captcha_image, name='captcha-image'),
     path('api/captcha/verify/', verify_captcha),
-    # JWT认证相关接口
     path('api/auth/refresh/', refresh_token),
     path('api/auth/logout/', logout),
-    # 全局用户信息接口
     path('api/user/info/', get_user_info),
 ]

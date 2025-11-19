@@ -1,6 +1,11 @@
+import os
+from pathlib import Path
+
+from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
+from django.views.decorators.http import require_GET
 from django.db import connection
 
 
@@ -73,3 +78,44 @@ def home(request):
                 'guest_message': '您当前以访客身份访问，请登录以获得完整功能'
             }
         })
+
+
+@require_GET
+def avatar_resource(request):
+    """
+    根据头像文件名返回可访问的静态资源URL
+    """
+    file_name = request.GET.get('file_name')
+    if not file_name:
+        return JsonResponse({
+            'success': False,
+            'error': '缺少头像参数'
+        }, status=400)
+
+    safe_name = os.path.basename(file_name.strip())
+    if not safe_name:
+        return JsonResponse({
+            'success': False,
+            'error': '头像文件名非法'
+        }, status=400)
+
+    static_dirs = getattr(settings, 'STATICFILES_DIRS', [])
+    if static_dirs:
+        user_head_dir = Path(static_dirs[0]) / 'user_heads'
+    else:
+        user_head_dir = Path(settings.BASE_DIR) / 'api' / 'static' / 'user_heads'
+
+    file_path = user_head_dir / safe_name
+    if not file_path.exists():
+        return JsonResponse({
+            'success': False,
+            'error': '头像文件不存在'
+        }, status=404)
+
+    avatar_url = request.build_absolute_uri(f'/api/static/user_heads/{safe_name}')
+    return JsonResponse({
+        'success': True,
+        'data': {
+            'avatar_url': avatar_url
+        }
+    })
