@@ -1,29 +1,75 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 
+const sanitizeUser = (rawUser) => {
+  if (!rawUser || typeof rawUser !== 'object') {
+    return null
+  }
+
+  return {
+    id: rawUser.id ?? '',
+    username: rawUser.username ?? '',
+    registered_time: rawUser.registered_time ?? rawUser.registeredTime ?? '',
+    avatar: rawUser.avatar ?? '',
+    bg_color: rawUser.bg_color ?? '',
+    bg_pattern: rawUser.bg_pattern ?? '',
+    corner_radius: rawUser.corner_radius ?? ''
+  }
+}
+
+const persistUserInfo = (userData) => {
+  if (userData) {
+    localStorage.setItem('user_info', JSON.stringify(userData))
+  } else {
+    localStorage.removeItem('user_info')
+  }
+}
+
 // 用户信息 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const isAuthenticated = ref(false)
   const wasLoggedIn = ref(false) // 标记用户当前会话是否登录过
   const tokenExpired = ref(false) // 标记token是否真正过期（刷新失败）
-
-  const username = computed(() => user.value?.username || '')
+  
   const userId = computed(() => user.value?.id || null)
+  const username = computed(() => user.value?.username || '')
+  const registeredTime = computed(() => user.value?.registered_time || '')
+  const avatar = computed(() => user.value?.avatar || '')
+  const bgColor = computed(() => user.value?.bg_color || '')
+  const bgPattern = computed(() => user.value?.bg_pattern || '')
+  const cornerRadius = computed(() => user.value?.corner_radius || '')
 
-  function setUser(nextUser) {
-    user.value = nextUser
-    isAuthenticated.value = !!nextUser
-    tokenExpired.value = false // 登录成功时清除过期状态
-    localStorage.removeItem('token_expired') // 清除过期标记
-    if (nextUser) {
+
+  function setUser(nextUser, options = {}) {
+    const { persist = true, resetTokenExpired = true } = options
+    const sanitized = sanitizeUser(nextUser)
+
+    user.value = sanitized
+    if (!tokenExpired.value || resetTokenExpired === true) {
+      isAuthenticated.value = !!sanitized
+    }
+
+    if (sanitized) {
       wasLoggedIn.value = true // 标记当前会话登录过
+      if (resetTokenExpired) {
+        tokenExpired.value = false // 登录成功时清除过期状态
+        localStorage.removeItem('token_expired') // 清除过期标记
+      }
+    } else if (resetTokenExpired) {
+      tokenExpired.value = false
+      localStorage.removeItem('token_expired')
+    }
+
+    if (persist) {
+      persistUserInfo(sanitized)
     }
   }
 
   function clear() {
     user.value = null
     isAuthenticated.value = false
+    persistUserInfo(null)
     // 注意：不清除wasLoggedIn和tokenExpired，保持当前会话登录过的状态和过期状态
   }
 
@@ -42,35 +88,29 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated.value = false
     wasLoggedIn.value = false // 重置会话登录状态
     tokenExpired.value = false // 重置过期状态
+    persistUserInfo(null)
     localStorage.removeItem('token_expired') // 清除过期标记
   }
 
   function syncFromLocalStorage() {
     try {
       const raw = localStorage.getItem('user_info')
-      const accessToken = localStorage.getItem('access_token')
-      const expiredFlag = localStorage.getItem('token_expired')
+      const expiredFlag = localStorage.getItem('token_expired') === 'true'
       
-      // 如果标记为过期，恢复过期状态（即使有accessToken也要恢复，因为token可能已过期）
-      if (expiredFlag === 'true' && raw) {
-        try {
-          const parsed = JSON.parse(raw)
-          user.value = parsed
-          isAuthenticated.value = false
-          tokenExpired.value = true
-          wasLoggedIn.value = true
-        } catch (_) {
-          // 解析失败
-        }
-        return
-      }
-      
-      // 如果没有过期标记，且有用户信息，正常恢复
       if (raw) {
         const parsed = JSON.parse(raw)
-        setUser(parsed)
+        const sanitized = sanitizeUser(parsed)
+        user.value = sanitized
+        if (sanitized) {
+          wasLoggedIn.value = true
+        }
+        isAuthenticated.value = expiredFlag ? false : !!sanitized
+      } else {
+        user.value = null
+        isAuthenticated.value = false
       }
-      // 不再检查持久化的登录状态
+
+      tokenExpired.value = expiredFlag
     } catch (_) {
       // 解析失败
     }
@@ -83,6 +123,11 @@ export const useAuthStore = defineStore('auth', () => {
     tokenExpired, // 导出过期状态
     username, 
     userId, 
+    registeredTime,
+    avatar,
+    bgColor,
+    bgPattern,
+    cornerRadius,
     setUser, 
     clear, 
     setTokenExpired, // 导出设置过期状态的方法

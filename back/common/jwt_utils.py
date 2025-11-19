@@ -48,8 +48,8 @@ class JWTUtils:
     ALGORITHM = 'HS256'
     
     # Token过期时间
-    ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Access Token 60分钟
-    REFRESH_TOKEN_EXPIRE_DAYS = 30  # Refresh Token 30天
+    ACCESS_TOKEN_EXPIRE_MINUTES = 0.5  # Access Token 60分钟
+    REFRESH_TOKEN_EXPIRE_DAYS = 2/(24*60)  # Refresh Token 30天
     
     @classmethod
     def generate_access_token(cls, user_id, username):
@@ -254,7 +254,7 @@ class RefreshTokenManager:
 # 简单的后台清理任务：定期删除已过期的 refresh_tokens 和验证码
 class _BackgroundCleaner:
     _started = False
-    _interval_seconds = 60
+    _interval_seconds = 60*60*24 #一天清理一次
 
     @classmethod
     def start(cls):

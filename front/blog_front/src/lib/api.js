@@ -85,7 +85,6 @@ apiClient.interceptors.request.use(
           if (refreshResponse.data?.success) {
             const newAccessToken = refreshResponse.data.data.access_token
             localStorage.setItem('access_token', newAccessToken)
-            localStorage.setItem('user_info', JSON.stringify(refreshResponse.data.data.user))
             try {
               const auth = useAuthStore()
               auth.setUser(refreshResponse.data.data.user)
@@ -139,7 +138,6 @@ apiClient.interceptors.response.use(
         if (refreshResponse.data?.success) {
           const newAccessToken = refreshResponse.data.data.access_token
           localStorage.setItem('access_token', newAccessToken)
-          localStorage.setItem('user_info', JSON.stringify(refreshResponse.data.data.user))
           try {
             const auth = useAuthStore()
             auth.setUser(refreshResponse.data.data.user)

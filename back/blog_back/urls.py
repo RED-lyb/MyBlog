@@ -40,7 +40,3 @@ urlpatterns = [
     # 全局用户信息接口
     path('api/user/info/', get_user_info),
 ]
-
-# 开发环境下提供媒体文件访问
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

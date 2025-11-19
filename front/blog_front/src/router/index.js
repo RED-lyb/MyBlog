@@ -116,7 +116,7 @@ router.beforeEach(async (to, from, next) => {
     if (userInfo) {
       try {
         const parsed = JSON.parse(userInfo)
-        authStore.user = parsed
+        authStore.setUser(parsed, { persist: false, resetTokenExpired: false })
         authStore.tokenExpired = true
         authStore.isAuthenticated = false
         authStore.wasLoggedIn = true
@@ -143,7 +143,7 @@ router.beforeEach(async (to, from, next) => {
           // 刷新成功，更新token和用户信息
           const newAccessToken = refreshResponse.data.data.access_token
           localStorage.setItem('access_token', newAccessToken)
-          localStorage.setItem('user_info', JSON.stringify(refreshResponse.data.data.user))
+          authStore.setUser(refreshResponse.data.data.user)
           authStore.setUser(refreshResponse.data.data.user)
           // 刷新成功，继续访问
           return next()
