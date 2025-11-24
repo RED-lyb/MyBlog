@@ -1,13 +1,45 @@
 <script setup>
-import { onBeforeMount, ref, watch } from 'vue'
+import { onBeforeMount, ref, watch, computed } from 'vue'
 import axios from 'axios'
 import theme from '../pages/theme.vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
+import { useRouter, useRoute } from 'vue-router'
 
-const activeIndex = ref('1')
+const router = useRouter()
+const route = useRoute()
+
+// 根据当前路由设置激活的菜单项
+const activeIndex = computed(() => {
+  const path = route.path
+  if (path === '/home') return '1'
+  if (path === '/network_disk') return '2'
+  if (path === '/tools') return '3'
+  if (path === '/games') return '4'
+  if (path === '/feedback') return '5'
+  if (path === '/history') return '6'
+  if (path === '/about') return '7'
+  return '1'
+})
+
 const handleSelect = (key, keyPath) => {
   console.log(key, keyPath)
+  // 根据菜单项索引跳转到对应路由
+  const routeMap = {
+    '0': '/', // Logo点击回到首页
+    '1': '/home', // 博客主页
+    '2': '/network_disk', // 流动网盘（暂时跳转到开发中页面）
+    '3': '/tools', // 实用工具（暂时跳转到开发中页面）
+    '4': '/games', // 趣味游戏（暂时跳转到开发中页面）
+    '5': '/feedback', // 意见反馈（暂时跳转到开发中页面）
+    '6': '/history', // 更新历史
+    '7': '/about', // 关于作者
+  }
+  
+  const targetPath = routeMap[key]
+  if (targetPath && route.path !== targetPath) {
+    router.push(targetPath)
+  }
 }
 
 const authStore = useAuthStore()

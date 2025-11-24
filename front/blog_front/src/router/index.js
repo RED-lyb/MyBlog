@@ -51,13 +51,61 @@ const routes=[
     }
   },
   {
-  path: '/develop',
-  name: 'develop',
-  component: () => import('../pages/develop.vue'),
-  meta: {
-    title: '开发中|L-BLOG'
+    path: '/develop',
+    name: 'develop',
+    component: () => import('../pages/develop.vue'),
+    meta: {
+      title: '开发中|L-BLOG'
+    }
+  },
+  {
+    path: '/network_disk',
+    name: 'network_disk',
+    component: () => import('../pages/network_disk.vue'),
+    meta: {
+      title: '流动网盘|L-BLOG'
+    }
+  },
+  {
+    path: '/tools',
+    name: 'tools',
+    component: () => import('../pages/tools.vue'),
+    meta: {
+      title: '实用工具|L-BLOG'
+    }
+  },
+  {
+    path: '/games',
+    name: 'games',
+    component: () => import('../pages/games.vue'),
+    meta: {
+      title: '趣味游戏|L-BLOG'
+    }
+  },
+  {
+    path: '/feedback',
+    name: 'feedback',
+    component: () => import('../pages/feedback.vue'),
+    meta: {
+      title: '意见反馈|L-BLOG'
+    }
+  },
+  {
+    path: '/history',
+    name: 'history',
+    component: () => import('../pages/history.vue'),
+    meta: {
+      title: '更新历史|L-BLOG'
+    }
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import('../pages/about.vue'),
+    meta: {
+      title: '关于作者|L-BLOG'
+    }
   }
-}
 ]
 //创建路由器实例
 const router = createRouter({
