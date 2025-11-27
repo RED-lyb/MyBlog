@@ -18,10 +18,19 @@ const logout = async () => {
 </script>
 
 <template>
-    <button @click="logout" style="margin-top: 10px; padding: 8px 16px; background-color: #f56c6c; color: white; border: none; border-radius: 4px; cursor: pointer;">
+    <span @click.stop="logout" class="logout-text">
         退出登录
-    </button>
-    
+    </span>
 </template>
+
+<style scoped>
+.logout-text {
+    cursor: pointer;
+    user-select: none;
+}
+.logout-text:hover {
+    color: #C8161D;
+}
+</style>
 
 

@@ -20,11 +20,34 @@ const activeIndex = computed(() => {
   if (path === '/feedback') return '5'
   if (path === '/history') return '6'
   if (path === '/about') return '7'
+  // 匹配 /user_home 或 /user_home/:userId
+  if (path.startsWith('/user_home')) return '9-home'
   return '1'
 })
 
 const handleSelect = (key, keyPath) => {
   console.log(key, keyPath)
+  // 退出登录菜单项不触发路由跳转（由 Logout 组件内部处理）
+  if (key === '9-logout') {
+    return
+  }
+
+  // 个人主页跳转，需要带上 userId
+  if (key === '9-home') {
+    if (userId.value) {
+      const targetPath = `/user_home/${userId.value}`
+      if (route.path !== targetPath) {
+        router.push(targetPath)
+      }
+    } else {
+      // 如果没有 userId，跳转到不带参数的路由
+      if (route.path !== '/user_home') {
+        router.push('/user_home')
+      }
+    }
+    return
+  }
+
   // 根据菜单项索引跳转到对应路由
   const routeMap = {
     '0': '/', // Logo点击回到首页
@@ -36,7 +59,7 @@ const handleSelect = (key, keyPath) => {
     '6': '/history', // 更新历史
     '7': '/about', // 关于作者
   }
-  
+
   const targetPath = routeMap[key]
   if (targetPath && route.path !== targetPath) {
     router.push(targetPath)
@@ -111,81 +134,70 @@ watch(
 </script>
 
 <template>
-  <el-menu
-      :default-active="activeIndex"
-      class="el-menu-demo"
-      mode="horizontal"
-      :ellipsis="false"
-      @select="handleSelect"
-      text-color="#EF5710"
-      active-text-color="	#C8161D"
-  >
-    <el-menu-item index="0" style="padding-left: 10px;padding-right: 20px">
-      <img style="width: 50px;"
-          src="/icon.png"
-          alt="L-BLOG"
-      />
-      <h1 style="font-size: 20px;font-weight: bolder">L-BLOG</h1>
-    </el-menu-item>
-    <el-menu-item index="1">博客主页</el-menu-item>
-    <el-menu-item index="2">流动网盘</el-menu-item>
-    <el-menu-item index="3">实用工具</el-menu-item>
-    <el-menu-item index="4">趣味游戏</el-menu-item>
-    <el-menu-item index="5">意见反馈</el-menu-item>
-    <el-menu-item index="6">更新历史</el-menu-item>
-    <el-menu-item index="7">关于作者</el-menu-item>
-    <el-menu-item index="8" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 10px">
-      <theme size="2.5" />
-    </el-menu-item>
-    <el-sub-menu
-      index="9"
-      popper-class="avatar-submenu"
-      :expand-open-icon="null"
-      :expand-close-icon="null"
-      :popper-style="{ marginLeft: '-24px' }"
-    >
-      <template #title>
-        <div class="avatar-trigger">
-          <el-skeleton
-            :loading="avatarLoading"
-            animated
-            style="display: flex;align-items: center;justify-content: center;width: 35px;height: 35px;"
-          >
-            <template #template>
-              <el-skeleton-item variant="circle" style="width: 35px;height: 35px;" />
-            </template>
-            <template #default>
-              <el-avatar :size="35" :src="user_avatar" />
-            </template>
-          </el-skeleton>
-        </div>
-      </template>
-      <template v-if="isAuthenticated">
-        <el-menu-item index="9-logout" class="avatar-menu-item">
-          <Logout />
-        </el-menu-item>
-      </template>
-      <template v-else>
-        <el-menu-item index="9-login" class="avatar-menu-item" @click="goToLogin">
-          去登录
-        </el-menu-item>
-      </template>
-    </el-sub-menu>
-  </el-menu>
+  <el-affix>
 
+    <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
+      @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">
+      <el-menu-item index="0" style="padding-left: 10px;padding-right: 20px">
+        <img style="width: 50px;" src="/icon.png" alt="L-BLOG" />
+        <h1 style="font-size: 20px;font-weight: bolder">L-BLOG</h1>
+      </el-menu-item>
+      <el-menu-item index="1">博客主页</el-menu-item>
+      <el-menu-item index="2">流动网盘</el-menu-item>
+      <el-menu-item index="3">实用工具</el-menu-item>
+      <el-menu-item index="4">趣味游戏</el-menu-item>
+      <el-menu-item index="5">意见反馈</el-menu-item>
+      <el-menu-item index="6">更新历史</el-menu-item>
+      <el-menu-item index="7">关于作者</el-menu-item>
+      <el-menu-item index="8" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 10px">
+        <theme size="2.5" />
+      </el-menu-item>
+      <el-sub-menu index="9" class="avatar-sub-menu" popper-class="avatar-submenu"
+        :popper-style="{ marginLeft: '-10px' }" style="padding-right: 10px;">
+        <template #title>
+          <div class="avatar-trigger" style="margin-right: 20px;padding-right: 0px;">
+            <el-skeleton :loading="avatarLoading" animated
+              style="display: flex;align-items: center;justify-content: center;width: 35px;height: 35px;">
+              <template #template>
+                <el-skeleton-item variant="circle" style="width: 35px;height: 35px;" />
+              </template>
+              <template #default>
+                <el-avatar :size="35" :src="user_avatar" />
+              </template>
+            </el-skeleton>
+          </div>
+        </template>
+        <template v-if="isAuthenticated">
+          <el-menu-item index="9-home" class="avatar-menu-item" :route="userId ? `/user_home/${userId}` : '/user_home'">
+            个人主页
+          </el-menu-item>
+          <el-menu-item index="9-logout" class="avatar-menu-item">
+            <Logout />
+          </el-menu-item>
+        </template>
+        <template v-else>
+          <el-menu-item index="9-login" class="avatar-menu-item" @click="goToLogin">
+            去登录
+          </el-menu-item>
+        </template>
+      </el-sub-menu>
+    </el-menu>
+  </el-affix>
 </template>
 <style scoped>
-.el-menu--horizontal > .el-menu-item:nth-child(1) {
+.el-menu--horizontal>.el-menu-item:nth-child(1) {
   margin-right: auto;
 }
+
 .el-menu {
   background-color: transparent !important;
 }
 
-.el-menu-item{
+.el-menu-item {
   background-color: transparent !important;
   font-size: 17px;
 }
+
 .avatar-trigger {
   display: flex;
   align-items: center;
@@ -193,10 +205,50 @@ watch(
   width: 35px;
   height: 35px;
   cursor: pointer;
+  margin-right: 8px;
 }
+
+/* 隐藏头像子菜单的箭头图标 - 使用多种选择器确保生效 */
+:deep(.avatar-sub-menu .el-sub-menu__icon-arrow),
+:deep(.avatar-sub-menu .el-icon),
+:deep(.avatar-sub-menu i.el-sub-menu__icon-arrow) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* 调整头像子菜单的标题区域，移除箭头占用的空间 */
+:deep(.avatar-sub-menu .el-sub-menu__title) {
+  padding-right: 0 !important;
+}
+
 .avatar-menu-item {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 确保子菜单项激活状态正确显示 */
+:deep(.el-menu--horizontal .el-sub-menu .el-menu-item.is-active) {
+  color: #C8161D !important;
+  border-bottom-color: #C8161D !important;
+}
+</style>
+
+<style>
+/* 全局样式作为备选方案，确保箭头被隐藏 */
+.el-menu--horizontal .avatar-sub-menu .el-sub-menu__icon-arrow,
+.el-menu--horizontal .avatar-sub-menu .el-icon.el-sub-menu__icon-arrow {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.el-menu--horizontal .avatar-sub-menu .el-sub-menu__title {
+  padding-right: 0 !important;
 }
 </style>

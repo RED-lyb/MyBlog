@@ -157,10 +157,10 @@ onMounted(async () => {
 </template>
 <style scoped>
 .el-aside {
-  background-color: #2effc1;
+  background-color: #2effc100;
 }
 
 .el-main {
-  background-color: #fbaf00;
+  background-color: #fbaf0000;
 }
 </style>
