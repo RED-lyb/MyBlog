@@ -5,6 +5,7 @@ import theme from '../pages/theme.vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
 import { useRouter, useRoute } from 'vue-router'
+import Logout from './Logout.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -45,8 +46,14 @@ const handleSelect = (key, keyPath) => {
 const authStore = useAuthStore()
 const {
   userId,
-  avatar
+  avatar,
+  isAuthenticated
 } = storeToRefs(authStore)
+
+// 跳转到登录页
+const goToLogin = () => {
+  router.push('/login')
+}
 
 const defaultAvatar = '/default_head.png'
 const user_avatar = ref(defaultAvatar)
@@ -130,20 +137,40 @@ watch(
     <el-menu-item index="8" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 10px">
       <theme size="2.5" />
     </el-menu-item>
-    <el-menu-item index="9" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 20px">
-      <el-skeleton
-        :loading="avatarLoading"
-        animated
-        style="display: flex;align-items: center;justify-content: center;width: 35px;height: 35px;"
-      >
-        <template #template>
-          <el-skeleton-item variant="circle" style="width: 35px;height: 35px;" />
-        </template>
-        <template #default>
-          <el-avatar :size="35" :src="user_avatar" />
-        </template>
-      </el-skeleton>
-    </el-menu-item>
+    <el-sub-menu
+      index="9"
+      popper-class="avatar-submenu"
+      :expand-open-icon="null"
+      :expand-close-icon="null"
+      :popper-style="{ marginLeft: '-24px' }"
+    >
+      <template #title>
+        <div class="avatar-trigger">
+          <el-skeleton
+            :loading="avatarLoading"
+            animated
+            style="display: flex;align-items: center;justify-content: center;width: 35px;height: 35px;"
+          >
+            <template #template>
+              <el-skeleton-item variant="circle" style="width: 35px;height: 35px;" />
+            </template>
+            <template #default>
+              <el-avatar :size="35" :src="user_avatar" />
+            </template>
+          </el-skeleton>
+        </div>
+      </template>
+      <template v-if="isAuthenticated">
+        <el-menu-item index="9-logout" class="avatar-menu-item">
+          <Logout />
+        </el-menu-item>
+      </template>
+      <template v-else>
+        <el-menu-item index="9-login" class="avatar-menu-item" @click="goToLogin">
+          去登录
+        </el-menu-item>
+      </template>
+    </el-sub-menu>
   </el-menu>
 
 </template>
@@ -158,5 +185,18 @@ watch(
 .el-menu-item{
   background-color: transparent !important;
   font-size: 17px;
+}
+.avatar-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  cursor: pointer;
+}
+.avatar-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
