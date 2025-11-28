@@ -3,7 +3,7 @@
 </script>
 <template>
   <div class="footer">
-    <el-divider>
+    <el-divider class="line">
       <el-icon><star-filled /></el-icon>
     </el-divider>
     <div class="icons">
@@ -51,5 +51,8 @@
 
 .copyright {
   margin-top: 0.5rem;
+}
+::v-deep(.el-divider__text.is-center) {
+  background-color: var(--background);
 }
 </style>

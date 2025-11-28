@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeMount, ref, watch, computed } from 'vue'
+import { onBeforeMount, ref, watch, computed,onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import theme from '../pages/theme.vue'
 import { storeToRefs } from 'pinia'
@@ -24,6 +24,14 @@ const activeIndex = computed(() => {
   if (path.startsWith('/user_home')) return '9-home'
   return '1'
 })
+
+// 添加遮罩状态
+const showMask = ref(false)
+
+// 滚动监听
+const handleScroll = () => {
+  showMask.value = window.scrollY > 10
+}
 
 const handleSelect = (key, keyPath) => {
   console.log(key, keyPath)
@@ -52,10 +60,10 @@ const handleSelect = (key, keyPath) => {
   const routeMap = {
     '0': '/', // Logo点击回到首页
     '1': '/home', // 博客主页
-    '2': '/network_disk', // 流动网盘（暂时跳转到开发中页面）
-    '3': '/tools', // 实用工具（暂时跳转到开发中页面）
-    '4': '/games', // 趣味游戏（暂时跳转到开发中页面）
-    '5': '/feedback', // 意见反馈（暂时跳转到开发中页面）
+    '2': '/network_disk', // 流动网盘
+    '3': '/tools', // 实用工具
+    '4': '/games', // 趣味游戏
+    '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史
     '7': '/about', // 关于作者
   }
@@ -119,7 +127,13 @@ const fetchUserAvatar = async () => {
 onBeforeMount(() => {
   fetchUserAvatar()
 })
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
 
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 watch(
   [userId, avatar],
   ([nextId, nextAvatar], [prevId, prevAvatar]) => {
@@ -135,7 +149,7 @@ watch(
 
 <template>
   <el-affix>
-
+    <div class="header-mask" :class="{ 'mask-active': showMask }">
     <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
       @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">
       <el-menu-item index="0" style="padding-left: 10px;padding-right: 20px">
@@ -182,9 +196,21 @@ watch(
         </template>
       </el-sub-menu>
     </el-menu>
+  </div>
   </el-affix>
 </template>
 <style scoped>
+/* 添加遮罩层 */
+.header-mask {
+  width: 100%;
+  background: transparent;
+  transition: background 0.3s ease;
+}
+
+.mask-active {
+  background: var(--el-bg-color); /* 使用Element Plus主题色 */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
 .el-menu--horizontal>.el-menu-item:nth-child(1) {
   margin-right: auto;
 }

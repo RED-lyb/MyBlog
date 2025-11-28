@@ -12,6 +12,7 @@ declare module 'vue' {
     Footer: typeof import('./src/components/Footer.vue')['default']
     FullScreenLoading: typeof import('./src/components/FullScreenLoading.vue')['default']
     Head: typeof import('./src/components/Head.vue')['default']
+    Home_main: typeof import('./src/components/home_main.vue')['default']
     Logout: typeof import('./src/components/Logout.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

@@ -48,8 +48,8 @@ class JWTUtils:
     ALGORITHM = 'HS256'
     
     # Token过期时间
-    ACCESS_TOKEN_EXPIRE_MINUTES = 0.5  # Access Token 60分钟
-    REFRESH_TOKEN_EXPIRE_DAYS = 2/(24*60)  # Refresh Token 30天
+    ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Access Token 60分钟
+    REFRESH_TOKEN_EXPIRE_DAYS = 30  # Refresh Token 30天
     
     @classmethod
     def generate_access_token(cls, user_id, username):
