@@ -1,7 +1,8 @@
 <script setup>
+import page_number from "./page_number.vue"
 </script>
 <template>
-哈哈
+<page_number />
 </template>
 <style scoped>
 </style>
