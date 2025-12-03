@@ -127,7 +127,7 @@ onMounted(async () => {
           <el-main style="height: 560px">
             <Home_main />
           </el-main>
-          <el-aside width="200px">Aside</el-aside>
+          <el-aside></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -135,26 +135,6 @@ onMounted(async () => {
       </el-container>
     </div>
   </div>
-  <!--    <div>-->
-  <!--        <h1>目前正处于测试部署状态，还未正式部署相关内容</h1>-->
-
-  <!--        <div v-if="loading">-->
-  <!--            <p>加载中...</p>-->
-  <!--        </div>-->
-
-  <!--        <div v-else>-->
-  <!--            <div v-if="authState.isAuthenticated && authState.user">-->
-
-  <!--                <Logout />-->
-  <!--            </div>-->
-
-  <!--            <div v-else>-->
-  <!--                <h2>访客模式</h2>-->
-  <!--                <p>您当前以访客身份访问，请登录以获得完整功能</p>-->
-  <!--            </div>-->
-
-  <!--        </div>-->
-  <!--    </div>-->
 </template>
 <style scoped>
 .el-aside {
