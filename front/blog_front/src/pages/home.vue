@@ -109,7 +109,7 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside width="200px">
+          <el-aside style="width: 200px;">
             <template v-if="isAuthenticated && user">
               <h2>欢迎回来，{{ username }}！</h2>
               <p>用户ID: {{ userId }}</p>
@@ -124,10 +124,10 @@ onMounted(async () => {
               <p>您当前以访客身份浏览</p>
             </template>
           </el-aside>
-          <el-main style="height: 560px">
+          <el-main style="height: 560px;">
             <Home_main />
           </el-main>
-          <el-aside></el-aside>
+          <el-aside style="width: 200px;"></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -143,5 +143,7 @@ onMounted(async () => {
 
 .el-main {
   background-color: #fbaf0000;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 </style>

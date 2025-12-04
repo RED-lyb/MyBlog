@@ -38,4 +38,5 @@ urlpatterns = [
     path('api/auth/refresh/', refresh_token),
     path('api/auth/logout/', logout),
     path('api/user/info/', get_user_info),
+    path('api/article/', include('article.urls')),  # 文章相关路由
 ]

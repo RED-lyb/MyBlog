@@ -25,7 +25,7 @@
 <script lang="ts" setup>
 import { ref, computed, watch } from 'vue'
 
-const currentPage3 = ref(5) //当前页码
+const currentPage3 = ref(1) //当前页码
 const pageSize3 = ref(10) //每页显示数量
 const total = ref(1000) //总页数
 
@@ -77,6 +77,9 @@ const handleCurrentChange = (val: number) => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.pagination-wrapper > * {
+  width: 100%;
 }
 .jumper-input {
   display: flex;

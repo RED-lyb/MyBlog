@@ -74,3 +74,22 @@ class RefreshToken(models.Model):
                 "UPDATE refresh_tokens SET last_used_at = NOW() WHERE id = %s",
                 [self.id]
             )
+
+
+class BlogArticle(models.Model):
+    """
+    博客文章模型
+    使用 managed = False，由 SQL 直接管理表结构
+    """
+    id = models.AutoField(primary_key=True, db_comment='文章ID，主键自增')
+    title = models.CharField(max_length=500, db_comment='文章标题')
+    content = models.TextField(db_comment='文章正文，支持 Markdown/HTML')
+    author_id = models.IntegerField(db_comment='作者ID，外键关联 users 表')
+    view_count = models.IntegerField(default=0, db_comment='浏览量，默认0')
+    love_count = models.IntegerField(default=0, db_comment='点赞数，默认0')
+    comment_count = models.IntegerField(default=0, db_comment='评论数，默认0，冗余字段便于查询')
+    published_at = models.DateTimeField(db_comment='发布时间，默认服务器系统时间')
+    
+    class Meta:
+        managed = False
+        db_table = 'blog_articles'
