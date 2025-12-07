@@ -6,12 +6,33 @@ from django.views.decorators.http import require_GET
 @require_GET
 def get_all_articles(request):
     """
-    获取所有文章列表
-    返回所有文章的完整信息
+    获取文章列表（支持分页）
+    返回分页后的文章信息
     """
     try:
+        # 获取分页参数
+        page = int(request.GET.get('page', 1))  # 当前页码，默认第1页
+        page_size = int(request.GET.get('page_size', 4))  # 每页数量，默认4条
+        
+        # 确保页码和每页数量有效
+        if page < 1:
+            page = 1
+        if page_size < 1:
+            page_size = 4
+        
+        # 计算偏移量
+        offset = (page - 1) * page_size
+        
         with connection.cursor() as cursor:
-            # 查询所有文章，并关联用户表获取作者用户名和头像
+            # 先查询总记录数
+            cursor.execute("""
+                SELECT COUNT(*) 
+                FROM blog_articles
+            """)
+            total_count = cursor.fetchone()[0]
+            
+            # 查询分页后的文章，并关联用户表获取作者用户名和头像
+            # 按发布时间降序排列（最先发布的在最后面）
             cursor.execute("""
                 SELECT 
                     a.id,
@@ -27,7 +48,8 @@ def get_all_articles(request):
                 FROM blog_articles a
                 LEFT JOIN users u ON a.author_id = u.id
                 ORDER BY a.published_at DESC
-            """)
+                LIMIT %s OFFSET %s
+            """, [page_size, offset])
             
             rows = cursor.fetchall()
             
@@ -52,7 +74,10 @@ def get_all_articles(request):
                 'message': '获取文章列表成功',
                 'data': {
                     'articles': articles,
-                    'total': len(articles)
+                    'total': total_count,
+                    'page': page,
+                    'page_size': page_size,
+                    'total_pages': (total_count + page_size - 1) // page_size  # 向上取整
                 }
             })
             
@@ -62,6 +87,9 @@ def get_all_articles(request):
             'error': f'获取文章列表失败: {str(e)}',
             'data': {
                 'articles': [],
-                'total': 0
+                'total': 0,
+                'page': 1,
+                'page_size': 4,
+                'total_pages': 0
             }
         }, status=500)

@@ -1,13 +1,20 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import page_number from "./page_number.vue"
+import FullScreenLoading from '../pages/FullScreenLoading.vue'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
+import { storeToRefs } from 'pinia'
+import { usePaginationStore } from '../stores/pagination.js'
 
 // 文章列表数据
 const articles = ref([])
 const loading = ref(false)
 const error = ref(null)
+
+// 使用分页 store
+const paginationStore = usePaginationStore()
+const { currentPage, pageSize } = storeToRefs(paginationStore)
 
 // 默认头像
 const defaultAvatar = '/default_head.png'
@@ -77,9 +84,19 @@ const fetchArticles = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`)
+    const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value
+      }
+    })
     if (response.data?.success) {
-      articles.value = response.data.data.articles || []
+      const data = response.data.data
+      articles.value = data.articles || []
+      
+      // 更新总记录数到 store
+      paginationStore.setTotal(data.total || 0)
+      
       // 为每篇文章初始化头像相关属性并获取头像
       articles.value.forEach(article => {
         article.display_avatar = defaultAvatar
@@ -98,18 +115,47 @@ const fetchArticles = async () => {
   }
 }
 
+// 监听页码变化，重新获取文章并滚动到顶部
+watch(currentPage, () => {
+  fetchArticles()
+  // 滚动到容器顶部
+  const container = document.querySelector('.home-main-container')
+  if (container) {
+    container.scrollTop = 0
+  }
+})
+
+// 处理文章点击事件
+const handleArticleClick = (article) => {
+  // 目前跳转到 #，后续可以改为具体的文章详情页
+  window.location.href = '#'
+}
+
 // 组件挂载时获取文章列表
 onMounted(() => {
+  // 从 localStorage 恢复分页状态（如果不存在则默认为第1页）
+  paginationStore.syncFromLocalStorage()
+  // 确保当前页码至少为1
+  if (paginationStore.currentPage < 1) {
+    paginationStore.setCurrentPage(1)
+  }
   fetchArticles()
 })
 </script>
 <template>
   <div class="home-main-container">
+    <!-- 全屏加载动画 -->
+    <FullScreenLoading :visible="loading" />
+    
     <!-- 文章列表区域 -->
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="error" class="error">错误: {{ error }}</div>
+      <div v-if="error" class="error">错误: {{ error }}</div>
       <div v-else class="articles-list">
-        <div v-for="article in articles" :key="article.id" class="article-item">
+        <div 
+          v-for="article in articles" 
+          :key="article.id" 
+          class="article-item"
+          @click="handleArticleClick(article)"
+        >
           <div class="article-body">
             <div class="article-main">
               <div class="author-info">
@@ -165,7 +211,6 @@ onMounted(() => {
   overflow-y: auto;
 }
 
-.loading,
 .error,
 .empty {
   text-align: center;
@@ -186,7 +231,14 @@ onMounted(() => {
   padding: 12px 20px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  background: var(--el-bg-color);
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.article-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .article-body {
@@ -265,12 +317,11 @@ onMounted(() => {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 100px;
+  bottom: 90px;
   display: flex;
   justify-content: center;
   align-items: flex-end;
   padding: 10px 0;
-  background: transparent !important;
   z-index: 100;
 }
 </style>

@@ -2,8 +2,8 @@
 
     <div class="pagination-wrapper">
       <el-pagination
-        v-model:current-page="currentPage3"
-        v-model:page-size="pageSize3"
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
         layout="prev, pager, next"
         :total="total"
         @size-change="handleSizeChange"
@@ -23,22 +23,28 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePaginationStore } from '../stores/pagination.js'
 
-const currentPage3 = ref(1) //当前页码
-const pageSize3 = ref(10) //每页显示数量
-const total = ref(1000) //总页数
+const paginationStore = usePaginationStore()
+const { currentPage, pageSize, total, totalPages } = storeToRefs(paginationStore)
+
+// 组件挂载时从 localStorage 恢复状态
+onMounted(() => {
+  paginationStore.syncFromLocalStorage()
+})
 
 // 计算最大页数
 const maxPage = computed(() => {
-  return Math.ceil(total.value / pageSize3.value)
+  return totalPages.value
 })
 
-// jumper输入框的值，与currentPage3双向绑定
-const jumperValue = ref(currentPage3.value)
+// jumper输入框的值，与currentPage双向绑定
+const jumperValue = ref(currentPage.value)
 
-// 监听currentPage3变化，同步更新jumperValue
-watch(currentPage3, (newVal) => {
+// 监听currentPage变化，同步更新jumperValue
+watch(currentPage, (newVal) => {
   jumperValue.value = newVal
 })
 
@@ -57,18 +63,20 @@ const updatePageFromJumper = () => {
   let page = Number(jumperValue.value)
   if (isNaN(page) || page < 1) {
     page = 1
-  } else if (page > maxPage.value) {
+  } else if (page > maxPage.value && maxPage.value > 0) {
     page = maxPage.value
   }
   jumperValue.value = page
-  currentPage3.value = page
+  paginationStore.setCurrentPage(page)
 }
 
 const handleSizeChange = (val: number) => {
   console.log(`${val} items per page`)
 }
+
 const handleCurrentChange = (val: number) => {
   console.log(`current page: ${val}`)
+  paginationStore.setCurrentPage(val)
 }
 </script>
 
@@ -119,6 +127,28 @@ const handleCurrentChange = (val: number) => {
 }
 :deep(.el-pager li.is-active:hover) {
   color: #C8161D !important;
+}
+
+/* 设置分页器背景透明 */
+:deep(.el-pager li) {
+  background: transparent !important;
+}
+
+:deep(.el-pagination .btn-next),
+:deep(.el-pagination .btn-prev) {
+  background-color: transparent !important;
+}
+
+:deep(.el-pagination .btn-next.is-disabled),
+:deep(.el-pagination .btn-next:disabled),
+:deep(.el-pagination .btn-prev.is-disabled),
+:deep(.el-pagination .btn-prev:disabled) {
+  background-color: transparent !important;
+}
+
+/* 设置输入框背景透明 */
+.jumper-input-field :deep(.el-input__wrapper) {
+  background-color: transparent !important;
 }
 
 </style>

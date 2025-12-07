@@ -59,7 +59,13 @@
 }
 
 .line {
-  padding-top: 24px !important;
-  margin-bottom: 24px !important;
+  margin-top: 50px !important;
+  margin-bottom: 15px !important;
+}
+
+/* 覆盖 el-divider--horizontal 的 margin，使分割线也向下移动 */
+.line :deep(.el-divider--horizontal) {
+  margin-top: 50px !important;
+  margin-bottom: 15px !important;
 }
 </style>
