@@ -8,6 +8,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Article_main: typeof import('./src/components/article_main.vue')['default']
     CaptchaDialog: typeof import('./src/components/CaptchaDialog.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']
     FullScreenLoading: typeof import('./src/components/FullScreenLoading.vue')['default']

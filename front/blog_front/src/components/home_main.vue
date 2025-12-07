@@ -1,11 +1,14 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import page_number from "./page_number.vue"
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import { usePaginationStore } from '../stores/pagination.js'
+
+const router = useRouter()
 
 // 文章列表数据
 const articles = ref([])
@@ -127,8 +130,8 @@ watch(currentPage, () => {
 
 // 处理文章点击事件
 const handleArticleClick = (article) => {
-  // 目前跳转到 #，后续可以改为具体的文章详情页
-  window.location.href = '#'
+  // 跳转到文章详情页
+  router.push(`/article/${article.id}`)
 }
 
 // 组件挂载时获取文章列表

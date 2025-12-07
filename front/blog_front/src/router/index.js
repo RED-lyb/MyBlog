@@ -99,27 +99,19 @@ const routes=[
     }
   },
   {
-    path: '/about',
-    name: 'about',
-    component: () => import('../pages/about.vue'),
-    meta: {
-      title: '关于作者|L-BLOG'
-    }
-  },
-  {
-    path: '/user_home',
-    name: 'user_home',
-    component: () => import('../pages/user_home.vue'),
-    meta: {
-      title: '个人主页|L-BLOG'
-    }
-  },
-  {
     path: '/user_home/:userId',
     name: 'user_home_with_id',
     component: () => import('../pages/user_home.vue'),
     meta: {
       title: '个人主页|L-BLOG'
+    }
+  },
+  {
+    path: '/article/:id',
+    name: 'article',
+    component: () => import('../pages/article.vue'),
+    meta: {
+      title: '文章详情|L-BLOG'
     }
   }
 ]

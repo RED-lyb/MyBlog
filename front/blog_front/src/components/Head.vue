@@ -19,7 +19,7 @@ const activeIndex = computed(() => {
   if (path === '/games') return '4'
   if (path === '/feedback') return '5'
   if (path === '/history') return '6'
-  if (path === '/about') return '7'
+  if (path === '/user_home/1') return '7' // 关于作者页面
   // 匹配 /user_home 或 /user_home/:userId
   if (path.startsWith('/user_home')) return '9-home'
   return '1'
@@ -65,7 +65,7 @@ const handleSelect = (key, keyPath) => {
     '4': '/games', // 趣味游戏
     '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史
-    '7': '/about', // 关于作者
+    '7': '/user_home/1', // 关于作者（跳转到用户ID为1的主页）
   }
 
   const targetPath = routeMap[key]

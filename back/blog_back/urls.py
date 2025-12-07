@@ -23,7 +23,7 @@ from forgot.views import forgot
 from login.views import login
 from common.captcha_views import get_captcha, verify_captcha, get_captcha_image
 from common.auth_views import refresh_token, logout
-from common.views import get_user_info
+from common.views import get_user_info, get_user_by_id
 
 urlpatterns = [
     path('captcha/', include('captcha.urls')),
@@ -38,5 +38,6 @@ urlpatterns = [
     path('api/auth/refresh/', refresh_token),
     path('api/auth/logout/', logout),
     path('api/user/info/', get_user_info),
+    path('api/user/<int:user_id>/', get_user_by_id, name='get_user_by_id'),  # 根据ID获取用户信息
     path('api/article/', include('article.urls')),  # 文章相关路由
 ]

@@ -93,3 +93,72 @@ def get_all_articles(request):
                 'total_pages': 0
             }
         }, status=500)
+
+
+@require_GET
+def get_article_detail(request, article_id):
+    """
+    获取文章详情
+    根据文章ID返回文章的完整信息
+    """
+    try:
+        with connection.cursor() as cursor:
+            # 查询文章详情，并关联用户表获取作者信息
+            cursor.execute("""
+                SELECT 
+                    a.id,
+                    a.title,
+                    a.content,
+                    a.author_id,
+                    u.username as author_name,
+                    u.avatar as author_avatar,
+                    a.view_count,
+                    a.love_count,
+                    a.comment_count,
+                    a.published_at
+                FROM blog_articles a
+                LEFT JOIN users u ON a.author_id = u.id
+                WHERE a.id = %s
+            """, [article_id])
+            
+            row = cursor.fetchone()
+            
+            if not row:
+                return JsonResponse({
+                    'success': False,
+                    'error': '文章不存在',
+                    'data': None
+                }, status=404)
+            
+            article = {
+                'id': row[0],
+                'title': row[1],
+                'content': row[2],
+                'author_id': row[3],
+                'author_name': row[4] if row[4] else '未知用户',
+                'author_avatar': row[5] if row[5] else None,
+                'view_count': row[6],
+                'love_count': row[7],
+                'comment_count': row[8],
+                'published_at': row[9].isoformat() if row[9] else None
+            }
+            
+            # 增加浏览量
+            cursor.execute("""
+                UPDATE blog_articles 
+                SET view_count = view_count + 1 
+                WHERE id = %s
+            """, [article_id])
+            
+            return JsonResponse({
+                'success': True,
+                'message': '获取文章详情成功',
+                'data': article
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'获取文章详情失败: {str(e)}',
+            'data': None
+        }, status=500)
