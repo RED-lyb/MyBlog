@@ -8,6 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
+import write_main from './write_main.vue'
 import { showGuestDialog } from '../lib/guestDialog.js'
 
 const authStore = useAuthStore()
@@ -93,26 +94,9 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside width="200px">
-            <template v-if="isAuthenticated && user">
-              <h2>欢迎回来，{{ username }}！</h2>
-              <p>用户ID: {{ userId }}</p>
-              <p>注册时间: {{ registeredTime }}</p>
-              <p>头像: {{ avatar || '暂未设置' }}</p>
-              <p>背景色: {{ bgColor || '默认' }}</p>
-              <p>背景样式: {{ bgPattern || '默认' }}</p>
-              <p>卡片圆角: {{ cornerRadius || '默认' }}</p>
-            </template>
-            <template v-else>
-              <h2>欢迎，游客！</h2>
-              <p>您当前以访客身份浏览</p>
-            </template>
-          </el-aside>
-          <el-main style="height: 600px">
-            <h1>意见反馈</h1>
-            <p>这里是意见反馈的内容区域</p>
+          <el-main style="height: calc(100vh - 200px); padding: 20px;">
+            <write_main />
           </el-main>
-          <el-aside width="200px">Aside</el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -123,11 +107,11 @@ onMounted(async () => {
 </template>
 <style scoped>
 .el-aside {
-  background-color: #2effc1;
+  background-color: #2effc100;
 }
 
 .el-main {
-  background-color: #fbaf00;
+  background-color: #fbaf0000;
 }
 </style>
 

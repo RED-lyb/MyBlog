@@ -96,6 +96,8 @@ const toggleFlip = () => {
 }
 
 const gohome = () => {
+    // 设置标记，表示从登录页的游客登录进入
+    sessionStorage.setItem('show_guest_dialog', 'true')
     router.push({ path: '/home' })
 }
 

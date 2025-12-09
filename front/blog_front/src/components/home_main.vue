@@ -194,9 +194,9 @@ onMounted(() => {
                 评论{{ article.comment_count || 0 }}
               </span>
 
-            </div>
           </div>
         </div>
+      </div>
     </div>
 
     <!-- 分页组件 -->
@@ -210,7 +210,10 @@ onMounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 20px 20px;
+  padding-top: 20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 0px;
   overflow-y: auto;
 }
 
@@ -317,14 +320,10 @@ onMounted(() => {
   color: #999;
 }
 .page-number-container {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 90px;
+  padding-top: 15px;
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding: 10px 0;
-  z-index: 100;
 }
 </style>

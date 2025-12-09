@@ -1,0 +1,116 @@
+/* 
+  highlight.js 代码高亮样式
+  全局样式，用于所有代码块的高亮显示
+*/
+
+/* 基础代码块样式 */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+  color: var(--el-text-color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 关键字 */
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+  color: #d73a4a;
+}
+
+/* 标题、类名、函数名 */
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+  color: #6f42c1;
+}
+
+/* 属性、字面量、数字、操作符、变量 */
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-variable {
+  color: #005cc5;
+}
+
+.hljs-meta 
+.hljs-string,
+.hljs-regexp,
+.hljs-string {
+  color: #620303;
+}
+
+/* 内置函数、符号 */
+.hljs-built_in,
+.hljs-symbol {
+  color: #e36209;
+}
+
+/* 注释 */
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+  color: #6a737d;
+}
+
+/* 名称、引用、选择器 */
+.hljs-name,
+.hljs-quote,
+.hljs-selector-pseudo,
+.hljs-selector-tag {
+  color: #22863a;
+}
+
+/* 替换文本 */
+.hljs-subst {
+  color: var(--el-text-color-primary);
+}
+
+/* 章节标题 */
+.hljs-section {
+  color: #005cc5;
+  font-weight: 600;
+}
+
+/* 列表项 */
+.hljs-bullet {
+  color: #735c0f;
+}
+
+/* 强调 */
+.hljs-emphasis {
+  color: var(--el-text-color-primary);
+  font-style: italic;
+}
+
+/* 粗体 */
+.hljs-strong {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
+/* 添加标记 */
+.hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+
+/* 删除标记 */
+.hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
+}
+

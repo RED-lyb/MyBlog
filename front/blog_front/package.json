@@ -19,6 +19,8 @@
     "canvas-confetti": "^1.9.3",
     "daisyui": "latest",
     "element-plus": "^2.11.8",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.1",
     "motion-v": "^1.7.0",
     "pinia": "^3.0.3",
     "tailwindcss": "latest",

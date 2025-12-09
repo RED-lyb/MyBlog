@@ -4,12 +4,12 @@ import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
-import Logout from '../components/Logout.vue'
+import { useRouter, useRoute } from 'vue-router'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Home_main from '../components/home_main.vue'
+import CreateButton from '../components/CreateButton.vue'
 
 const authStore = useAuthStore()
 const {
@@ -26,6 +26,7 @@ const {
 } = storeToRefs(authStore)
 const { loading, fetchUserInfo } = useUserInfo()
 const router = useRouter()
+const route = useRoute()
 const isLoading = ref(true)
 const layoutReady = ref(false)
 const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
@@ -70,10 +71,15 @@ onMounted(async () => {
   const accessToken = localStorage.getItem('access_token')
 
   if (!accessToken) {
-    // 游客模式：没有 token，直接结束 loading，并提示
+    // 游客模式：没有 token，直接结束 loading
     isLoading.value = false
     await markLayoutReady()
-    if (!isAuthenticated.value) {
+    // 只有从登录页的游客登录进入时才显示弹窗
+    const shouldShowDialog = sessionStorage.getItem('show_guest_dialog') === 'true'
+    if (!isAuthenticated.value && shouldShowDialog) {
+      // 清除标记，确保只弹出一次
+      sessionStorage.removeItem('show_guest_dialog')
+      await nextTick()
       guest_info_show()
     }
     return
@@ -88,11 +94,17 @@ onMounted(async () => {
     }
   } finally {
     isLoading.value = false
-    // 只有在不是过期状态且未认证时才显示游客提示
-    if (!isAuthenticated.value && !tokenExpired.value) {
+    // 只有在不是过期状态且未认证时，且从登录页的游客登录进入时才显示游客提示
+    const shouldShowDialog = sessionStorage.getItem('show_guest_dialog') === 'true'
+    if (!isAuthenticated.value && !tokenExpired.value && shouldShowDialog) {
+      // 清除标记，确保只弹出一次
+      sessionStorage.removeItem('show_guest_dialog')
+      await markLayoutReady()
+      await nextTick()
       guest_info_show()
+    } else {
+      await markLayoutReady()
     }
-    await markLayoutReady()
   }
 })
 </script>
@@ -109,27 +121,15 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside style="width: 200px;">
-            <template v-if="isAuthenticated && user">
-              <h2>欢迎回来，{{ username }}！</h2>
-              <p>用户ID: {{ userId }}</p>
-              <p>注册时间: {{ registeredTime }}</p>
-              <p>头像: {{ avatar || '暂未设置' }}</p>
-              <p>背景色: {{ bgColor || '默认' }}</p>
-              <p>背景样式: {{ bgPattern || '默认' }}</p>
-              <p>卡片圆角: {{ cornerRadius || '默认' }}</p>
-            </template>
-            <template v-else>
-              <h2>欢迎，游客！</h2>
-              <p>您当前以访客身份浏览</p>
-            </template>
-          </el-aside>
-          <el-main style="height: 560px;">
+          <el-aside style="width: 200px;">用于筛选</el-aside>
+          <el-main style="height: 580px;">
             <Home_main />
           </el-main>
-          <el-aside style="width: 200px;"></el-aside>
+          <el-aside style="width: 200px;height: 560px;">
+            <CreateButton />
+          </el-aside>
         </el-container>
-        <el-footer style="padding: 0">
+        <el-footer >
           <Footer />
         </el-footer>
       </el-container>

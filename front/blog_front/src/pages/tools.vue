@@ -3,7 +3,6 @@ import { onMounted, ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
-import { ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
@@ -34,26 +33,6 @@ const markLayoutReady = async () => {
   await nextTick()
   layoutReady.value = true
 }
-const guest_info_show = () => {
-  ElMessageBox.confirm(
-    `您当前正在以游客身份访问，仅可进行博客文档内容阅读，<br/>
-        无个人主页，无法撰写与上传内容，无法与其他用户进行互动，
-        如需获得完整体验，请进行登录<br/>`,
-    '游客须知',
-    {
-      dangerouslyUseHTMLString: true,
-      cancelButtonText: '继续访问',
-      confirmButtonText: '去登录',
-      type: 'info',
-      center: true,
-    }
-  )
-    .then(() => {
-      router.push({ path: '/login' })
-    })
-    .catch(() => {
-    })
-}
 // 页面挂载时刷新用户信息（确保数据最新）
 // 注意：应用启动时已自动获取，这里作为刷新机制
 onMounted(async () => {
@@ -69,12 +48,9 @@ onMounted(async () => {
   const accessToken = localStorage.getItem('access_token')
 
   if (!accessToken) {
-    // 游客模式：没有 token，直接结束 loading，并提示
+    // 游客模式：没有 token，直接结束 loading
     isLoading.value = false
     await markLayoutReady()
-    if (!isAuthenticated.value) {
-      guest_info_show()
-    }
     return
   }
 
@@ -87,10 +63,6 @@ onMounted(async () => {
     }
   } finally {
     isLoading.value = false
-    // 只有在不是过期状态且未认证时才显示游客提示
-    if (!isAuthenticated.value && !tokenExpired.value) {
-      guest_info_show()
-    }
     await markLayoutReady()
   }
 })

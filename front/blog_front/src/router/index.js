@@ -113,6 +113,14 @@ const routes=[
     meta: {
       title: '文章详情|L-BLOG'
     }
+  },
+  {
+    path: '/write',
+    name: 'write',
+    component: () => import('../pages/write.vue'),
+    meta: {
+      title: '创作|L-BLOG'
+    }
   }
 ]
 //创建路由器实例
@@ -142,6 +150,11 @@ function checkAuthStatus() {
 router.beforeEach(async (to, from, next) => {
   if (to.meta.title) {
     document.title = to.meta.title
+  }
+
+  // 保存来源路径到 sessionStorage（用于游客模式返回）
+  if (from.path && from.path !== '/login' && from.path !== to.path) {
+    sessionStorage.setItem('guest_from_path', from.path)
   }
 
   const authStore = useAuthStore()

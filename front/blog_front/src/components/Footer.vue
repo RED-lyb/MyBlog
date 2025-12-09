@@ -41,7 +41,7 @@
   align-items: center;
   text-align: center;
   width: 100%;
-  height: 100px;
+  height: 60px; /* 降低高度从 100px 到 60px */
 }
 
 .icons {
@@ -60,12 +60,12 @@
 
 .line {
   margin-top: 50px !important;
-  margin-bottom: 15px !important;
+  margin-bottom: 10px !important;
 }
 
 /* 覆盖 el-divider--horizontal 的 margin，使分割线也向下移动 */
 .line :deep(.el-divider--horizontal) {
   margin-top: 50px !important;
-  margin-bottom: 15px !important;
+  margin-bottom: 10px !important;
 }
 </style>
