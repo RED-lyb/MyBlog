@@ -1,13 +1,100 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { marked } from 'marked'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
+// 导入代码高亮样式
+import '@/assets/highlight.css'
+// 按需导入highlight.js核心和语言包
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import python from 'highlight.js/lib/languages/python'
+import java from 'highlight.js/lib/languages/java'
+import xml from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import typescript from 'highlight.js/lib/languages/typescript'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import sql from 'highlight.js/lib/languages/sql'
+import php from 'highlight.js/lib/languages/php'
+
+// 注册常用语言
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('php', php)
+
+// 配置marked使用highlight.js进行代码高亮
+marked.use({
+  gfm: true,
+  breaks: true,
+  langPrefix: 'hljs language-',
+  renderer: {
+    code(token) {
+      let codeStr = token.text || token.code || token.raw || ''
+      const lang = token.lang || ''
+      
+      // 清理代码块标记
+      codeStr = codeStr.replace(/^```+\s*/gm, '').replace(/\s*```+$/gm, '').trim()
+      
+      // 如果有语言标识且该语言已注册，使用highlight.js进行高亮
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          const highlighted = hljs.highlight(codeStr, { language: lang })
+          return `<pre class="hljs"><code class="language-${lang}">${highlighted.value}</code></pre>`
+        } catch (err) {
+          // 如果高亮失败，降级为转义代码
+          const escaped = codeStr
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+          return `<pre class="hljs"><code class="language-${lang}">${escaped}</code></pre>`
+        }
+      }
+      
+      // 如果没有指定语言或语言未注册，直接转义代码
+      const escaped = codeStr
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+      const langClass = lang ? `language-${lang}` : ''
+      return `<pre class="hljs"><code class="${langClass}">${escaped}</code></pre>`
+    }
+  }
+})
 
 const route = useRoute()
 const article = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// 解析文章内容（支持Markdown和HTML）
+const parsedContent = computed(() => {
+  if (!article.value?.content) {
+    return ''
+  }
+  
+  try {
+    // 使用marked解析Markdown
+    const result = marked.parse(article.value.content)
+    return typeof result === 'string' ? result : String(result || '')
+  } catch (e) {
+    console.error('Markdown解析错误:', e)
+    return article.value.content
+  }
+})
 
 // 默认头像
 const defaultAvatar = '/default_head.png'
@@ -132,7 +219,7 @@ onMounted(() => {
       </div>
       
       <!-- 文章内容 -->
-      <div class="article-content" v-html="article.content"></div>
+      <div class="article-content" v-html="parsedContent"></div>
 
       
       <!-- 文章统计信息 -->
@@ -231,6 +318,153 @@ onMounted(() => {
   word-wrap: break-word;
   margin-bottom: 20px;
   margin-top: 20px;
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+}
+
+/* 标题样式 */
+.article-content :deep(h1) {
+  font-size: 2em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+
+.article-content :deep(h2) {
+  font-size: 1.5em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.article-content :deep(h3) {
+  font-size: 1.25em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.article-content :deep(h4) {
+  font-size: 1.1em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.4;
+}
+
+.article-content :deep(h5) {
+  font-size: 1em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.5;
+}
+
+.article-content :deep(h6) {
+  font-size: 0.9em !important;
+  font-weight: bold !important;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.5;
+}
+
+.article-content :deep(p) {
+  margin: 0.5em 0;
+  display: block;
+}
+
+/* 列表样式 */
+.article-content :deep(ul),
+.article-content :deep(ol) {
+  margin: 0.5em 0 !important;
+  padding-left: 2em !important;
+  display: block !important;
+}
+
+.article-content :deep(ul) {
+  list-style-type: disc !important;
+}
+
+.article-content :deep(ul ul) {
+  list-style-type: circle !important;
+}
+
+.article-content :deep(ul ul ul) {
+  list-style-type: square !important;
+}
+
+.article-content :deep(ul ul ul ul) {
+  list-style-type: disc !important;
+}
+
+.article-content :deep(ol) {
+  list-style-type: decimal !important;
+}
+
+.article-content :deep(ol ol) {
+  list-style-type: lower-alpha !important;
+}
+
+.article-content :deep(ol ol ol) {
+  list-style-type: lower-roman !important;
+}
+
+.article-content :deep(ol ol ol ol) {
+  list-style-type: decimal !important;
+}
+
+.article-content :deep(li) {
+  display: list-item !important;
+  margin: 0.25em 0 !important;
+}
+
+.article-content :deep(blockquote) {
+  border-left: 4px solid var(--el-border-color);
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--el-text-color-secondary);
+}
+
+/* 行内代码样式 */
+.article-content :deep(code:not(pre code)) {
+  background: var(--el-fill-color-light);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+/* 代码块样式 */
+.article-content :deep(pre) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px !important;
+  margin: 1em 0 !important;
+  padding: 16px !important;
+  overflow-x: auto !important;
+}
+
+.article-content :deep(pre code) {
+  background: transparent !important;
+  padding: 0 !important;
+  line-height: 1.5 !important;
+  color: var(--el-text-color-primary) !important;
+}
+
+.article-content :deep(a) {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.article-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.article-content :deep(img) {
+  max-width: 100%;
+  height: auto;
 }
 </style>
 

@@ -122,10 +122,10 @@ onMounted(async () => {
         </el-header>
         <el-container>
           <el-aside style="width: 200px;">用于筛选</el-aside>
-          <el-main style="height: 580px;">
+          <el-main style="min-height: 580px;">
             <Home_main />
           </el-main>
-          <el-aside style="width: 200px;height: 560px;">
+          <el-aside style="width: 200px;">
             <CreateButton />
           </el-aside>
         </el-container>
