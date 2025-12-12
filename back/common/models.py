@@ -20,6 +20,10 @@ class Users(models.Model):
     bg_color = models.CharField(max_length=20, blank=True, null=True, db_comment='个人中心背景色，CSS 合法值')
     bg_pattern = models.CharField(max_length=50, blank=True, null=True, db_comment='背景点缀样式名或 URL')
     corner_radius = models.CharField(max_length=10, blank=True, null=True, db_comment='卡片圆角大小，单位 px 或百分比')
+    follow_count = models.IntegerField(default=0, db_comment='关注数，默认0')
+    article_count = models.IntegerField(default=0, db_comment='发布文章数，默认0')
+    liked_article_count = models.IntegerField(default=0, db_comment='喜欢的文章数，默认0')
+    follower_count = models.IntegerField(default=0, db_comment='粉丝数，默认0')
 
     class Meta:
         managed = False
@@ -93,3 +97,49 @@ class BlogArticle(models.Model):
     class Meta:
         managed = False
         db_table = 'blog_articles'
+
+
+class UserFollow(models.Model):
+    """
+    用户关注关系表
+    记录用户之间的关注关系
+    """
+    id = models.AutoField(primary_key=True, db_comment='主键，自增')
+    follower_id = models.IntegerField(db_comment='关注者ID，外键关联 users 表')
+    following_id = models.IntegerField(db_comment='被关注者ID，外键关联 users 表')
+    created_at = models.DateTimeField(auto_now_add=True, db_comment='关注时间，默认服务器系统时间')
+    
+    class Meta:
+        managed = True
+        db_table = 'user_follows'
+        unique_together = [['follower_id', 'following_id']]  # 防止重复关注
+        indexes = [
+            models.Index(fields=['follower_id']),  # 查询某用户关注了哪些人
+            models.Index(fields=['following_id']),  # 查询某用户被哪些人关注
+        ]
+    
+    def __str__(self):
+        return f"User {self.follower_id} follows User {self.following_id}"
+
+
+class UserLikedArticle(models.Model):
+    """
+    用户喜欢的文章关系表
+    记录用户对文章的喜欢关系
+    """
+    id = models.AutoField(primary_key=True, db_comment='主键，自增')
+    user_id = models.IntegerField(db_comment='用户ID，外键关联 users 表')
+    article_id = models.IntegerField(db_comment='文章ID，外键关联 blog_articles 表')
+    created_at = models.DateTimeField(auto_now_add=True, db_comment='喜欢时间，默认服务器系统时间')
+    
+    class Meta:
+        managed = True
+        db_table = 'user_liked_articles'
+        unique_together = [['user_id', 'article_id']]  # 防止重复喜欢
+        indexes = [
+            models.Index(fields=['user_id']),  # 查询某用户喜欢了哪些文章
+            models.Index(fields=['article_id']),  # 查询某文章被哪些用户喜欢
+        ]
+    
+    def __str__(self):
+        return f"User {self.user_id} liked Article {self.article_id}"

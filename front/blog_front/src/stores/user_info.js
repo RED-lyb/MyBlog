@@ -13,7 +13,11 @@ const sanitizeUser = (rawUser) => {
     avatar: rawUser.avatar ?? '',
     bg_color: rawUser.bg_color ?? '',
     bg_pattern: rawUser.bg_pattern ?? '',
-    corner_radius: rawUser.corner_radius ?? ''
+    corner_radius: rawUser.corner_radius ?? '',
+    follow_count: rawUser.follow_count ?? 0,
+    article_count: rawUser.article_count ?? 0,
+    liked_article_count: rawUser.liked_article_count ?? 0,
+    follower_count: rawUser.follower_count ?? 0
   }
 }
 
@@ -39,6 +43,10 @@ export const useAuthStore = defineStore('auth', () => {
   const bgColor = computed(() => user.value?.bg_color || '')
   const bgPattern = computed(() => user.value?.bg_pattern || '')
   const cornerRadius = computed(() => user.value?.corner_radius || '')
+  const followCount = computed(() => user.value?.follow_count || 0)
+  const articleCount = computed(() => user.value?.article_count || 0)
+  const likedArticleCount = computed(() => user.value?.liked_article_count || 0)
+  const followerCount = computed(() => user.value?.follower_count || 0)
 
 
   function setUser(nextUser, options = {}) {
@@ -128,6 +136,10 @@ export const useAuthStore = defineStore('auth', () => {
     bgColor,
     bgPattern,
     cornerRadius,
+    followCount,
+    articleCount,
+    likedArticleCount,
+    followerCount,
     setUser, 
     clear, 
     setTokenExpired, // 导出设置过期状态的方法

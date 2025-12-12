@@ -20,7 +20,8 @@ def get_user_info(request):
         try:
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius 
+                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius,
+                           follow_count, article_count, liked_article_count, follower_count
                     FROM users WHERE id = %s
                 """, [user_id])
                 row = cursor.fetchone()
@@ -34,7 +35,11 @@ def get_user_info(request):
                         'avatar': row[4],
                         'bg_color': row[5],
                         'bg_pattern': row[6],
-                        'corner_radius': row[7]
+                        'corner_radius': row[7],
+                        'follow_count': row[8] if len(row) > 8 else 0,
+                        'article_count': row[9] if len(row) > 9 else 0,
+                        'liked_article_count': row[10] if len(row) > 10 else 0,
+                        'follower_count': row[11] if len(row) > 11 else 0
                     }
                     
                     return JsonResponse({
@@ -84,7 +89,8 @@ def get_user_by_id(request, user_id):
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius 
+                SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius,
+                       follow_count, article_count, liked_article_count, follower_count
                 FROM users WHERE id = %s
             """, [user_id])
             row = cursor.fetchone()
@@ -98,7 +104,11 @@ def get_user_by_id(request, user_id):
                     'avatar': row[4],
                     'bg_color': row[5],
                     'bg_pattern': row[6],
-                    'corner_radius': row[7]
+                    'corner_radius': row[7],
+                    'follow_count': row[8] if len(row) > 8 else 0,
+                    'article_count': row[9] if len(row) > 9 else 0,
+                    'liked_article_count': row[10] if len(row) > 10 else 0,
+                    'follower_count': row[11] if len(row) > 11 else 0
                 }
                 
                 return JsonResponse({

@@ -311,7 +311,7 @@ const onCaptchaCancel = () => {
 
 .splitter-wrapper {
   flex: 1;
-  min-height: 500px;
+  min-height: 490px;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -600,7 +600,7 @@ const onCaptchaCancel = () => {
   justify-content: center;
   align-items: center;
   width: 100%;
-  padding-top: 20px;
+  padding-top: 19px;
   flex-shrink: 0;
 }
 </style>

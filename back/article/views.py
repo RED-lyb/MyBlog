@@ -111,6 +111,14 @@ def get_article_detail(request, article_id):
     """
     try:
         with connection.cursor() as cursor:
+
+            # 增加浏览量
+            cursor.execute("""
+                UPDATE blog_articles 
+                SET view_count = view_count + 1 
+                WHERE id = %s
+            """, [article_id])
+
             # 查询文章详情，并关联用户表获取作者信息
             cursor.execute("""
                 SELECT 
@@ -151,12 +159,7 @@ def get_article_detail(request, article_id):
                 'published_at': row[9].isoformat() if row[9] else None
             }
             
-            # 增加浏览量
-            cursor.execute("""
-                UPDATE blog_articles 
-                SET view_count = view_count + 1 
-                WHERE id = %s
-            """, [article_id])
+
             
             return JsonResponse({
                 'success': True,

@@ -94,7 +94,7 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-main style="height: 580px;padding-bottom: 0px;">
+          <el-main style="min-height: 580px;padding-bottom: 0px;">
             <write_main />
           </el-main>
         </el-container>

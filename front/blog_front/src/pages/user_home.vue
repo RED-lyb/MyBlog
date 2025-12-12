@@ -28,7 +28,11 @@ const {
   avatar,
   bgColor,
   bgPattern,
-  cornerRadius
+  cornerRadius,
+  followCount,
+  articleCount,
+  likedArticleCount,
+  followerCount
 } = storeToRefs(authStore)
 const { loading, fetchUserInfo } = useUserInfo()
 const router = useRouter()
@@ -139,19 +143,93 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside width="200px">
+          <el-aside width="200px" class="user-aside">
             <template v-if="isAuthenticated && user">
-              <h2>欢迎回来，{{ username }}！</h2>
-              <p>用户ID: {{ userId }}</p>
-              <p>注册时间: {{ registeredTime }}</p>
-              <p>头像: {{ avatar || '暂未设置' }}</p>
-              <p>背景色: {{ bgColor || '默认' }}</p>
-              <p>背景样式: {{ bgPattern || '默认' }}</p>
-              <p>卡片圆角: {{ cornerRadius || '默认' }}</p>
+              <div class="avatar-container">
+                <img 
+                  v-if="avatar" 
+                  :src="avatar" 
+                  alt="用户头像" 
+                  class="user-avatar"
+                />
+                <img 
+                  v-else 
+                  src="/default_head.png" 
+                  alt="默认头像" 
+                  class="user-avatar"
+                />
+              </div>
+              <div class="stats-row">
+                <span class="stat-item">
+                  <span class="stat-label">关注</span>
+                  <span class="stat-value">{{ followCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">喜欢</span>
+                  <span class="stat-value">{{ likedArticleCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">文章</span>
+                  <span class="stat-value">{{ articleCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">粉丝</span>
+                  <span class="stat-value">{{ followerCount }}</span>
+                </span>
+              </div>
+              <div class="register-time">
+                注册时间：{{ registeredTime }}
+              </div>
+            </template>
+            <template v-else-if="targetUser">
+              <div class="avatar-container">
+                <img 
+                  v-if="targetUser.avatar" 
+                  :src="targetUser.avatar" 
+                  alt="用户头像" 
+                  class="user-avatar"
+                />
+                <img 
+                  v-else 
+                  src="/default_head.png" 
+                  alt="默认头像" 
+                  class="user-avatar"
+                />
+              </div>
+              <div class="stats-row">
+                <span class="stat-item">
+                  <span class="stat-label">关注</span>
+                  <span class="stat-value">{{ targetUser.follow_count || 0 }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">喜欢</span>
+                  <span class="stat-value">{{ targetUser.liked_article_count || 0 }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">文章</span>
+                  <span class="stat-value">{{ targetUser.article_count || 0 }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">粉丝</span>
+                  <span class="stat-value">{{ targetUser.follower_count || 0 }}</span>
+                </span>
+              </div>
+              <div class="register-time">
+                注册时间：{{ targetUser.registered_time }}
+              </div>
             </template>
             <template v-else>
-              <h2>欢迎，游客！</h2>
-              <p>您当前以访客身份浏览</p>
+              <div class="avatar-container">
+                <img 
+                  src="/default_head.png" 
+                  alt="默认头像" 
+                  class="user-avatar"
+                />
+              </div>
+              <div class="guest-message">
+                <p>欢迎，游客！</p>
+                <p>您当前以访客身份浏览</p>
+              </div>
             </template>
           </el-aside>
           <el-main style="height: 600px">
@@ -182,12 +260,72 @@ onMounted(async () => {
   </div>
 </template>
 <style scoped>
-.el-aside {
-  background-color: #2effc1;
+.user-aside {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.el-main {
-  background-color: #fbaf00;
+.avatar-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.user-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e4e7ed;
+}
+
+.stats-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 10px 0;
+  border-top: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.register-time {
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+  padding-top: 10px;
+}
+
+.guest-message {
+  text-align: center;
+  color: #909399;
+}
+
+.guest-message p {
+  margin: 10px 0;
 }
 
 .user-loading,
