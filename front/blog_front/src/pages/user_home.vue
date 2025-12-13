@@ -10,12 +10,57 @@ import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import apiClient from '../lib/api.js'
+import axios from 'axios'
 
 const route = useRoute()
 const targetUserId = ref(null)
 const targetUser = ref(null)
 const userLoading = ref(false)
 const userError = ref(null)
+
+// 默认头像
+const defaultAvatar = '/default_head.png'
+
+// 构建头像URL
+const buildAvatarUrl = (userId, avatar) => {
+  if (!userId || !avatar) return defaultAvatar
+  const baseUrl = import.meta.env?.VITE_API_FILE_URL || import.meta.env?.VITE_API_URL || ''
+  const avatarFileName = `${userId}${avatar}`
+  if (!baseUrl) return `/api/static/user_heads/${avatarFileName}`
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+  return `${normalizedBase}static/user_heads/${avatarFileName}`
+}
+
+// 获取用户头像URL
+const getUserAvatarUrl = async (userId, avatar) => {
+  if (!userId || !avatar) return defaultAvatar
+  
+  const avatarFileName = `${userId}${avatar}`
+  
+  try {
+    const { data } = await axios.get(`${import.meta.env.VITE_API_URL}home/avatar/`, {
+      params: {
+        file_name: avatarFileName
+      }
+    })
+    if (data?.success && data?.data?.avatar_url) {
+      return data.data.avatar_url
+    } else {
+      return buildAvatarUrl(userId, avatar)
+    }
+  } catch (error) {
+    console.error('获取头像失败', error)
+    return buildAvatarUrl(userId, avatar)
+  }
+}
+
+// 当前用户头像URL
+const currentUserAvatar = ref(defaultAvatar)
+const currentUserAvatarLoading = ref(false)
+
+// 目标用户头像URL
+const targetUserAvatar = ref(defaultAvatar)
+const targetUserAvatarLoading = ref(false)
 
 const authStore = useAuthStore()
 const {
@@ -61,6 +106,14 @@ const fetchTargetUser = async (userId) => {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${userId}/`)
     if (response.data?.success) {
       targetUser.value = response.data.data.user
+      // 获取目标用户头像
+      if (targetUser.value.avatar) {
+        targetUserAvatarLoading.value = true
+        targetUserAvatar.value = await getUserAvatarUrl(targetUser.value.id, targetUser.value.avatar)
+        targetUserAvatarLoading.value = false
+      } else {
+        targetUserAvatar.value = defaultAvatar
+      }
     } else {
       userError.value = response.data?.error || '获取用户信息失败'
     }
@@ -73,6 +126,17 @@ const fetchTargetUser = async (userId) => {
     console.error('获取用户信息错误:', err)
   } finally {
     userLoading.value = false
+  }
+}
+
+// 获取当前用户头像
+const fetchCurrentUserAvatar = async () => {
+  if (isAuthenticated.value && user.value && avatar.value) {
+    currentUserAvatarLoading.value = true
+    currentUserAvatar.value = await getUserAvatarUrl(userId.value, avatar.value)
+    currentUserAvatarLoading.value = false
+  } else {
+    currentUserAvatar.value = defaultAvatar
   }
 }
 
@@ -119,6 +183,8 @@ onMounted(async () => {
 
   try {
     await fetchUserInfo()
+    // 获取当前用户头像
+    await fetchCurrentUserAvatar()
   } catch (error) {
     // 如果是token过期错误，不显示错误消息，让路由守卫处理
     if (error.message !== 'TOKEN_EXPIRED') {
@@ -127,6 +193,13 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
     await markLayoutReady()
+  }
+})
+
+// 监听用户信息变化，更新头像
+watch([isAuthenticated, userId, avatar], async () => {
+  if (isAuthenticated.value) {
+    await fetchCurrentUserAvatar()
   }
 })
 </script>
@@ -144,57 +217,22 @@ onMounted(async () => {
         </el-header>
         <el-container>
           <el-aside width="200px" class="user-aside">
-            <template v-if="isAuthenticated && user">
+            <!-- 优先显示目标用户信息（查看别人的主页） -->
+            <template v-if="targetUser">
               <div class="avatar-container">
-                <img 
-                  v-if="avatar" 
-                  :src="avatar" 
-                  alt="用户头像" 
-                  class="user-avatar"
-                />
-                <img 
-                  v-else 
-                  src="/default_head.png" 
-                  alt="默认头像" 
-                  class="user-avatar"
-                />
-              </div>
-              <div class="stats-row">
-                <span class="stat-item">
-                  <span class="stat-label">关注</span>
-                  <span class="stat-value">{{ followCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">喜欢</span>
-                  <span class="stat-value">{{ likedArticleCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">文章</span>
-                  <span class="stat-value">{{ articleCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">粉丝</span>
-                  <span class="stat-value">{{ followerCount }}</span>
-                </span>
-              </div>
-              <div class="register-time">
-                注册时间：{{ registeredTime }}
-              </div>
-            </template>
-            <template v-else-if="targetUser">
-              <div class="avatar-container">
-                <img 
-                  v-if="targetUser.avatar" 
-                  :src="targetUser.avatar" 
-                  alt="用户头像" 
-                  class="user-avatar"
-                />
-                <img 
-                  v-else 
-                  src="/default_head.png" 
-                  alt="默认头像" 
-                  class="user-avatar"
-                />
+                <el-skeleton :loading="targetUserAvatarLoading" animated>
+                  <template #template>
+                    <el-skeleton-item variant="circle" style="width: 120px; height: 120px;" />
+                  </template>
+                  <template #default>
+                    <img 
+                      :src="targetUserAvatar" 
+                      alt="用户头像" 
+                      class="user-avatar"
+                      @error="targetUserAvatar = defaultAvatar"
+                    />
+                  </template>
+                </el-skeleton>
               </div>
               <div class="stats-row">
                 <span class="stat-item">
@@ -218,6 +256,46 @@ onMounted(async () => {
                 注册时间：{{ targetUser.registered_time }}
               </div>
             </template>
+            <!-- 显示当前登录用户信息（自己的主页） -->
+            <template v-else-if="isAuthenticated && user">
+              <div class="avatar-container">
+                <el-skeleton :loading="currentUserAvatarLoading" animated>
+                  <template #template>
+                    <el-skeleton-item variant="circle" style="width: 120px; height: 120px;" />
+                  </template>
+                  <template #default>
+                    <img 
+                      :src="currentUserAvatar" 
+                      alt="用户头像" 
+                      class="user-avatar"
+                      @error="currentUserAvatar = defaultAvatar"
+                    />
+                  </template>
+                </el-skeleton>
+              </div>
+              <div class="stats-row">
+                <span class="stat-item">
+                  <span class="stat-label">关注</span>
+                  <span class="stat-value">{{ followCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">喜欢</span>
+                  <span class="stat-value">{{ likedArticleCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">文章</span>
+                  <span class="stat-value">{{ articleCount }}</span>
+                </span>
+                <span class="stat-item">
+                  <span class="stat-label">粉丝</span>
+                  <span class="stat-value">{{ followerCount }}</span>
+                </span>
+              </div>
+              <div class="register-time">
+                注册时间：{{ registeredTime }}
+              </div>
+            </template>
+            <!-- 游客模式 -->
             <template v-else>
               <div class="avatar-container">
                 <img 
@@ -308,7 +386,6 @@ onMounted(async () => {
 .stat-value {
   font-size: 18px;
   font-weight: bold;
-  color: #303133;
 }
 
 .register-time {

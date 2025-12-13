@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
@@ -76,9 +76,17 @@ marked.use({
 })
 
 const route = useRoute()
+const router = useRouter()
 const article = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// 跳转到作者主页
+const goToAuthorHome = () => {
+  if (article.value?.author_id) {
+    router.push(`/user_home/${article.value.author_id}`)
+  }
+}
 
 // 解析文章内容（支持Markdown和HTML）
 const parsedContent = computed(() => {
@@ -203,17 +211,19 @@ onMounted(() => {
       
       <!-- 作者信息 -->
       <div class="article-author">
-        <el-skeleton :loading="article.avatar_loading" animated
-          style="display: flex;align-items: center;justify-content: center;width: 40px;height: 40px;">
-          <template #template>
-            <el-skeleton-item variant="circle" style="width: 40px;height: 40px;" />
-          </template>
-          <template #default>
-            <el-avatar :size="40" :src="article.display_avatar || defaultAvatar" />
-          </template>
-        </el-skeleton>
+        <div class="author-avatar-wrapper" @click="goToAuthorHome" :title="`查看 ${article.author_name} 的主页`">
+          <el-skeleton :loading="article.avatar_loading" animated
+            style="display: flex;align-items: center;justify-content: center;width: 40px;height: 40px;">
+            <template #template>
+              <el-skeleton-item variant="circle" style="width: 40px;height: 40px;" />
+            </template>
+            <template #default>
+              <el-avatar :size="40" :src="article.display_avatar || defaultAvatar" />
+            </template>
+          </el-skeleton>
+        </div>
         <div class="author-info">
-          <span class="author-name">{{ article.author_name }}</span>
+          <span class="author-name" @click="goToAuthorHome" :title="`查看 ${article.author_name} 的主页`">{{ article.author_name }}</span>
           <span class="publish-time">发布时间：{{ formatDate(article.published_at) }}</span>
         </div>
       </div>
@@ -280,6 +290,11 @@ onMounted(() => {
   border-bottom: 1px solid var(--el-border-color);
 }
 
+
+.author-avatar-wrapper {
+  cursor: pointer;
+}
+
 .author-info {
   display: flex;
   flex-direction: column;
@@ -289,6 +304,10 @@ onMounted(() => {
 .author-name {
   font-size: 16px;
   font-weight: 500;
+  cursor: pointer;
+}
+.author-name:hover{
+  text-decoration: underline;
 }
 
 .publish-time {

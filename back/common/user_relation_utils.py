@@ -33,20 +33,10 @@ def follow_user(follower_id, following_id):
     
     try:
         with transaction.atomic():
-            # 创建关注关系
+            # 创建关注关系（触发器会自动更新统计字段）
             UserFollow.objects.create(
                 follower_id=follower_id,
                 following_id=following_id
-            )
-            
-            # 更新关注者的关注数
-            Users.objects.filter(id=follower_id).update(
-                follow_count=F('follow_count') + 1
-            )
-            
-            # 更新被关注者的粉丝数
-            Users.objects.filter(id=following_id).update(
-                follower_count=F('follower_count') + 1
             )
         
         return True, "关注成功"
@@ -74,21 +64,11 @@ def unfollow_user(follower_id, following_id):
     
     try:
         with transaction.atomic():
-            # 删除关注关系
+            # 删除关注关系（触发器会自动更新统计字段）
             UserFollow.objects.filter(
                 follower_id=follower_id,
                 following_id=following_id
             ).delete()
-            
-            # 更新关注者的关注数
-            Users.objects.filter(id=follower_id).update(
-                follow_count=F('follow_count') - 1
-            )
-            
-            # 更新被关注者的粉丝数
-            Users.objects.filter(id=following_id).update(
-                follower_count=F('follower_count') - 1
-            )
         
         return True, "取消关注成功"
     except Exception as e:
@@ -119,20 +99,10 @@ def like_article(user_id, article_id):
     
     try:
         with transaction.atomic():
-            # 创建喜欢关系
+            # 创建喜欢关系（触发器会自动更新统计字段）
             UserLikedArticle.objects.create(
                 user_id=user_id,
                 article_id=article_id
-            )
-            
-            # 更新用户的喜欢文章数
-            Users.objects.filter(id=user_id).update(
-                liked_article_count=F('liked_article_count') + 1
-            )
-            
-            # 更新文章的点赞数
-            BlogArticle.objects.filter(id=article_id).update(
-                love_count=F('love_count') + 1
             )
         
         return True, "喜欢成功"
@@ -160,21 +130,11 @@ def unlike_article(user_id, article_id):
     
     try:
         with transaction.atomic():
-            # 删除喜欢关系
+            # 删除喜欢关系（触发器会自动更新统计字段）
             UserLikedArticle.objects.filter(
                 user_id=user_id,
                 article_id=article_id
             ).delete()
-            
-            # 更新用户的喜欢文章数
-            Users.objects.filter(id=user_id).update(
-                liked_article_count=F('liked_article_count') - 1
-            )
-            
-            # 更新文章的点赞数
-            BlogArticle.objects.filter(id=article_id).update(
-                love_count=F('love_count') - 1
-            )
         
         return True, "取消喜欢成功"
     except Exception as e:
@@ -279,26 +239,4 @@ def is_liked_article(user_id, article_id):
     ).exists()
 
 
-def update_article_count_on_publish(user_id):
-    """
-    用户发布文章时更新文章数
-    
-    Args:
-        user_id: 用户ID
-    """
-    Users.objects.filter(id=user_id).update(
-        article_count=F('article_count') + 1
-    )
-
-
-def update_article_count_on_delete(user_id):
-    """
-    用户删除文章时更新文章数
-    
-    Args:
-        user_id: 用户ID
-    """
-    Users.objects.filter(id=user_id).update(
-        article_count=F('article_count') - 1
-    )
 

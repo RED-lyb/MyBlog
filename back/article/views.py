@@ -375,7 +375,7 @@ def create_article(request):
         # 因为内容是Markdown格式，会被marked安全解析
         # 转义会导致代码块中的引号等字符变成HTML实体（如 &quot;），影响显示
         
-        # 写入数据库
+        # 写入数据库（触发器会自动更新用户的文章数）
         with connection.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO blog_articles (title, content, author_id, view_count, love_count, comment_count, published_at)

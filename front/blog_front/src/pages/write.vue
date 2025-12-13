@@ -8,7 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
-import write_main from './write_main.vue'
+import write_main from '../components/write_main.vue'
 import { showGuestDialog } from '../lib/guestDialog.js'
 
 const authStore = useAuthStore()
