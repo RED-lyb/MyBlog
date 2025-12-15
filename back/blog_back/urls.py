@@ -40,4 +40,5 @@ urlpatterns = [
     path('api/user/info/', get_user_info),
     path('api/user/<int:user_id>/', get_user_by_id, name='get_user_by_id'),  # 根据ID获取用户信息
     path('api/article/', include('article.urls')),  # 文章相关路由
+    path('api/network_disk/', include('network_disk.urls')),  # 网盘相关路由
 ]
