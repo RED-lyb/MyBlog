@@ -1,7 +1,7 @@
 <script setup>
 import { onBeforeMount, ref, watch, computed,onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
-import theme from '../pages/theme.vue'
+import theme from './theme.vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
 import { useRouter, useRoute } from 'vue-router'

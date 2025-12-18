@@ -59,7 +59,7 @@ const routes=[
     }
   },
   {
-    path: '/network_disk',
+    path: '/network_disk/:path*',
     name: 'network_disk',
     component: () => import('../pages/network_disk.vue'),
     meta: {

@@ -1,6 +1,6 @@
 <script setup>
 //导入必要组件
-import theme from './theme.vue';
+import theme from '../components/theme.vue';
 import BlurReveal from './inspira/BlurReveal.vue';
 import indexbutton from './inspira/indexbutton.vue';
 import LetterPullup from './inspira/LetterPullup.vue';
