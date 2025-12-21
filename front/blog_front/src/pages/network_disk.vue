@@ -9,6 +9,7 @@ import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import UserInfoSidebar from '../components/UserInfoSidebar.vue'
+import NetworkDiskMain from '../components/network_disk_main.vue'
 import apiClient from '../lib/api.js'
 
 const authStore = useAuthStore()
@@ -38,6 +39,7 @@ const uploadDialogVisible = ref(false)
 const uploadFileList = ref([])
 const mkdirDialogVisible = ref(false)
 const newDirName = ref('')
+const isDownloadingFile = ref(false) // 标记是否正在处理文件下载
 
 const apiUrl = import.meta.env.VITE_API_URL
 
@@ -156,6 +158,18 @@ const enterDirectory = (dirName) => {
   // fetchFileList 会由路由监听触发
 }
 
+// 处理进入目录（从组件接收）
+const handleEnterDirectory = (row) => {
+  if (row.is_directory) {
+    if (!currentPath.value && row.user_id) {
+      updateUrl(String(row.user_id))
+    } else {
+      const dirName = currentPath.value ? row.name : (row.user_id ? String(row.user_id) : row.name)
+      enterDirectory(dirName)
+    }
+  }
+}
+
 // 获取完整路径
 const getFullPath = (name) => {
   return currentPath.value ? `${currentPath.value}/${name}` : name
@@ -169,8 +183,19 @@ const getFileDownloadUrl = (fileName) => {
 
 // 下载文件（通过 URL 跳转）
 const downloadFile = (fileName) => {
+  const filePath = getFullPath(fileName)
   const downloadUrl = getFileDownloadUrl(fileName)
-  window.open(downloadUrl, '_blank')
+  
+  // 使用隐藏的 a 标签触发下载，避免页面跳转
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.style.display = 'none'
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  
+  // 下载后不需要跳转，因为已经在正确的目录了
 }
 
 // 删除文件或目录
@@ -277,34 +302,186 @@ const createDirectory = async () => {
   }
 }
 
-// 获取路径面包屑（显示用户名）
-const breadcrumbs = computed(() => {
-  const parts = pathParts.value.length > 0 ? pathParts.value : []
-  const usernames = pathUsernames.value.length > 0 ? pathUsernames.value : []
-  const crumbs = [
-    { name: '根目录', path: '', isLast: parts.length === 0 }
-  ]
+// 批量删除项目
+const deleteItems = async (items) => {
+  if (!isAuthenticated.value) {
+    ElMessage.warning('请先登录')
+    return
+  }
   
-  parts.forEach((part, index) => {
-    const displayName = usernames[index] || part
-    crumbs.push({
-      name: displayName,
-      path: parts.slice(0, index + 1).join('/'),
-      isLast: index === parts.length - 1
-    })
-  })
-  
-  return crumbs
-})
+  try {
+    let successCount = 0
+    let failCount = 0
+    
+    // 逐个删除
+    for (const item of items) {
+      try {
+        const itemPath = getFullPath(item.name)
+        const response = await apiClient.delete(`${apiUrl}network_disk/delete/${encodeURIComponent(itemPath)}`)
+        if (response.data?.success) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch (error) {
+        failCount++
+        console.error(`删除 ${item.name} 失败:`, error)
+      }
+    }
+    
+    if (failCount === 0) {
+      ElMessage.success(`成功删除 ${successCount} 个项目`)
+    } else if (successCount > 0) {
+      ElMessage.warning(`成功删除 ${successCount} 个项目，${failCount} 个项目删除失败`)
+    } else {
+      ElMessage.error('删除失败')
+    }
+    
+    fetchFileList() // 从 URL 读取路径
+  } catch (error) {
+    console.error('删除错误:', error)
+    ElMessage.error('删除失败')
+  }
+}
 
-// 跳转到指定路径
-const navigateToPath = (path) => {
-  updateUrl(path)
-  // fetchFileList 会由路由监听触发
+// 编辑文件（占位函数，可以根据需要实现）
+const editFile = (file) => {
+  ElMessage.info(`编辑文件功能待实现: ${file.name}`)
+}
+
+// 递归查找第一个存在的父目录
+const findValidParentPath = async (filePath) => {
+  const pathParts = filePath.split('/').filter(p => p)
+  
+  // 从完整路径开始，逐步向上查找
+  for (let i = pathParts.length; i > 0; i--) {
+    const testPath = pathParts.slice(0, i).join('/')
+    
+    try {
+      const response = await apiClient.get(`${apiUrl}network_disk/list/`, {
+        params: { path: testPath }
+      })
+      if (response.data?.success) {
+        return testPath // 找到有效的目录
+      }
+    } catch (error) {
+      // 继续尝试上一级
+      continue
+    }
+  }
+  
+  // 如果都找不到，返回根目录
+  return ''
+}
+
+// 触发文件下载并跳转到父路径
+const triggerFileDownload = async (filePath, isFileNotFound = false) => {
+  const downloadUrl = `${apiUrl}network_disk/download/${encodeURIComponent(filePath)}`
+  
+  // 如果文件不存在，递归查找第一个有效的父目录
+  if (isFileNotFound) {
+    const validPath = await findValidParentPath(filePath)
+    
+    // 确保标记已重置，让路由监听能够正常处理
+    isDownloadingFile.value = false
+    
+    // 更新URL到有效路径，这会触发路由监听并加载数据
+    updateUrl(validPath)
+    
+    // 显示提示
+    ElMessage.warning('文件不存在，已跳转到可访问的目录')
+    return
+  }
+  
+  // 文件存在，正常下载
+  // 获取父路径（文件的上一层目录）
+  const pathParts = filePath.split('/').filter(p => p)
+  let parentPath = ''
+  if (pathParts.length > 1) {
+    pathParts.pop() // 移除文件名，获取父目录
+    parentPath = pathParts.join('/')
+  }
+  
+  // 使用隐藏的 a 标签触发下载，避免页面跳转
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.style.display = 'none'
+  link.download = '' // 让浏览器使用服务器返回的文件名
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  
+  // 延迟更新URL到父路径，确保下载已开始
+  setTimeout(() => {
+    // 先重置标记，让路由监听能够正常处理
+    isDownloadingFile.value = false
+    
+    // 然后更新URL，这会触发路由监听并加载数据
+    if (parentPath) {
+      updateUrl(parentPath)
+    } else {
+      // 如果路径只有文件名，返回根目录
+      router.push({ name: 'network_disk' })
+    }
+  }, 200)
+}
+
+// 检查文件是否存在（静默检查，不显示错误信息，不触发下载）
+const checkFileExists = async (filePath) => {
+  try {
+    // 使用 fetch API 静默检查文件是否存在
+    // 使用 Range 请求只获取第一个字节，避免下载整个文件
+    const downloadUrl = `${apiUrl}network_disk/download/${encodeURIComponent(filePath)}`
+    const response = await fetch(downloadUrl, {
+      method: 'GET',
+      headers: {
+        'Range': 'bytes=0-0' // 只请求第一个字节
+      },
+      credentials: 'include'
+    })
+    
+    // 如果状态码是 404，说明文件不存在
+    if (response.status === 404) {
+      // 读取响应内容以避免显示 JSON，但不使用它
+      try {
+        const text = await response.text()
+        // 如果响应是 JSON 错误信息，解析它但不显示
+        try {
+          JSON.parse(text)
+        } catch (e) {
+          // 不是 JSON，忽略
+        }
+      } catch (e) {
+        // 忽略读取错误
+      }
+      return false
+    }
+    
+    // 206 表示部分内容（Range 请求成功），200 表示完整内容，都说明文件存在
+    // 读取响应内容以避免显示，但不使用它
+    if (response.status === 200 || response.status === 206) {
+      try {
+        await response.blob()
+      } catch (e) {
+        // 忽略读取错误
+      }
+      return true
+    }
+    
+    return false
+  } catch (error) {
+    // 网络错误或其他错误，返回 false
+    return false
+  }
 }
 
 // 监听路由变化
 watch(() => route.params.path, async () => {
+  // 如果正在处理文件下载，跳过
+  if (isDownloadingFile.value) {
+    return
+  }
+  
   const path = getPathFromRoute()
   
   if (path) {
@@ -316,9 +493,28 @@ watch(() => route.params.path, async () => {
       // 400 可能是因为路径是文件而不是目录
       // 404 可能是路径不存在或文件不存在
       if (error.response?.status === 400 || error.response?.status === 404) {
-        const downloadUrl = `${apiUrl}network_disk/download/${encodeURIComponent(path)}`
-        // 直接跳转到下载URL（浏览器会自动处理下载）
-        window.location.href = downloadUrl
+        // 先尝试递归查找有效目录（避免暴露后端URL）
+        const validPath = await findValidParentPath(path)
+        
+        // 如果找到的有效路径与当前路径不同，说明当前路径不存在或不是目录
+        if (validPath !== path) {
+          // 检查文件是否真的存在（静默检查，不显示错误信息）
+          const fileExists = await checkFileExists(path)
+          
+          if (fileExists) {
+            // 文件存在，正常下载（不暴露后端URL）
+            await triggerFileDownload(path, false)
+          } else {
+            // 文件不存在，跳转到有效目录（不暴露后端URL）
+            await triggerFileDownload(path, true)
+          }
+        } else {
+          // 如果有效路径与当前路径相同，说明当前路径可能是有效的目录
+          // 但 fetchFileList 失败了，这不应该发生
+          // 为了安全，直接跳转到根目录
+          ElMessage.warning('路径不存在，已跳转到根目录')
+          router.push({ name: 'network_disk' })
+        }
         return
       }
       // 其他错误，显示错误信息
@@ -371,166 +567,42 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside style="height: 580px;width: 200px;" v-if="currentOwnerId">
+          <el-aside style="height: 570px;width: 200px;" v-if="currentOwnerId">
             <UserInfoSidebar :user-id="currentOwnerId" />
           </el-aside>
-          <el-aside style="height: 580px;width: 200px;" v-else></el-aside>
-          <el-main style="min-height: 580px;" class="network-disk-main">
-            <div class="network-disk-container">
-              <div class="disk-header">
-                <h1>流动网盘</h1>
-                <div class="header-actions" v-if="canWrite && isAuthenticated">
-                  <el-button type="primary" :icon="Plus" @click="mkdirDialogVisible = true">新建文件夹</el-button>
-                  <el-button type="success" :icon="Upload" @click="uploadDialogVisible = true">上传文件</el-button>
-                </div>
-                <div v-else-if="!isAuthenticated" class="header-tip">
-                  <el-text type="info">访客模式：只能浏览和下载</el-text>
-                </div>
-                <div v-else class="header-tip">
-                  <el-text type="info">当前目录只读</el-text>
-                </div>
+          <el-aside style="height: 570px;width: 200px;" v-else></el-aside>
+          <el-main style="min-height: 570px;" class="network-disk-main">
+            <NetworkDiskMain
+              :directories="directories"
+              :files="files"
+              :loading-files="loadingFiles"
+              :path-parts="pathParts"
+              :path-usernames="pathUsernames"
+              :current-path="currentPath"
+              :can-delete="canDelete"
+              :is-authenticated="isAuthenticated"
+              :current-owner-id="currentOwnerId"
+              :user-id="userId"
+              @navigate-to-path="updateUrl"
+              @enter-directory="handleEnterDirectory"
+              @download-file="downloadFile"
+              @delete-items="deleteItems"
+              @edit-file="editFile"
+            />
+          </el-main>
+          <el-aside style="height: 580px;width: 200px;">
+            <div class="disk-header">
+              <div class="header-actions" v-if="canWrite && isAuthenticated">
+                <el-button type="primary" :icon="Plus" @click="mkdirDialogVisible = true" style="width: 100%; margin-bottom: 10px;">新建文件夹</el-button>
+                <el-button type="success" :icon="Upload" @click="uploadDialogVisible = true" style="width: 100%;">上传文件</el-button>
               </div>
-
-              <!-- 路径导航 - DaisyUI 风格 -->
-              <div class="dsi-breadcrumbs text-sm items-center gap-2" style="margin-bottom: 20px;">
-                <ul>
-                  <li v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
-                    <a 
-                      v-if="!crumb.isLast"
-                      @click.prevent="navigateToPath(crumb.path)"
-                      class="breadcrumb-link"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        class="h-4 w-4 stroke-current">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                      </svg>
-                      {{ crumb.name }}
-                    </a>
-                    
-                    <span v-else class="inline-flex items-center gap-2">
-                      <!-- 当前打开的路径：显示打开的文件夹图标 -->
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-linecap="round"
-                        stroke-width="2">
-                        <g>
-                          <path d="M3 12V7.2c0-1.12 0-1.68.218-2.108a2 2 0 0 1 .874-.874C4.52 4 5.08 4 6.2 4h1.475c.489 0 .733 0 .963.055a2 2 0 0 1 .579.24c.201.123.374.296.72.642l.126.126c.346.346.519.519.72.642c.18.11.375.19.579.24c.23.055.474.055.963.055h.475c1.12 0 1.68 0 2.108.218a2 2 0 0 1 .874.874C16 7.52 16 8.08 16 9.2v.3"></path>
-                          <path d="M4.7 20h10.92c.854 0 1.28 0 1.64-.146a2 2 0 0 0 .813-.604c.243-.303.366-.713.611-1.53l1.08-3.6c.419-1.397.628-2.095.477-2.648a2 2 0 0 0-.869-1.168C18.886 10 18.157 10 16.699 10h-5.318c-.854 0-1.281 0-1.642.146a2 2 0 0 0-.812.604c-.243.303-.366.712-.611 1.53l-1.948 6.494A1.72 1.72 0 0 1 4.72 20v0C3.77 20 3 19.23 3 18.28V11m8 4h5"></path>
-                        </g>
-                      </svg>
-                      {{ crumb.name }}
-                    </span>
-                  </li>
-                </ul>
+              <div v-else-if="!isAuthenticated" class="header-tip">
+                <el-text type="info">访客模式：只能浏览和下载</el-text>
               </div>
-
-              <!-- 文件列表 -->
-              <FullScreenLoading :visible="loadingFiles" />
-              <div class="file-list-container" v-if="!loadingFiles">
-                <el-table 
-                  :data="[...directories, ...files]" 
-                  style="width: 100%"
-                  stripe
-                >
-                  <el-table-column prop="name" label="名称" min-width="300">
-                    <template #default="{ row }">
-                      <div class="file-name-cell">
-                        <!-- 文件夹图标 -->
-                        <svg
-                          v-if="row.is_directory"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          class="h-4 w-4 stroke-current file-icon"
-                          @click="enterDirectory(row.display_name || row.name)"
-                          style="cursor: pointer;">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-                        </svg>
-                        <!-- 文件图标 -->
-                        <svg
-                          v-else
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          class="file-icon file-icon-default">
-                          <g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2">
-                            <path stroke-linecap="round" d="M4 4v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8.342a2 2 0 0 0-.602-1.43l-4.44-4.342A2 2 0 0 0 13.56 2H6a2 2 0 0 0-2 2m5 9h6m-6 4h3"></path>
-                            <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-                          </g>
-                        </svg>
-                        <!-- 文件夹名称（可点击进入） -->
-                        <span 
-                          v-if="row.is_directory"
-                          @click="enterDirectory(currentPath ? row.name : (row.user_id ? String(row.user_id) : row.name))"
-                          class="file-name-link"
-                          style="cursor: pointer;">
-                          {{ row.display_name || row.name }}
-                        </span>
-                        <!-- 文件名称（可点击下载） -->
-                        <a
-                          v-else
-                          :href="getFileDownloadUrl(row.name)"
-                          @click.prevent="downloadFile(row.name)"
-                          class="file-name-link">
-                          {{ row.name }}
-                        </a>
-                      </div>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="size_formatted" label="大小" width="120" align="right">
-                    <template #default="{ row }">
-                      {{ row.is_directory ? '-' : row.size_formatted }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="修改时间" width="180">
-                    <template #default="{ row }">
-                      {{ formatDate(row.modified_time) }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="180" fixed="right">
-                    <template #default="{ row }">
-                      <el-button 
-                        v-if="!row.is_directory"
-                        type="primary" 
-                        size="small" 
-                        :icon="Download"
-                        @click="downloadFile(row.name)"
-                      >
-                        下载
-                      </el-button>
-                      <el-button 
-                        v-if="canDelete && isAuthenticated"
-                        type="danger" 
-                        size="small" 
-                        :icon="Delete"
-                        @click="deleteItem(row)"
-                      >
-                        删除
-                      </el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-              <div v-else class="file-list-container">
-                <div style="text-align: center; padding: 40px;">加载中...</div>
+              <div v-else class="header-tip">
+                <el-text type="info">当前目录只读</el-text>
               </div>
             </div>
-          </el-main>
-          <el-aside style="height: 580px;width: 200px;"> 
           </el-aside>
         </el-container>
         <el-footer style="padding: 0">
@@ -576,8 +648,11 @@ onMounted(async () => {
 
 <style scoped>
 .network-disk-main {
-  padding: 20px;
-  background-color: var(--el-bg-color-page);
+  padding: 10px 20px 20px 20px;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .network-disk-container {
@@ -586,66 +661,20 @@ onMounted(async () => {
 }
 
 .disk-header {
+  padding: 20px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.disk-header h1 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+  flex-direction: column;
 }
 
 .header-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
 .header-tip {
   display: flex;
   align-items: center;
-}
-
-
-.file-list-container {
-  background-color: var(--el-bg-color);
-  border-radius: 4px;
   padding: 10px;
-}
-
-.file-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.file-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.file-name-link {
-  color: var(--el-text-color-regular);
-  text-decoration: none;
-}
-
-.file-name-link:hover {
-  color: #EF5710;
-  text-decoration: underline;
-}
-
-.el-table {
-  --el-table-border-color: var(--el-border-color-lighter);
-}
-
-.el-table :deep(.el-table__row) {
-  cursor: default;
-}
-
-.el-table :deep(.el-table__row:hover) {
-  background-color: var(--el-fill-color-light);
 }
 </style>

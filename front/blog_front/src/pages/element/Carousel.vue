@@ -14,7 +14,7 @@ watch(isDark, (newVal) => {
 })
 </script>
 <template>
-    <el-carousel :interval=2000 height="500px" motion-blur style="width: 800px;border-radius: 20px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">
+    <el-carousel :interval=2000 height="500px" motion-blur style="width: 800px;border-radius: 20px; box-shadow: 0 0 18px rgba(0, 0, 0, 0.3);border: 1px solid var(--el-border-color-light);">
       <el-carousel-item v-for="item of 3" :key="item">
 <img :src="`/images/login${item}_${theme}.jpg`" class= "pic" alt="网络不好，请重新加载">
       </el-carousel-item>

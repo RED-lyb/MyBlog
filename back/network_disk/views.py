@@ -263,13 +263,19 @@ def list_files(request):
         parent_path = '/'.join(parent_parts) if parent_parts else ''
         
         # 获取路径中的用户名（用于显示）
+        # 只有第一层（索引0）才映射成用户名，其他层直接显示文件夹名
         path_usernames = []
-        for part in path_parts:
-            try:
-                user_id = int(part)
-                username = get_username_by_id(user_id)
-                path_usernames.append(username if username else part)
-            except (ValueError, TypeError):
+        for index, part in enumerate(path_parts):
+            if index == 0:
+                # 第一层：尝试映射成用户名
+                try:
+                    user_id = int(part)
+                    username = get_username_by_id(user_id)
+                    path_usernames.append(username if username else part)
+                except (ValueError, TypeError):
+                    path_usernames.append(part)
+            else:
+                # 其他层：直接使用文件夹名
                 path_usernames.append(part)
         
         # 获取当前路径的所有者用户ID和用户名
@@ -390,6 +396,7 @@ def download_file(request, file_path):
     下载文件
     所有用户都可以下载（包括访客）
     支持直接URL访问下载
+    支持 Range 请求（用于检查文件是否存在而不下载）
     """
     try:
         # 防止路径遍历攻击
@@ -416,6 +423,30 @@ def download_file(request, file_path):
                 'success': False,
                 'error': '文件不存在'
             }, status=404)
+        
+        # 检查是否是 Range 请求（用于检查文件是否存在）
+        range_header = request.META.get('HTTP_RANGE', '')
+        if range_header and range_header.startswith('bytes=0-0'):
+            # 只返回第一个字节，用于检查文件是否存在
+            file_size = target_file.stat().st_size
+            if file_size > 0:
+                with open(target_file, 'rb') as f:
+                    f.seek(0)
+                    first_byte = f.read(1)
+                    response = FileResponse(
+                        first_byte,
+                        status=206,  # Partial Content
+                        content_type='application/octet-stream'
+                    )
+                    response['Content-Range'] = f'bytes 0-0/{file_size}'
+                    response['Accept-Ranges'] = 'bytes'
+                    return response
+            else:
+                # 空文件
+                return FileResponse(
+                    b'',
+                    content_type='application/octet-stream'
+                )
         
         # 返回文件
         response = FileResponse(

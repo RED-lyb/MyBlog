@@ -1,0 +1,13 @@
+/* Element Plus 颜色变量覆盖
+ * 此文件在 Element Plus CSS 之后加载，确保变量覆盖生效
+ */
+
+html {
+  /* --el-text-color-regular: #e40606 !important; 文字默认颜色*/
+  /* --el-border-color-light: #e4e7ed; 边框颜色*/
+}
+
+html.dark {
+    /* --el-text-color-regular: #0852ff !important; 文字默认颜色*/
+    /* --el-border-color-light:#414243; 边框颜色*/
+  }

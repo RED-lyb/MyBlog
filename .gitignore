@@ -39,9 +39,8 @@ front/blog_front/.env.production
 *.log
 *.tmp
 
-# 静态资源上传目录（如有用户上传文件）
-static/uploads/
-media/
+# 静态资源上传目录
+back/api/static/
 
 # 其他
 .DS_Store

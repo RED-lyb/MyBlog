@@ -142,7 +142,7 @@ onMounted(async () => {
 }
 
 .el-main {
-  background-color: #fbaf0000;
+  background-color: #2effc100;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }

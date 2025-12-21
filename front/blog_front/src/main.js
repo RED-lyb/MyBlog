@@ -8,6 +8,7 @@ import './style.css'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
+import '@/assets/element-plus-override.css' // 在 Element Plus CSS 之后加载，确保覆盖生效
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { useAuthStore } from './stores/user_info.js'
 
