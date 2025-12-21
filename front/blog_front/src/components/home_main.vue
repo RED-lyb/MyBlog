@@ -210,7 +210,7 @@ onMounted(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  padding-top: 20px;
+  padding-top: 10px;
   padding-left: 20px;
   padding-right: 20px;
   padding-bottom: 0px;
@@ -234,8 +234,9 @@ onMounted(() => {
 }
 
 .article-item {
-  padding: 12px 20px;
+  padding: 12px 20px 12px 20px;
   border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
@@ -281,7 +282,7 @@ onMounted(() => {
 }
 
 .article-summary {
-  color: #666;
+  color: #8a8a8a;
   font-size: 13px;
   margin-bottom: 0;
   white-space: nowrap;
@@ -312,7 +313,6 @@ onMounted(() => {
   font-size: 13px;
 }
 .stat-date {
-  padding-top: 3px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -320,7 +320,7 @@ onMounted(() => {
   color: #999;
 }
 .page-number-container {
-  padding-top: 15px;
+  padding-top: 10px;
   position: relative;
   display: flex;
   justify-content: center;

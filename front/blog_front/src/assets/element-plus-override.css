@@ -5,9 +5,16 @@
 html {
   /* --el-text-color-regular: #e40606 !important; 文字默认颜色*/
   /* --el-border-color-light: #e4e7ed; 边框颜色*/
+
 }
 
 html.dark {
-    /* --el-text-color-regular: #0852ff !important; 文字默认颜色*/
-    /* --el-border-color-light:#414243; 边框颜色*/
-  }
+  /* --el-text-color-regular: #0852ff !important; 文字默认颜色*/
+  /* --el-border-color-light:#414243; 边框颜色*/
+}
+
+.el-checkbox {
+  --el-checkbox-checked-bg-color: #EF5710 !important;
+  --el-checkbox-checked-input-border-color: #EF5710 !important;
+  --el-checkbox-input-border-color-hover: #EF5710 !important;
+}

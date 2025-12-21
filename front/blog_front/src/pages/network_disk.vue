@@ -3,7 +3,7 @@ import { onMounted, ref, computed, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElIcon } from 'element-plus'
 import { Download, Delete, Upload, Plus, UploadFilled } from '@element-plus/icons-vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
@@ -40,6 +40,15 @@ const uploadFileList = ref([])
 const mkdirDialogVisible = ref(false)
 const newDirName = ref('')
 const isDownloadingFile = ref(false) // 标记是否正在处理文件下载
+
+// 存储信息
+const storageInfo = ref({
+  total_gb: 15.0,
+  used_gb: 0,
+  remaining_gb: 15.0,
+  usage_percentage: 0
+})
+const loadingStorageInfo = ref(false)
 
 const apiUrl = import.meta.env.VITE_API_URL
 
@@ -234,6 +243,7 @@ const deleteItem = async (item) => {
 }
 
 // 上传文件
+const uploading = ref(false)
 const handleUpload = async () => {
   if (!isAuthenticated.value) {
     ElMessage.warning('请先登录')
@@ -245,14 +255,32 @@ const handleUpload = async () => {
     return
   }
   
+  // 在上传前检查容量
+  const file = uploadFileList.value[0].raw
+  const fileSizeGB = file.size / (1024 ** 3)
+  const totalGB = storageInfo.value.total_gb
+  const usedGB = storageInfo.value.used_gb
+  const remainingGB = storageInfo.value.remaining_gb
+  
+  // 如果文件大小超过剩余容量，提前提示
+  if (fileSizeGB > remainingGB) {
+    ElMessage.error(`存储空间不足，无法上传。文件大小 ${fileSizeGB.toFixed(2)}G，剩余空间 ${remainingGB.toFixed(2)}G`)
+    return
+  }
+  
+  uploading.value = true
   try {
     const formData = new FormData()
-    formData.append('file', uploadFileList.value[0].raw)
+    formData.append('file', file)
     formData.append('path', currentPath.value)
     
     const response = await apiClient.post(`${apiUrl}network_disk/upload/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        // 可以在这里添加进度条，但FullScreenLoading已经足够
+        // const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
       }
     })
     
@@ -261,12 +289,19 @@ const handleUpload = async () => {
       uploadDialogVisible.value = false
       uploadFileList.value = []
       fetchFileList() // 从 URL 读取路径
+      fetchStorageInfo() // 更新存储信息
     } else {
       ElMessage.error(response.data?.error || '上传失败')
     }
   } catch (error) {
     console.error('上传错误:', error)
-    ElMessage.error('上传失败')
+    if (error.response?.data?.error) {
+      ElMessage.error(error.response.data.error)
+    } else {
+      ElMessage.error('上传失败')
+    }
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -338,15 +373,153 @@ const deleteItems = async (items) => {
     }
     
     fetchFileList() // 从 URL 读取路径
+    fetchStorageInfo() // 更新存储信息
   } catch (error) {
     console.error('删除错误:', error)
     ElMessage.error('删除失败')
   }
 }
 
-// 编辑文件（占位函数，可以根据需要实现）
-const editFile = (file) => {
-  ElMessage.info(`编辑文件功能待实现: ${file.name}`)
+// 编辑文件/文件夹（重命名）
+const editFile = async (item) => {
+  if (!isAuthenticated.value) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  try {
+    const { value: newName } = await ElMessageBox.prompt(
+      `请输入新的${item.is_directory ? '文件夹' : '文件'}名称`,
+      '重命名',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: item.name,
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return '名称不能为空'
+          }
+          if (value.includes('/') || value.includes('\\') || value.includes('..')) {
+            return '名称包含非法字符'
+          }
+          return true
+        }
+      }
+    )
+    
+    if (!newName || newName.trim() === item.name) {
+      return
+    }
+    
+    const itemPath = getFullPath(item.name)
+    const response = await apiClient.post(`${apiUrl}network_disk/rename/`, {
+      path: itemPath,
+      new_name: newName.trim()
+    })
+    
+    if (response.data?.success) {
+      ElMessage.success('重命名成功')
+      fetchFileList() // 从 URL 读取路径
+    } else {
+      ElMessage.error(response.data?.error || '重命名失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('重命名错误:', error)
+      ElMessage.error('重命名失败')
+    }
+  }
+}
+
+// 递归获取文件夹下的所有文件路径
+const getAllFilesInDirectory = async (dirPath) => {
+  const files = []
+  try {
+    const response = await apiClient.get(`${apiUrl}network_disk/list/`, {
+      params: { path: dirPath }
+    })
+    if (response.data?.success) {
+      const { directories, files: dirFiles } = response.data.data
+      
+      // 添加当前目录下的文件
+      for (const file of dirFiles) {
+        const filePath = dirPath ? `${dirPath}/${file.name}` : file.name
+        files.push({ path: filePath, name: file.name, is_directory: false })
+      }
+      
+      // 递归获取子目录下的文件
+      for (const dir of directories) {
+        const subDirPath = dirPath ? `${dirPath}/${dir.name}` : dir.name
+        const subFiles = await getAllFilesInDirectory(subDirPath)
+        files.push(...subFiles)
+      }
+    }
+  } catch (error) {
+    console.error(`获取目录 ${dirPath} 的文件列表失败:`, error)
+  }
+  return files
+}
+
+// 循环下载文件/文件夹
+const downloadingFiles = ref(false)
+const downloadArchive = async (items) => {
+  if (items.length === 0) {
+    ElMessage.warning('请先选择要下载的项目')
+    return
+  }
+  
+  downloadingFiles.value = true
+  try {
+    // 收集所有需要下载的文件
+    const filesToDownload = []
+    
+    for (const item of items) {
+      const itemPath = getFullPath(item.name)
+      
+      if (item.is_directory) {
+        // 文件夹：递归获取所有文件
+        const dirFiles = await getAllFilesInDirectory(itemPath)
+        filesToDownload.push(...dirFiles)
+      } else {
+        // 文件：直接添加
+        filesToDownload.push({ path: itemPath, name: item.name, is_directory: false })
+      }
+    }
+    
+    if (filesToDownload.length === 0) {
+      ElMessage.warning('没有可下载的文件')
+      return
+    }
+    
+    // 逐个下载文件
+    for (let i = 0; i < filesToDownload.length; i++) {
+      const file = filesToDownload[i]
+      try {
+        const downloadUrl = `${apiUrl}network_disk/download/${encodeURIComponent(file.path)}`
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.style.display = 'none'
+        link.download = file.name
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        // 添加小延迟，避免浏览器阻止多个下载
+        if (i < filesToDownload.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 300))
+        }
+      } catch (error) {
+        console.error(`下载文件 ${file.name} 失败:`, error)
+      }
+    }
+    
+    ElMessage.success(`开始下载 ${filesToDownload.length} 个文件`)
+  } catch (error) {
+    console.error('下载错误:', error)
+    ElMessage.error('下载失败')
+  } finally {
+    downloadingFiles.value = false
+  }
 }
 
 // 递归查找第一个存在的父目录
@@ -543,6 +716,39 @@ const ensureUserDirectory = async () => {
   }
 }
 
+// 获取存储信息
+const fetchStorageInfo = async () => {
+  loadingStorageInfo.value = true
+  try {
+    const response = await apiClient.get(`${apiUrl}network_disk/storage-info/`)
+    if (response.data?.success) {
+      storageInfo.value = response.data.data
+    }
+  } catch (error) {
+    console.error('获取存储信息失败:', error)
+  } finally {
+    loadingStorageInfo.value = false
+  }
+}
+
+// 根据使用率获取进度条颜色（仪表盘类型需要数组）
+const getProgressColors = (percentage) => {
+  // 仪表盘类型使用渐变色数组，根据使用率设置不同颜色段
+  if (percentage < 50) {
+    return [
+      { color: '#67c23a', percentage: 100 } // 绿色
+    ]
+  } else if (percentage < 80) {
+    return [
+      { color: '#e6a23c', percentage: 100 } // 橙色
+    ]
+  } else {
+    return [
+      { color: '#f56c6c', percentage: 100 } // 红色
+    ]
+  }
+}
+
 onMounted(async () => {
   authStore.syncFromLocalStorage()
   isLoading.value = false
@@ -550,6 +756,9 @@ onMounted(async () => {
   
   // 如果用户已登录，确保用户文件夹存在
   await ensureUserDirectory()
+  
+  // 获取存储信息
+  await fetchStorageInfo()
   
   // 从 URL 获取路径并加载文件列表（路由监听会处理）
   const path = getPathFromRoute()
@@ -571,7 +780,8 @@ onMounted(async () => {
             <UserInfoSidebar :user-id="currentOwnerId" />
           </el-aside>
           <el-aside style="height: 570px;width: 200px;" v-else></el-aside>
-          <el-main style="min-height: 570px;" class="network-disk-main">
+          <el-main style="min-height: 570px;">
+            <FullScreenLoading :visible="downloadingFiles" />
             <NetworkDiskMain
               :directories="directories"
               :files="files"
@@ -586,22 +796,58 @@ onMounted(async () => {
               @navigate-to-path="updateUrl"
               @enter-directory="handleEnterDirectory"
               @download-file="downloadFile"
+              @download-archive="downloadArchive"
               @delete-items="deleteItems"
               @edit-file="editFile"
             />
           </el-main>
-          <el-aside style="height: 580px;width: 200px;">
+          <el-aside style="height: 570px;width: 200px; position: relative;">
             <div class="disk-header">
-              <div class="header-actions" v-if="canWrite && isAuthenticated">
-                <el-button type="primary" :icon="Plus" @click="mkdirDialogVisible = true" style="width: 100%; margin-bottom: 10px;">新建文件夹</el-button>
-                <el-button type="success" :icon="Upload" @click="uploadDialogVisible = true" style="width: 100%;">上传文件</el-button>
-              </div>
-              <div v-else-if="!isAuthenticated" class="header-tip">
+              <div v-if="!isAuthenticated" class="header-tip">
                 <el-text type="info">访客模式：只能浏览和下载</el-text>
               </div>
-              <div v-else class="header-tip">
+              <div v-else-if="!canWrite" class="header-tip">
                 <el-text type="info">当前目录只读</el-text>
               </div>
+              
+              <!-- 存储容量显示 -->
+              <div class="storage-info" style="margin-top: 20px;">
+                <div class="storage-title">
+                  <el-text type="info" size="small">网盘容量</el-text>
+                </div>
+                <el-progress 
+                  type="dashboard"
+                  :percentage="storageInfo.usage_percentage" 
+                  :color="getProgressColors(storageInfo.usage_percentage)"
+                  style="margin-top: 10px;"
+                />
+                <div class="storage-details" style="margin-top: 10px;">
+                  <el-text type="info" size="small">
+                    已用: {{ storageInfo.used_gb }}G / {{ storageInfo.total_gb }}G
+                  </el-text>
+                  <el-text type="info" size="small" style="display: block; margin-top: 5px;">
+                    剩余: {{ storageInfo.remaining_gb }}G
+                  </el-text>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 圆形操作按钮 -->
+            <div class="floating-action-buttons" v-if="canWrite && isAuthenticated">
+              <button 
+                class="circular-btn circular-btn-primary" 
+                @click="mkdirDialogVisible = true"
+                title="新建文件夹"
+              >
+                <el-icon><Plus /></el-icon>
+              </button>
+              <button 
+                class="circular-btn circular-btn-success" 
+                @click="uploadDialogVisible = true"
+                title="上传文件"
+              >
+                <el-icon><Upload /></el-icon>
+              </button>
             </div>
           </el-aside>
         </el-container>
@@ -613,11 +859,13 @@ onMounted(async () => {
 
     <!-- 上传文件对话框 -->
     <el-dialog v-model="uploadDialogVisible" title="上传文件" width="500px">
+      <FullScreenLoading :visible="uploading" />
       <el-upload
         :auto-upload="false"
         :on-change="(file) => uploadFileList = [file]"
         :file-list="uploadFileList"
         :limit="1"
+        :disabled="uploading"
         drag
       >
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
@@ -626,8 +874,8 @@ onMounted(async () => {
         </div>
       </el-upload>
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleUpload">确定</el-button>
+        <el-button @click="uploadDialogVisible = false" :disabled="uploading">取消</el-button>
+        <el-button type="primary" @click="handleUpload" :loading="uploading">确定</el-button>
       </template>
     </el-dialog>
 
@@ -647,8 +895,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.network-disk-main {
-  padding: 10px 20px 20px 20px;
+.el-main {
+  background-color: #00000000;
+  padding: 0px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
@@ -676,5 +925,62 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 10px;
+}
+
+/* 圆形操作按钮 */
+.floating-action-buttons {
+  position: absolute;
+  bottom: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  justify-content: center;
+}
+
+.circular-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.circular-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.circular-btn:active {
+  transform: scale(0.95);
+}
+
+.circular-btn-primary {
+  background-color: var(--el-color-primary);
+  color: white;
+}
+
+.circular-btn-primary:hover {
+  background-color: var(--el-color-primary-light-3);
+}
+
+.circular-btn-success {
+  background-color: var(--el-color-success);
+  color: white;
+}
+
+.circular-btn-success:hover {
+  background-color: var(--el-color-success-light-3);
+}
+
+.circular-btn .el-icon {
+  font-size: 24px;
 }
 </style>

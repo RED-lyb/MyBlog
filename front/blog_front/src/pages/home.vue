@@ -121,11 +121,11 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside style="width: 200px;">用于筛选</el-aside>
-          <el-main style="min-height: 580px;">
+          <el-aside style="height: 570px;width: 200px;"></el-aside>
+          <el-main style="min-height: 570px;">
             <Home_main />
           </el-main>
-          <el-aside style="width: 200px;">
+          <el-aside style="height: 570px;width: 200px;">
             <CreateButton />
           </el-aside>
         </el-container>
@@ -138,12 +138,17 @@ onMounted(async () => {
 </template>
 <style scoped>
 .el-aside {
-  background-color: #2effc100;
+  background-color: #00000000;
 }
 
 .el-main {
-  background-color: #2effc100;
+  background-color: #00000000;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
+
 </style>

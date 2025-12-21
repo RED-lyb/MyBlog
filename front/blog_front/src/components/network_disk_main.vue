@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Delete, Edit } from '@element-plus/icons-vue'
+import { ElIcon } from 'element-plus'
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
 
 // Props
@@ -53,6 +54,7 @@ const emit = defineEmits([
   'navigate-to-path',
   'enter-directory',
   'download-file',
+  'download-archive',
   'delete-items',
   'edit-file'
 ])
@@ -70,9 +72,19 @@ const selectedFiles = computed(() => {
   return selectedItems.value.filter(item => !item.is_directory)
 })
 
-// 是否只选中了一个文件
-const isSingleFileSelected = computed(() => {
-  return selectedFiles.value.length === 1
+// 是否只选中了一个项目（文件或文件夹）
+const isSingleItemSelected = computed(() => {
+  return selectedItems.value.length === 1
+})
+
+// 是否在根目录
+const isRootDirectory = computed(() => {
+  return props.pathParts.length === 0
+})
+
+// 是否可以编辑（不在根目录且只选中一个项目）
+const canEditSelected = computed(() => {
+  return !isRootDirectory.value && isSingleItemSelected.value
 })
 
 // 是否可以删除（在自己的文件空间下）
@@ -127,29 +139,48 @@ watch(() => [props.directories, props.files], () => {
   }
 }, { deep: true })
 
-// 下载选中的文件
-const handleDownloadSelected = () => {
-  if (selectedFiles.value.length === 0) {
-    ElMessage.warning('请先选择要下载的文件')
+// 下载选中的文件/文件夹
+const handleDownloadSelected = async () => {
+  if (selectedItems.value.length === 0) {
+    ElMessage.warning('请先选择要下载的项目')
     return
   }
   
-  selectedFiles.value.forEach(file => {
-    emit('download-file', file.name)
-  })
+  // 保存选中的项目，因为emit后需要清空
+  const itemsToDownload = [...selectedItems.value]
+  
+  // 如果只有一个文件，直接下载
+  if (itemsToDownload.length === 1 && !itemsToDownload[0].is_directory) {
+    emit('download-file', itemsToDownload[0].name)
+    // 清空选择
+    selectedItems.value = []
+    if (tableRef.value) {
+      tableRef.value.clearSelection()
+    }
+    return
+  }
+  
+  // 多个文件或包含文件夹，使用打包下载
+  emit('download-archive', itemsToDownload)
+  
+  // 等待一下再清空，确保下载已经开始
+  await new Promise(resolve => setTimeout(resolve, 100))
   
   // 清空选择
   selectedItems.value = []
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
 }
 
-// 编辑选中的文件
+// 编辑选中的文件/文件夹（重命名）
 const handleEditSelected = () => {
-  if (selectedFiles.value.length !== 1) {
-    ElMessage.warning('请选择一个文件进行编辑')
+  if (selectedItems.value.length !== 1) {
+    ElMessage.warning('请选择一个项目进行重命名')
     return
   }
   
-  emit('edit-file', selectedFiles.value[0])
+  emit('edit-file', selectedItems.value[0])
 }
 
 // 删除选中的项目
@@ -247,32 +278,29 @@ const handleDeleteSelected = async () => {
       <!-- 操作按钮区域 -->
       <div class="action-buttons-wrapper" style="flex: 0 0 30%;" v-if="selectedItems.length > 0">
         <div class="action-buttons">
-          <el-button 
-            type="primary" 
-            size="small" 
-            :icon="Download"
+          <button 
+            class="dsi-btn dsi-btn-outline dsi-btn-success"
             @click="handleDownloadSelected"
           >
+            <el-icon><Download /></el-icon>
             下载
-          </el-button>
-          <el-button 
-            type="success" 
-            size="small" 
-            :icon="Edit"
-            :disabled="!isSingleFileSelected"
+          </button>
+          <button 
+            class="dsi-btn dsi-btn-outline dsi-btn-info"
+            :disabled="!canEditSelected"
             @click="handleEditSelected"
           >
+            <el-icon><Edit /></el-icon>
             编辑
-          </el-button>
-          <el-button 
-            type="danger" 
-            size="small" 
-            :icon="Delete"
+          </button>
+          <button 
+            class="dsi-btn dsi-btn-outline dsi-btn-error"
             :disabled="!canDeleteSelected"
             @click="handleDeleteSelected"
           >
+            <el-icon><Delete /></el-icon>
             删除
-          </el-button>
+          </button>
         </div>
       </div>
     </div>
@@ -339,7 +367,7 @@ const handleDeleteSelected = async () => {
         </el-table-column>
         <el-table-column prop="size_formatted" label="大小" width="120" align="right">
           <template #default="{ row }">
-            {{ row.is_directory ? '-' : row.size_formatted }}
+            {{ row.size_formatted || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="修改时间" width="180">
@@ -361,6 +389,7 @@ const handleDeleteSelected = async () => {
 }
 
 .breadcrumb-container {
+  margin: 10px;
   display: flex;
   align-items: center;
 }
@@ -378,6 +407,24 @@ const handleDeleteSelected = async () => {
 .action-buttons {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.action-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-buttons button .el-icon {
+  font-size: 16px;
 }
 
 .file-list-container {
@@ -418,6 +465,15 @@ const handleDeleteSelected = async () => {
 
 .el-table :deep(.el-table__row:hover) {
   background-color: var(--el-fill-color-light);
+}
+.dsi-btn{
+  height: 25px;
+  font-weight: 400;
+  font-size: 12px;
+  border: 1px solid;
+}
+.dsi-btn:hover{
+  border: 1px solid var(--dsi-btn-bg);
 }
 </style>
 

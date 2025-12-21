@@ -216,7 +216,7 @@ watch([isAuthenticated, userId, avatar], async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside width="200px" class="user-aside">
+          <el-aside style="height: 570px;width: 200px;" class="user-aside">
             <!-- 优先显示目标用户信息（查看别人的主页） -->
             <template v-if="targetUser">
               <div class="avatar-container">
@@ -310,7 +310,7 @@ watch([isAuthenticated, userId, avatar], async () => {
               </div>
             </template>
           </el-aside>
-          <el-main style="height: 600px">
+          <el-main style="min-height: 570px;">
             <div v-if="userLoading" class="user-loading">加载中...</div>
             <div v-else-if="userError" class="user-error">{{ userError }}</div>
             <div v-else-if="targetUser" class="user-info">
@@ -328,7 +328,7 @@ watch([isAuthenticated, userId, avatar], async () => {
               <p>请先登录</p>
             </div>
           </el-main>
-          <el-aside width="200px">Aside</el-aside>
+          <el-aside style="height: 570px;width: 200px;"></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -338,6 +338,19 @@ watch([isAuthenticated, userId, avatar], async () => {
   </div>
 </template>
 <style scoped>
+.el-aside {
+  background-color: #00000000;
+}
+
+.el-main {
+  background-color: #00000000;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
+}
 .user-aside {
   padding: 20px;
   display: flex;

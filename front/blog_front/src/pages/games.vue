@@ -93,26 +93,13 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside width="200px">
-            <template v-if="isAuthenticated && user">
-              <h2>欢迎回来，{{ username }}！</h2>
-              <p>用户ID: {{ userId }}</p>
-              <p>注册时间: {{ registeredTime }}</p>
-              <p>头像: {{ avatar || '暂未设置' }}</p>
-              <p>背景色: {{ bgColor || '默认' }}</p>
-              <p>背景样式: {{ bgPattern || '默认' }}</p>
-              <p>卡片圆角: {{ cornerRadius || '默认' }}</p>
-            </template>
-            <template v-else>
-              <h2>欢迎，游客！</h2>
-              <p>您当前以访客身份浏览</p>
-            </template>
+          <el-aside style="height: 570px;width: 200px;">
           </el-aside>
-          <el-main style="height: 600px">
+          <el-main style="min-height: 570px;">
             <h1>趣味游戏</h1>
             <p>这里是趣味游戏的内容区域</p>
           </el-main>
-          <el-aside width="200px">Aside</el-aside>
+          <el-aside style="height: 570px;width: 200px;"></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -123,11 +110,17 @@ onMounted(async () => {
 </template>
 <style scoped>
 .el-aside {
-  background-color: #2effc100;
+  background-color: #00000000;
 }
 
 .el-main {
-  background-color: #fbaf0000;
+  background-color: #00000000;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
 </style>
 
