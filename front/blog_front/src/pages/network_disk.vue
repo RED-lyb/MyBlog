@@ -316,7 +316,7 @@ const createDirectory = async () => {
     ElMessage.warning('请输入目录名')
     return
   }
-  
+
   try {
     const response = await apiClient.post(`${apiUrl}network_disk/mkdir/`, {
       name: newDirName.value.trim(),
@@ -339,7 +339,7 @@ const createDirectory = async () => {
 
 // 批量删除项目
 const deleteItems = async (items) => {
-  if (!isAuthenticated.value) {
+    if (!isAuthenticated.value) {
     ElMessage.warning('请先登录')
     return
   }
@@ -386,7 +386,7 @@ const editFile = async (item) => {
     ElMessage.warning('请先登录')
     return
   }
-  
+
   try {
     const { value: newName } = await ElMessageBox.prompt(
       `请输入新的${item.is_directory ? '文件夹' : '文件'}名称`,
@@ -709,7 +709,7 @@ const ensureUserDirectory = async () => {
       await apiClient.get(`${apiUrl}network_disk/list/`, {
         params: { path: String(userId.value) }
       })
-    } catch (error) {
+  } catch (error) {
       // 忽略错误，目录会在后端自动创建
       console.log('确保用户目录:', error)
     }
@@ -742,7 +742,7 @@ const getProgressColors = (percentage) => {
     return [
       { color: '#e6a23c', percentage: 100 } // 橙色
     ]
-  } else {
+    } else {
     return [
       { color: '#f56c6c', percentage: 100 } // 红色
     ]
@@ -767,7 +767,6 @@ onMounted(async () => {
 </script>
 
 <template>
-  <FullScreenLoading :visible="showPageLoading" />
   <div v-if="showPageLoading"></div>
   <div v-else>
     <div class="common-layout">
@@ -776,11 +775,11 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside style="height: 570px;width: 200px;" v-if="currentOwnerId">
+          <el-aside v-if="currentOwnerId">
             <UserInfoSidebar :user-id="currentOwnerId" />
           </el-aside>
-          <el-aside style="height: 570px;width: 200px;" v-else></el-aside>
-          <el-main style="min-height: 570px;">
+          <el-aside v-else></el-aside>
+          <el-main>
             <FullScreenLoading :visible="downloadingFiles" />
             <NetworkDiskMain
               :directories="directories"
@@ -801,7 +800,7 @@ onMounted(async () => {
               @edit-file="editFile"
             />
           </el-main>
-          <el-aside style="height: 570px;width: 200px; position: relative;">
+          <el-aside>
             <div class="disk-header">
               <div v-if="!isAuthenticated" class="header-tip">
                 <el-text type="info">访客模式：只能浏览和下载</el-text>
@@ -895,8 +894,18 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.el-aside {
+  background-color: #00000000;
+  width: 230px;
+  position: sticky;
+  top: 60px;
+  align-self: flex-start;
+  height: 570px;
+}
+
 .el-main {
   background-color: #00000000;
+  min-height: 570px;
   padding: 0px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;

@@ -121,11 +121,11 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside style="height: 570px;width: 200px;"></el-aside>
-          <el-main style="min-height: 570px;">
+          <el-aside></el-aside>
+          <el-main>
             <Home_main />
           </el-main>
-          <el-aside style="height: 570px;width: 200px;">
+          <el-aside>
             <CreateButton />
           </el-aside>
         </el-container>
@@ -139,16 +139,20 @@ onMounted(async () => {
 <style scoped>
 .el-aside {
   background-color: #00000000;
+  width: 230px;
+  position: sticky;
+  top: 60px;
+  align-self: flex-start;
+  height: 570px;
 }
 
 .el-main {
   background-color: #00000000;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+  min-height: 570px;
+  padding: 0px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
 }
-
 </style>
