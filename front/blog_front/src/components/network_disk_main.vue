@@ -307,7 +307,7 @@ const handleDeleteSelected = async () => {
 
     <!-- 文件列表 -->
     <FullScreenLoading :visible="loadingFiles" />
-    <div class="file-list-container" v-if="!loadingFiles">
+    <div class="file-list-container"">
       <el-table 
         ref="tableRef"
         :data="allItems" 
@@ -376,9 +376,6 @@ const handleDeleteSelected = async () => {
           </template>
         </el-table-column>
       </el-table>
-    </div>
-    <div v-else class="file-list-container">
-      <div style="text-align: center; padding: 40px;">加载中...</div>
     </div>
   </div>
 </template>

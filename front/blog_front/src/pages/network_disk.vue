@@ -760,9 +760,7 @@ onMounted(async () => {
   // 获取存储信息
   await fetchStorageInfo()
   
-  // 从 URL 获取路径并加载文件列表（路由监听会处理）
-  const path = getPathFromRoute()
-  await fetchFileList(path)
+  // 文件列表加载由路由监听器处理（watch with immediate: true）
 })
 </script>
 
@@ -805,22 +803,20 @@ onMounted(async () => {
               <div v-if="!isAuthenticated" class="header-tip">
                 <el-text type="info">访客模式：只能浏览和下载</el-text>
               </div>
-              <div v-else-if="!canWrite" class="header-tip">
-                <el-text type="info">当前目录只读</el-text>
-              </div>
               
               <!-- 存储容量显示 -->
               <div class="storage-info" style="margin-top: 20px;">
-                <div class="storage-title">
+                <div class="storage-title" style="text-align: center;">
                   <el-text type="info" size="small">网盘容量</el-text>
                 </div>
-                <el-progress 
-                  type="dashboard"
-                  :percentage="storageInfo.usage_percentage" 
-                  :color="getProgressColors(storageInfo.usage_percentage)"
-                  style="margin-top: 10px;"
-                />
-                <div class="storage-details" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: center; margin-top: 10px;">
+                  <el-progress 
+                    type="dashboard"
+                    :percentage="storageInfo.usage_percentage" 
+                    :color="getProgressColors(storageInfo.usage_percentage)"
+                  />
+                </div>
+                <div class="storage-details" style="margin-top: 10px; text-align: center;">
                   <el-text type="info" size="small">
                     已用: {{ storageInfo.used_gb }}G / {{ storageInfo.total_gb }}G
                   </el-text>
@@ -834,14 +830,15 @@ onMounted(async () => {
             <!-- 圆形操作按钮 -->
             <div class="floating-action-buttons" v-if="canWrite && isAuthenticated">
               <button 
-                class="circular-btn circular-btn-primary" 
+                class="dsi-btn dsi-btn-soft dsi-btn-accent circular-btn""
                 @click="mkdirDialogVisible = true"
                 title="新建文件夹"
               >
                 <el-icon><Plus /></el-icon>
               </button>
+              <button ></button>
               <button 
-                class="circular-btn circular-btn-success" 
+                class="dsi-btn dsi-btn-soft dsi-btn-info circular-btn""
                 @click="uploadDialogVisible = true"
                 title="上传文件"
               >
@@ -939,7 +936,7 @@ onMounted(async () => {
 /* 圆形操作按钮 */
 .floating-action-buttons {
   position: absolute;
-  bottom: 10%;
+  bottom: 5%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -949,47 +946,27 @@ onMounted(async () => {
 }
 
 .circular-btn {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 25px;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 2px solid;
+  width: 60px;
+  height: 60px;
+  border-radius: 60px;
 }
 
 .circular-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--dsi-btn-bg);
 }
 
 .circular-btn:active {
   transform: scale(0.95);
 }
 
-.circular-btn-primary {
-  background-color: var(--el-color-primary);
-  color: white;
-}
-
-.circular-btn-primary:hover {
-  background-color: var(--el-color-primary-light-3);
-}
-
-.circular-btn-success {
-  background-color: var(--el-color-success);
-  color: white;
-}
-
-.circular-btn-success:hover {
-  background-color: var(--el-color-success-light-3);
-}
-
-.circular-btn .el-icon {
-  font-size: 24px;
-}
 </style>
