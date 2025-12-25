@@ -16,6 +16,76 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `blog_articles`
+--
+
+DROP TABLE IF EXISTS `blog_articles`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `blog_articles` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '文章ID，主键自增',
+  `title` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章标题',
+  `content` longtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章正文，支持 Markdown/HTML',
+  `author_id` int unsigned NOT NULL COMMENT '作者ID，外键关联 users 表',
+  `view_count` int unsigned NOT NULL DEFAULT '0' COMMENT '浏览量，默认0',
+  `love_count` int unsigned NOT NULL DEFAULT '0' COMMENT '点赞数，默认0',
+  `comment_count` int unsigned NOT NULL DEFAULT '0' COMMENT '评论数，默认0，冗余字段便于查询',
+  `published_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间，默认服务器系统时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_author_id` (`author_id`),
+  KEY `idx_published_at` (`published_at`),
+  KEY `idx_view_count` (`view_count`),
+  CONSTRAINT `blog_articles_ibfk_1` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='博客文章表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_insert` AFTER INSERT ON `blog_articles` FOR EACH ROW BEGIN
+
+    UPDATE users 
+
+    SET article_count = article_count + 1 
+
+    WHERE id = NEW.author_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_delete` AFTER DELETE ON `blog_articles` FOR EACH ROW BEGIN
+
+    UPDATE users 
+
+    SET article_count = article_count - 1 
+
+    WHERE id = OLD.author_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
 -- Table structure for table `captcha_captchastore`
 --
 
@@ -30,7 +100,7 @@ CREATE TABLE `captcha_captchastore` (
   `expiration` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hashkey` (`hashkey`)
-) ENGINE=InnoDB AUTO_INCREMENT=532 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -46,7 +116,7 @@ CREATE TABLE `django_content_type` (
   `model` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `django_content_type_app_label_model_76bd3d3b_uniq` (`app_label`,`model`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -62,7 +132,7 @@ CREATE TABLE `django_migrations` (
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `applied` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -99,8 +169,186 @@ CREATE TABLE `refresh_tokens` (
   KEY `refresh_tok_user_id_46676d_idx` (`user_id`),
   KEY `refresh_tok_token_h_2fa7c6_idx` (`token_hash`),
   KEY `refresh_tok_expires_a128d9_idx` (`expires_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=151 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user_follows`
+--
+
+DROP TABLE IF EXISTS `user_follows`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_follows` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `follower_id` int unsigned NOT NULL COMMENT '关注者ID，外键关联 users 表',
+  `following_id` int unsigned NOT NULL COMMENT '被关注者ID，外键关联 users 表',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '关注时间，默认服务器系统时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_follow` (`follower_id`,`following_id`),
+  KEY `idx_follower` (`follower_id`),
+  KEY `idx_following` (`following_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注关系表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_insert` AFTER INSERT ON `user_follows` FOR EACH ROW BEGIN
+
+    -- 更新关注者的关注数
+
+    UPDATE users 
+
+    SET follow_count = follow_count + 1 
+
+    WHERE id = NEW.follower_id;
+
+    
+
+    -- 更新被关注者的粉丝数
+
+    UPDATE users 
+
+    SET follower_count = follower_count + 1 
+
+    WHERE id = NEW.following_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_delete` AFTER DELETE ON `user_follows` FOR EACH ROW BEGIN
+
+    -- 更新关注者的关注数
+
+    UPDATE users 
+
+    SET follow_count = follow_count - 1 
+
+    WHERE id = OLD.follower_id;
+
+    
+
+    -- 更新被关注者的粉丝数
+
+    UPDATE users 
+
+    SET follower_count = follower_count - 1 
+
+    WHERE id = OLD.following_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `user_liked_articles`
+--
+
+DROP TABLE IF EXISTS `user_liked_articles`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_liked_articles` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `user_id` int unsigned NOT NULL COMMENT '用户ID，外键关联 users 表',
+  `article_id` int unsigned NOT NULL COMMENT '文章ID，外键关联 blog_articles 表',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '喜欢时间，默认服务器系统时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_like` (`user_id`,`article_id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_article` (`article_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户喜欢的文章关系表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_insert` AFTER INSERT ON `user_liked_articles` FOR EACH ROW BEGIN
+
+    -- 更新用户的喜欢文章数
+
+    UPDATE users 
+
+    SET liked_article_count = liked_article_count + 1 
+
+    WHERE id = NEW.user_id;
+
+    
+
+    -- 更新文章的点赞数
+
+    UPDATE blog_articles 
+
+    SET love_count = love_count + 1 
+
+    WHERE id = NEW.article_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_0900_ai_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_delete` AFTER DELETE ON `user_liked_articles` FOR EACH ROW BEGIN
+
+    -- 更新用户的喜欢文章数
+
+    UPDATE users 
+
+    SET liked_article_count = liked_article_count - 1 
+
+    WHERE id = OLD.user_id;
+
+    
+
+    -- 更新文章的点赞数
+
+    UPDATE blog_articles 
+
+    SET love_count = love_count - 1 
+
+    WHERE id = OLD.article_id;
+
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `users`
@@ -118,11 +366,15 @@ CREATE TABLE `users` (
   `registered_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间，默认当前时间',
   `avatar` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像 URL，空表示未上传',
   `bg_color` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '个人中心背景色，CSS 合法值',
-  `bg_pattern` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '背景点缀样式名或 URL',
+  `bg_pattern` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '背景点缀样式',
   `corner_radius` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '卡片圆角大小，单位 px 或百分比',
+  `follow_count` int unsigned NOT NULL DEFAULT '0' COMMENT '关注数，默认0',
+  `article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '发布文章数，默认0',
+  `liked_article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '喜欢的文章数，默认0',
+  `follower_count` int unsigned NOT NULL DEFAULT '0' COMMENT '粉丝数，默认0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
-) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -134,4 +386,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-11-11 22:52:40
+-- Dump completed on 2025-12-25 22:53:58

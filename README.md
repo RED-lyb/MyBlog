@@ -261,5 +261,18 @@ systemctl start nginx
 ```
 * 执行上述步骤后即可完成部署，可通过访问服务器IP或域名进行访问。
 
+## 网盘容量自动管理脚本配置
+* 编辑 crontab：
+```bash
+crontab -e
+```
+* 添加以下行（每天0:00执行）：
+```bash
+0 0 * * * cd /webproject/my-blog/back && /usr/local/python3.12/bin/python3.12 manage.py cleanup_old_files >/dev/null 2>&1
+```
+* `--days [(int)天数]`: 指定删除多少天前修改的文件（不带该参数则默认7天）
+* `--dry-run`: 预览模式，仅显示将要删除的文件，不实际删除
+* `--no-log`: 不写入日志文件，仅输出到控制台（默认情况下会同时输出到控制台和日志文件）
+
 ## 参与贡献
 1. 李远博
