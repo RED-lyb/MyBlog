@@ -101,10 +101,13 @@ const breadcrumbs = computed(() => {
   ]
   
   parts.forEach((part, index) => {
-    const displayName = usernames[index] || part
+    // 确保 part 是有效字符串
+    const safePart = String(part || '')
+    const displayName = (usernames[index] && String(usernames[index])) || safePart
+    const path = parts.slice(0, index + 1).filter(p => p != null).join('/')
     crumbs.push({
-      name: displayName,
-      path: parts.slice(0, index + 1).join('/'),
+      name: String(displayName || ''),
+      path: String(path || ''),
       isLast: index === parts.length - 1
     })
   })
@@ -307,7 +310,7 @@ const handleDeleteSelected = async () => {
 
     <!-- 文件列表 -->
     <FullScreenLoading :visible="loadingFiles" />
-    <div class="file-list-container"">
+    <div class="file-list-container">
       <el-table 
         ref="tableRef"
         :data="allItems" 

@@ -222,6 +222,8 @@ root         /usr/share/nginx/html/dist;
 ```
 添加：
 ```nginx
+client_max_body_size 300M; #上传文件大小限制，可按实际需求进行修改。
+
 location / { 
 
         try_files $uri $uri/ /index.html;

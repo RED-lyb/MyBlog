@@ -830,15 +830,14 @@ onMounted(async () => {
             <!-- 圆形操作按钮 -->
             <div class="floating-action-buttons" v-if="canWrite && isAuthenticated">
               <button 
-                class="dsi-btn dsi-btn-soft dsi-btn-accent circular-btn""
+                class="dsi-btn dsi-btn-soft dsi-btn-accent circular-btn"
                 @click="mkdirDialogVisible = true"
                 title="新建文件夹"
               >
                 <el-icon><Plus /></el-icon>
               </button>
-              <button ></button>
               <button 
-                class="dsi-btn dsi-btn-soft dsi-btn-info circular-btn""
+                class="dsi-btn dsi-btn-soft dsi-btn-info circular-btn"
                 @click="uploadDialogVisible = true"
                 title="上传文件"
               >
