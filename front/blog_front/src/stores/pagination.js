@@ -30,6 +30,13 @@ export const usePaginationStore = defineStore('pagination', () => {
     persistPagination()
   }
 
+  // 设置每页显示数量
+  function setPageSize(size) {
+    if (size >= 1) {
+      pageSize.value = size
+    }
+  }
+
   // 重置分页状态
   function reset() {
     currentPage.value = 1
@@ -71,6 +78,7 @@ export const usePaginationStore = defineStore('pagination', () => {
     totalPages,
     setCurrentPage,
     setTotal,
+    setPageSize,
     reset,
     syncFromLocalStorage
   }

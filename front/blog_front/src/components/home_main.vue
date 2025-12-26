@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import page_number from "./page_number.vue"
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
@@ -18,6 +18,82 @@ const error = ref(null)
 // 使用分页 store
 const paginationStore = usePaginationStore()
 const { currentPage, pageSize } = storeToRefs(paginationStore)
+
+// 容器引用
+const containerRef = ref(null)
+const articlesListRef = ref(null)
+let resizeObserver = null
+let resizeTimer = null
+
+// 标记是否已经初始化完成
+const isInitialized = ref(false)
+
+// 测量实际的文章高度
+const measureArticleHeight = () => {
+  if (!articlesListRef.value) return null
+  
+  // 获取第一个文章项
+  const firstArticle = articlesListRef.value.querySelector('.article-item')
+  if (!firstArticle) return null
+  
+  // 获取文章项的实际高度（包括 padding）
+  const articleHeight = firstArticle.offsetHeight
+  
+  // articles-list 的 gap 是 10px
+  const gap = 10
+  
+  // 总高度 = 文章高度 + gap
+  return articleHeight + gap
+}
+
+// 计算每页显示数量（根据容器高度和实际文章高度）
+const calculatePageSize = () => {
+  if (!containerRef.value) return
+  
+  const container = containerRef.value
+  const containerHeight = container.offsetHeight || container.clientHeight
+  
+  // 如果高度异常，跳过计算
+  if (containerHeight < 100) return
+  
+  // 测量实际的文章高度
+  const articleItemHeight = measureArticleHeight()
+  
+  // 如果无法测量（文章列表为空），使用默认值
+  if (!articleItemHeight) {
+    // 使用默认值 140px
+    const defaultHeight = 140
+    const paginationHeight = 50
+    const containerPadding = 10
+    const availableHeight = containerHeight - paginationHeight - containerPadding
+    let calculatedSize = Math.floor(availableHeight / defaultHeight)
+    calculatedSize = Math.max(4, Math.min(20, calculatedSize))
+    if (calculatedSize !== pageSize.value) {
+      paginationStore.setPageSize(calculatedSize)
+    }
+    return
+  }
+  console.log('articleItemHeight', articleItemHeight)
+  // 分页组件高度约 40px，加上 padding-top 10px
+  const paginationHeight = 50
+  
+  // 容器 padding: top 10px, bottom 0px
+  const containerPadding = 10
+  
+  // 可用高度 = 容器高度 - 分页组件高度 - 容器 padding
+  const availableHeight = containerHeight - paginationHeight - containerPadding
+  
+  // 计算能显示多少篇文章
+  let calculatedSize = Math.floor(availableHeight / articleItemHeight)
+  
+  // 设置最小值为 4，最大值为 20
+  calculatedSize = Math.max(4, Math.min(20, calculatedSize))
+  
+  // 只有当计算出的值与当前值不同时才更新，避免不必要的重新请求
+  if (calculatedSize !== pageSize.value) {
+    paginationStore.setPageSize(calculatedSize)
+  }
+}
 
 // 默认头像
 const defaultAvatar = '/default_head.png'
@@ -106,7 +182,13 @@ const fetchArticles = async () => {
         article.avatar_loading = true
         fetchUserAvatar(article)
       })
-      console.log('文章列表:', articles.value)
+      
+      // 等待 DOM 更新后重新计算 pageSize（使用实际文章高度）
+      await nextTick()
+      // 延迟一下确保文章完全渲染（包括头像加载）
+      setTimeout(() => {
+        calculatePageSize()
+      }, 300)
     } else {
       error.value = response.data?.error || '获取文章列表失败'
     }
@@ -122,9 +204,16 @@ const fetchArticles = async () => {
 watch(currentPage, () => {
   fetchArticles()
   // 滚动到容器顶部
-  const container = document.querySelector('.home-main-container')
-  if (container) {
-    container.scrollTop = 0
+  if (containerRef.value) {
+    containerRef.value.scrollTop = 0
+  }
+})
+
+// 监听每页数量变化，重新获取文章（当容器高度变化导致 pageSize 改变时）
+watch(pageSize, () => {
+  // 只有在初始化完成后才重新获取，避免初始化时重复请求
+  if (isInitialized.value) {
+    fetchArticles()
   }
 })
 
@@ -135,24 +224,61 @@ const handleArticleClick = (article) => {
 }
 
 // 组件挂载时获取文章列表
-onMounted(() => {
+onMounted(async () => {
   // 从 localStorage 恢复分页状态（如果不存在则默认为第1页）
   paginationStore.syncFromLocalStorage()
   // 确保当前页码至少为1
   if (paginationStore.currentPage < 1) {
     paginationStore.setCurrentPage(1)
   }
-  fetchArticles()
+  
+  // 等待 DOM 渲染完成
+  await nextTick()
+  
+  // 使用 ResizeObserver 监听容器尺寸变化（包括高度和宽度）
+  if (containerRef.value) {
+    // 使用防抖，避免频繁计算
+    resizeObserver = new ResizeObserver(() => {
+      // 清除之前的定时器
+      if (resizeTimer) {
+        clearTimeout(resizeTimer)
+      }
+      // 延迟 200ms 后再计算，避免频繁触发
+      resizeTimer = setTimeout(() => {
+        calculatePageSize()
+      }, 200)
+    })
+    resizeObserver.observe(containerRef.value)
+  }
+  
+  // 获取文章列表
+  await fetchArticles()
+  
+  // 标记初始化完成
+  isInitialized.value = true
+})
+
+// 组件卸载时清理 ResizeObserver 和定时器
+onUnmounted(() => {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = null
+  }
+  if (resizeObserver && containerRef.value) {
+    resizeObserver.unobserve(containerRef.value)
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
 })
 </script>
 <template>
-  <div class="home-main-container">
+  <div class="home-main-container" ref="containerRef">
     <!-- 全屏加载动画 -->
     <FullScreenLoading :visible="loading" />
     
     <!-- 文章列表区域 -->
       <div v-if="error" class="error">错误: {{ error }}</div>
-      <div v-else class="articles-list">
+      <div v-else class="articles-list" ref="articlesListRef">
         <div 
           v-for="article in articles" 
           :key="article.id" 

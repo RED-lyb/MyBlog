@@ -94,7 +94,7 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-main style="min-height: 580px;padding-bottom: 0px;">
+          <el-main>
             <write_main />
           </el-main>
         </el-container>
@@ -106,12 +106,11 @@ onMounted(async () => {
   </div>
 </template>
 <style scoped>
-.el-aside {
-  background-color: #2effc100;
-}
 
 .el-main {
-  background-color: #fbaf0000;
+  background-color: #00000000;
+  min-height: max(580px, calc(100vh - 150px));
+  padding-bottom: 0px;
 }
 </style>
 
