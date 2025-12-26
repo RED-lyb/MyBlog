@@ -109,7 +109,7 @@ onMounted(async () => {
 
 .el-main {
   background-color: #00000000;
-  min-height: max(580px, calc(100vh - 150px));
+  min-height: max(580px, calc(100vh - 160px));
   padding-bottom: 0px;
 }
 </style>

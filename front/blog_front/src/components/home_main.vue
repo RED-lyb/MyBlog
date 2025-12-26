@@ -73,7 +73,7 @@ const calculatePageSize = () => {
     }
     return
   }
-  console.log('articleItemHeight', articleItemHeight)
+  
   // 分页组件高度约 40px，加上 padding-top 10px
   const paginationHeight = 50
   
@@ -159,8 +159,10 @@ const formatDate = (dateString) => {
 }
 
 // 获取所有文章
-const fetchArticles = async () => {
-  loading.value = true
+const fetchArticles = async (showLoading = true) => {
+  if (showLoading) {
+    loading.value = true
+  }
   error.value = null
   try {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
@@ -186,8 +188,49 @@ const fetchArticles = async () => {
       // 等待 DOM 更新后重新计算 pageSize（使用实际文章高度）
       await nextTick()
       // 延迟一下确保文章完全渲染（包括头像加载）
-      setTimeout(() => {
-        calculatePageSize()
+      setTimeout(async () => {
+        // 如果还在初始化阶段，使用实际高度重新计算
+        if (!isInitialized.value) {
+          const oldPageSize = pageSize.value
+          calculatePageSize()
+          
+          // 如果 pageSize 变化了，需要重新请求（保持 loading 状态）
+          if (oldPageSize !== pageSize.value) {
+            // 保持 loading 状态，重新请求文章（不显示新的 loading，因为已经在 loading 中）
+            try {
+              const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
+                params: {
+                  page: currentPage.value,
+                  page_size: pageSize.value
+                }
+              })
+              if (response.data?.success) {
+                const data = response.data.data
+                articles.value = data.articles || []
+                paginationStore.setTotal(data.total || 0)
+                
+                // 为每篇文章初始化头像相关属性并获取头像
+                articles.value.forEach(article => {
+                  article.display_avatar = defaultAvatar
+                  article.avatar_loading = true
+                  fetchUserAvatar(article)
+                })
+              }
+            } catch (err) {
+              error.value = err.message || '请求失败'
+              console.error('获取文章列表错误:', err)
+            }
+          }
+          
+          // 初始化完成，结束 loading
+          loading.value = false
+          isInitialized.value = true
+        } else {
+          // 已经初始化完成，正常结束 loading
+          if (showLoading) {
+            loading.value = false
+          }
+        }
       }, 300)
     } else {
       error.value = response.data?.error || '获取文章列表失败'
@@ -196,7 +239,11 @@ const fetchArticles = async () => {
     error.value = err.message || '请求失败'
     console.error('获取文章列表错误:', err)
   } finally {
-    loading.value = false
+    // 只有在不是初始化阶段时才结束 loading
+    // 如果是初始化阶段，loading 会在使用实际高度重新计算并完成最终请求后结束
+    if (showLoading && isInitialized.value) {
+      loading.value = false
+    }
   }
 }
 
@@ -210,10 +257,11 @@ watch(currentPage, () => {
 })
 
 // 监听每页数量变化，重新获取文章（当容器高度变化导致 pageSize 改变时）
-watch(pageSize, () => {
+watch(pageSize, async () => {
   // 只有在初始化完成后才重新获取，避免初始化时重复请求
   if (isInitialized.value) {
-    fetchArticles()
+    // 不显示 loading，因为这是自动调整，用户不应该感知到加载过程
+    await fetchArticles(false)
   }
 })
 
@@ -235,6 +283,11 @@ onMounted(async () => {
   // 等待 DOM 渲染完成
   await nextTick()
   
+  // 先计算初始 pageSize（使用默认高度估算，避免等待文章加载）
+  // 延迟一下确保容器高度已经正确设置
+  await new Promise(resolve => setTimeout(resolve, 100))
+  calculatePageSize()
+  
   // 使用 ResizeObserver 监听容器尺寸变化（包括高度和宽度）
   if (containerRef.value) {
     // 使用防抖，避免频繁计算
@@ -251,11 +304,14 @@ onMounted(async () => {
     resizeObserver.observe(containerRef.value)
   }
   
-  // 获取文章列表
-  await fetchArticles()
+  // 等待 pageSize 稳定后再获取文章列表（避免 watch 触发重复请求）
+  await nextTick()
+  // 再延迟一下，确保 pageSize 已经更新完成
+  await new Promise(resolve => setTimeout(resolve, 50))
   
-  // 标记初始化完成
-  isInitialized.value = true
+  // 获取文章列表（初始化时显示 loading）
+  // 注意：isInitialized 会在文章加载完成并使用实际高度重新计算后设置为 true
+  await fetchArticles(true)
 })
 
 // 组件卸载时清理 ResizeObserver 和定时器

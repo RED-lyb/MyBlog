@@ -48,7 +48,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.5rem;
+
+  gap: 0.7rem;
 }
 
 .copyright {
@@ -60,7 +61,7 @@
 
 .line {
   margin-top: 50px !important;
-  margin-bottom: 10px !important;
+  margin-bottom: 15px !important;
 }
 
 /* 覆盖 el-divider--horizontal 的 margin，使分割线也向下移动 */

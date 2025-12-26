@@ -300,7 +300,7 @@ const onCaptchaCancel = () => {
 <style scoped>
 .write-container {
   width: 100%;
-  height: 500px;
+  height: max(500px, calc(100vh - 240px));
   border-radius: 8px;
   overflow: visible;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -311,7 +311,6 @@ const onCaptchaCancel = () => {
 
 .splitter-wrapper {
   flex: 1;
-  min-height: 490px;
   border-radius: 8px;
   overflow: hidden;
 }
