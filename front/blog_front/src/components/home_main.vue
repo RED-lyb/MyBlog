@@ -502,7 +502,7 @@ onUnmounted(() => {
   color: #999;
 }
 .page-number-container {
-  padding-top: 10px;
+  padding-top: 8px;
   position: relative;
   display: flex;
   justify-content: center;

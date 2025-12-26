@@ -48,10 +48,12 @@ CREATE USER 'admin'@'%' IDENTIFIED BY '密码';
 3. 授予对webproject数据库的所有权限（本地用户）
 ```sql
 GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'localhost';
+GRANT PROCESS ON *.* TO 'admin'@'localhost';
 ```
 4. 授予对webproject数据库的所有权限（远程用户）
 ```sql
 GRANT ALL PRIVILEGES ON webproject.* TO 'admin'@'%';
+GRANT PROCESS ON *.* TO 'admin'@'%';
 ```
 5. 刷新权限使配置生效
 ```sql
