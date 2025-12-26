@@ -143,12 +143,12 @@ onMounted(async () => {
   position: sticky;
   top: 60px;
   align-self: flex-start;
-  height: calc(100vh - 160px);
+  height: calc(100vh - 165px);
 }
 
 .el-main {
   background-color: #00000000;
-  min-height: max(570px, calc(100vh - 160px));
+  min-height: max(570px, calc(100vh - 165px));
   padding: 0px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
