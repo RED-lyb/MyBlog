@@ -16,6 +16,66 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `article_comments`
+--
+
+DROP TABLE IF EXISTS `article_comments`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `article_comments` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `article_id` int unsigned NOT NULL COMMENT '文章ID，外键关联 blog_articles 表',
+  `user_id` int unsigned NOT NULL COMMENT '评论用户ID，外键关联 users 表',
+  `content` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '评论内容，最多200字',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间，默认服务器系统时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_article_id` (`article_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `article_comments_ibfk_1` FOREIGN KEY (`article_id`) REFERENCES `blog_articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `article_comments_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章评论表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
+    UPDATE blog_articles 
+    SET comment_count = comment_count + 1 
+    WHERE id = NEW.article_id;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
+    UPDATE blog_articles 
+    SET comment_count = GREATEST(comment_count - 1, 0)
+    WHERE id = OLD.article_id;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
 -- Table structure for table `blog_articles`
 --
 
@@ -28,7 +88,7 @@ CREATE TABLE `blog_articles` (
   `content` longtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章正文，支持 Markdown/HTML',
   `author_id` int unsigned NOT NULL COMMENT '作者ID，外键关联 users 表',
   `view_count` int unsigned NOT NULL DEFAULT '0' COMMENT '浏览量，默认0',
-  `love_count` int unsigned NOT NULL DEFAULT '0' COMMENT '点赞数，默认0',
+  `love_count` int unsigned NOT NULL DEFAULT '0' COMMENT '喜欢数，默认0',
   `comment_count` int unsigned NOT NULL DEFAULT '0' COMMENT '评论数，默认0，冗余字段便于查询',
   `published_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间，默认服务器系统时间',
   PRIMARY KEY (`id`),
@@ -92,7 +152,7 @@ CREATE TABLE `captcha_captchastore` (
   `expiration` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hashkey` (`hashkey`)
-) ENGINE=InnoDB AUTO_INCREMENT=693 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=723 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -161,7 +221,7 @@ CREATE TABLE `refresh_tokens` (
   KEY `refresh_tok_user_id_46676d_idx` (`user_id`),
   KEY `refresh_tok_token_h_2fa7c6_idx` (`token_hash`),
   KEY `refresh_tok_expires_a128d9_idx` (`expires_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=248 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=262 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -249,7 +309,7 @@ CREATE TABLE `user_liked_articles` (
   UNIQUE KEY `unique_like` (`user_id`,`article_id`),
   KEY `idx_user` (`user_id`),
   KEY `idx_article` (`article_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户喜欢的文章关系表';
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户喜欢的文章关系表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -266,7 +326,7 @@ DELIMITER ;;
     SET liked_article_count = liked_article_count + 1 
     WHERE id = NEW.user_id;
     
-    -- 更新文章的点赞数
+    -- 更新文章的喜欢数
     UPDATE blog_articles 
     SET love_count = love_count + 1 
     WHERE id = NEW.article_id;
@@ -324,6 +384,7 @@ CREATE TABLE `users` (
   `article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '发布文章数，默认0',
   `liked_article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '喜欢的文章数，默认0',
   `follower_count` int unsigned NOT NULL DEFAULT '0' COMMENT '粉丝数，默认0',
+  `is_admin` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否为管理员，0-否，1-是',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`)
 ) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -338,4 +399,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-26 23:50:09
+-- Dump completed on 2025-12-28 21:53:19

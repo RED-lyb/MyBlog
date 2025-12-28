@@ -17,7 +17,8 @@ const sanitizeUser = (rawUser) => {
     follow_count: rawUser.follow_count ?? 0,
     article_count: rawUser.article_count ?? 0,
     liked_article_count: rawUser.liked_article_count ?? 0,
-    follower_count: rawUser.follower_count ?? 0
+    follower_count: rawUser.follower_count ?? 0,
+    is_admin: rawUser.is_admin ?? false
   }
 }
 
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
   const articleCount = computed(() => user.value?.article_count || 0)
   const likedArticleCount = computed(() => user.value?.liked_article_count || 0)
   const followerCount = computed(() => user.value?.follower_count || 0)
+  const isAdmin = computed(() => user.value?.is_admin ?? false)
 
 
   function setUser(nextUser, options = {}) {
@@ -140,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
     articleCount,
     likedArticleCount,
     followerCount,
+    isAdmin,
     setUser, 
     clear, 
     setTokenExpired, // 导出设置过期状态的方法

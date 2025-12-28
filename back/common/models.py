@@ -90,7 +90,7 @@ class BlogArticle(models.Model):
     content = models.TextField(db_comment='文章正文，支持 Markdown/HTML')
     author_id = models.IntegerField(db_comment='作者ID，外键关联 users 表')
     view_count = models.IntegerField(default=0, db_comment='浏览量，默认0')
-    love_count = models.IntegerField(default=0, db_comment='点赞数，默认0')
+    love_count = models.IntegerField(default=0, db_comment='喜欢数，默认0')
     comment_count = models.IntegerField(default=0, db_comment='评论数，默认0，冗余字段便于查询')
     published_at = models.DateTimeField(db_comment='发布时间，默认服务器系统时间')
     
@@ -143,3 +143,27 @@ class UserLikedArticle(models.Model):
     
     def __str__(self):
         return f"User {self.user_id} liked Article {self.article_id}"
+
+
+class ArticleComment(models.Model):
+    """
+    文章评论表
+    记录用户对文章的评论
+    """
+    id = models.AutoField(primary_key=True, db_comment='主键，自增')
+    article_id = models.IntegerField(db_comment='文章ID，外键关联 blog_articles 表')
+    user_id = models.IntegerField(db_comment='评论用户ID，外键关联 users 表')
+    content = models.CharField(max_length=200, db_comment='评论内容，最多200字')
+    created_at = models.DateTimeField(auto_now_add=True, db_comment='评论时间，默认服务器系统时间')
+    
+    class Meta:
+        managed = True
+        db_table = 'article_comments'
+        indexes = [
+            models.Index(fields=['article_id']),  # 查询某文章的所有评论
+            models.Index(fields=['user_id']),  # 查询某用户的所有评论
+            models.Index(fields=['created_at']),  # 按时间排序
+        ]
+    
+    def __str__(self):
+        return f"Comment {self.id} on Article {self.article_id} by User {self.user_id}"

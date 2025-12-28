@@ -1,18 +1,27 @@
 /* Element Plus 颜色变量覆盖
  * 此文件在 Element Plus CSS 之后加载，确保变量覆盖生效
+ * 主题色: #EF5710 (橙色)
  */
 
-html {
-  /* --el-text-color-regular: #e40606 !important; 文字默认颜色*/
-  /* --el-border-color-light: #e4e7ed; 边框颜色*/
-
+:root {
+  --el-color-primary: #EF5710 !important;
+  --el-color-primary-light-3: rgb(243, 156, 86) !important;
+  --el-color-primary-light-5: rgb(247, 171, 136) !important;
+  --el-color-primary-light-7: rgb(251, 205, 185) !important;
+  --el-color-primary-light-8: rgb(252, 219, 207) !important;
+  --el-color-primary-light-9: rgb(253, 233, 230) !important;
+  --el-color-primary-dark-2: #BF450D !important;
 }
 
 html.dark {
-  /* --el-text-color-regular: #0852ff !important; 文字默认颜色*/
-  /* --el-border-color-light:#414243; 边框颜色*/
+  --el-color-primary: #EF5710 !important;
+  --el-color-primary-light-3: rgb(191, 68, 11) !important;
+  --el-color-primary-light-5: rgb(143, 50, 8) !important;
+  --el-color-primary-light-7: rgb(95, 33, 5) !important;
+  --el-color-primary-light-8: rgb(71, 25, 4) !important;
+  --el-color-primary-light-9: rgb(48, 17, 3) !important;
+  --el-color-primary-dark-2: #BF450D !important;
 }
-
 .el-checkbox {
   --el-checkbox-checked-bg-color: #EF5710 !important;
   --el-checkbox-checked-input-border-color: #EF5710 !important;

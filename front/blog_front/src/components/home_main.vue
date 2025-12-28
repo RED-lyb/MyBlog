@@ -7,8 +7,13 @@ import apiClient from '../lib/api.js'
 import axios from 'axios'
 import { storeToRefs } from 'pinia'
 import { usePaginationStore } from '../stores/pagination.js'
+import { useAuthStore } from '../stores/user_info.js'
+import { ElMessage } from 'element-plus'
+import { Star, ChatLineRound, View, Calendar } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
+const { isAuthenticated, userId } = storeToRefs(authStore)
 
 // 文章列表数据
 const articles = ref([])
@@ -131,7 +136,6 @@ const fetchUserAvatar = async (article) => {
       article.display_avatar = buildAvatarUrl(article.author_id, article.author_avatar)
     }
   } catch (error) {
-    console.error('获取头像失败', error)
     article.display_avatar = buildAvatarUrl(article.author_id, article.author_avatar)
   } finally {
     article.avatar_loading = false
@@ -182,8 +186,23 @@ const fetchArticles = async (showLoading = true) => {
       articles.value.forEach(article => {
         article.display_avatar = defaultAvatar
         article.avatar_loading = true
+        article.is_liked = false // 初始化喜欢状态
         fetchUserAvatar(article)
       })
+      
+      // 如果用户已登录，检查每篇文章的喜欢状态
+      if (isAuthenticated.value && userId.value) {
+        articles.value.forEach(async (article) => {
+          try {
+            const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/${article.id}/like/status/`)
+            if (response.data?.success) {
+              article.is_liked = response.data.data.is_liked
+            }
+          } catch (err) {
+            console.error('获取喜欢状态失败:', err)
+          }
+        })
+      }
       
       // 等待 DOM 更新后重新计算 pageSize（使用实际文章高度）
       await nextTick()
@@ -270,6 +289,33 @@ const handleArticleClick = (article) => {
   // 跳转到文章详情页
   router.push(`/article/${article.id}`)
 }
+
+// 处理喜欢点击事件
+const handleLikeClick = async (event, article) => {
+  event.stopPropagation() // 阻止事件冒泡，避免触发文章点击
+  
+  if (!isAuthenticated.value) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  try {
+    const response = await apiClient.post(`${import.meta.env.VITE_API_URL}article/${article.id}/like/`)
+    if (response.data?.success) {
+      // 更新文章的喜欢状态和数量
+      article.is_liked = response.data.data.is_liked
+      // 重新获取文章列表以更新数量
+      await fetchArticles(false)
+      ElMessage.success(response.data.message)
+    } else {
+      ElMessage.error(response.data?.error || '操作失败')
+    }
+  } catch (err) {
+    console.error('喜欢操作失败:', err)
+    ElMessage.error(err.response?.data?.error || '操作失败')
+  }
+}
+
 
 // 组件挂载时获取文章列表
 onMounted(async () => {
@@ -367,8 +413,13 @@ onUnmounted(() => {
                 <el-icon><View /></el-icon>
                 阅读{{ article.view_count || 0 }}
               </span>
-              <span class="stat-item">
-                <el-icon><Star /></el-icon>
+              <span 
+                class="stat-item clickable" 
+                :class="{ 'liked': article.is_liked }"
+                @click.stop="handleLikeClick($event, article)"
+                :title="article.is_liked ? '取消喜欢' : '喜欢'"
+              >
+                <el-icon :class="{ 'filled-star': article.is_liked }"><Star /></el-icon>
                 喜欢{{ article.love_count || 0 }}
               </span>
               <span class="stat-item">
@@ -491,9 +542,39 @@ onUnmounted(() => {
   color: #999;
 }
 
+.stat-item.clickable {
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.stat-item.clickable:hover {
+  color: var(--el-color-primary);
+}
+
+.stat-item.clickable:hover .el-icon {
+  color: var(--el-color-primary);
+}
+
+.stat-item.clickable:hover .el-icon.filled-star {
+  fill: var(--el-color-primary);
+}
+
+.stat-item.liked {
+  color: var(--el-color-warning);
+}
+
+.stat-item.liked .el-icon {
+  color: var(--el-color-warning);
+}
+
+.stat-item.liked .el-icon.filled-star {
+  fill: var(--el-color-warning);
+}
+
 .stat-item i {
   font-size: 13px;
 }
+
 .stat-date {
   display: flex;
   align-items: center;

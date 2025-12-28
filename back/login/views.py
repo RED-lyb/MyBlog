@@ -39,11 +39,11 @@ def login(request):
 
         # 验证用户凭据
         with connection.cursor() as cursor:
-            cursor.execute("SELECT id, password FROM users WHERE username=%s", [username])
+            cursor.execute("SELECT id, password, is_admin FROM users WHERE username=%s", [username])
             row = cursor.fetchone()
 
             if row:
-                user_id, stored_password = row
+                user_id, stored_password, is_admin = row
                 if check_password(password, stored_password):
                     # 登录成功，清除登录失败记录
                     LoginLimitUtils.clear_login_failure(request, username)
@@ -63,7 +63,8 @@ def login(request):
                             'access_token': access_token,
                             'user': {
                                 'id': user_id,
-                                'username': username
+                                'username': username,
+                                'is_admin': bool(is_admin) if is_admin is not None else False
                             }
                         }
                     })

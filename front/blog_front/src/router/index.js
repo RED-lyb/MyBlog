@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import adminRoutes from './admin.js'
 
 /**
  * 检查 token 是否过期（从 api.js 复制，避免循环依赖）
@@ -121,6 +122,15 @@ const routes=[
     meta: {
       title: '创作|L-BLOG'
     }
+  },
+  {
+    path: '/admin',
+    component: () => import('../pages/admin/index.vue'),
+    meta: {
+      title: '管理后台|L-BLOG',
+      requiresAdmin: true
+    },
+    children: adminRoutes
   }
 ]
 //创建路由器实例
@@ -236,6 +246,74 @@ router.beforeEach(async (to, from, next) => {
   
   // 再次同步状态，确保过期标记被正确应用
   authStore.syncFromLocalStorage()
+  
+  // 检查管理员权限
+  if (to.meta.requiresAdmin) {
+    // 确保用户信息已同步 - 先同步，再检查
+    const userInfo = localStorage.getItem('user_info')
+    const accessToken = localStorage.getItem('access_token')
+    
+    if (userInfo) {
+      try {
+        const parsed = JSON.parse(userInfo)
+        // 使用persist: true确保同步到localStorage，但不重置token过期状态
+        authStore.setUser(parsed, { persist: true, resetTokenExpired: false })
+      } catch (e) {
+        // 解析失败，忽略
+      }
+    }
+    
+    // 再次同步，确保状态正确
+    authStore.syncFromLocalStorage()
+    
+    // 如果有token但isAdmin为false，尝试从后端重新获取用户信息
+    if (accessToken && !authStore.tokenExpired && !authStore.isAdmin) {
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}user/info/`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          },
+          validateStatus: (status) => status < 500
+        })
+        
+        if (response.status === 200 && response.data?.success && response.data?.data?.user) {
+          const userData = response.data.data.user
+          // 更新用户信息
+          authStore.setUser(userData, { persist: true, resetTokenExpired: false })
+        }
+      } catch (e) {
+        // 获取失败，忽略
+      }
+    }
+    
+    if (!authStore.isAuthenticated || authStore.tokenExpired) {
+      try {
+        await ElMessageBox.alert('请先登录', '需要登录', {
+          confirmButtonText: '去登录',
+          type: 'warning',
+          closeOnClickModal: false
+        })
+      } catch (_) {}
+      // 无论用户点击确认还是关闭，都跳转到登录页
+      next('/login')
+      return
+    }
+    
+    // 再次检查isAdmin，确保从localStorage同步后正确
+    if (!authStore.isAdmin) {
+      console.log('路由守卫 - 用户不是管理员，跳转到首页')
+      try {
+        await ElMessageBox.alert('您没有管理员权限', '权限不足', {
+          confirmButtonText: '确定',
+          type: 'error',
+          closeOnClickModal: false
+        })
+      } catch (_) {}
+      // 无论用户点击确认还是关闭，都跳转到首页
+      next('/home')
+      return
+    }
+  }
   
   // 检查认证状态
   const authStatus = checkAuthStatus()

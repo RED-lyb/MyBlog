@@ -11,6 +11,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import '@/assets/element-plus-override.css' // 在 Element Plus CSS 之后加载，确保覆盖生效
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { useAuthStore } from './stores/user_info.js'
+import { useConfigStore } from './stores/config.js'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -36,3 +37,7 @@ app.mount('#app')
 // 让路由守卫和页面组件来处理用户信息的获取和token过期检查
 const authStore = useAuthStore()
 authStore.syncFromLocalStorage()
+
+// 加载配置文件
+const configStore = useConfigStore()
+configStore.loadConfig()

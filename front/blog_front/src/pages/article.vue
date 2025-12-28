@@ -3,12 +3,30 @@ import { onMounted, ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Article_main from '../components/article_main.vue'
+import UserInfoSidebar from '../components/UserInfoSidebar.vue'
+import CommentList from '../components/CommentList.vue'
+
+const route = useRoute()
+const articleId = computed(() => route.params.id)
+const authorId = ref(null)
+const commentListRef = ref(null)
+
+const handleAuthorLoaded = (authorIdValue) => {
+  authorId.value = authorIdValue
+}
+
+const handleCommentAdded = () => {
+  // 刷新评论列表
+  if (commentListRef.value && commentListRef.value.refresh) {
+    commentListRef.value.refresh()
+  }
+}
 
 const authStore = useAuthStore()
 const {
@@ -82,11 +100,14 @@ onMounted(async () => {
         </el-header>
         <el-container>
           <el-aside>
+            <UserInfoSidebar :userId="authorId" />
           </el-aside>
           <el-main>
-            <Article_main />
+            <Article_main @author-loaded="handleAuthorLoaded" @comment-added="handleCommentAdded" />
           </el-main>
-          <el-aside></el-aside>
+          <el-aside>
+            <CommentList ref="commentListRef" :articleId="articleId" />
+          </el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />

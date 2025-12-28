@@ -4,11 +4,15 @@ import axios from 'axios'
 import theme from './theme.vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
+import { useConfigStore } from '../stores/config.js'
 import { useRouter, useRoute } from 'vue-router'
 import Logout from './Logout.vue'
 
 const router = useRouter()
 const route = useRoute()
+
+const configStore = useConfigStore()
+const { config } = storeToRefs(configStore)
 
 // 根据当前路由设置激活的菜单项
 const activeIndex = computed(() => {
@@ -20,7 +24,7 @@ const activeIndex = computed(() => {
   if (path === '/games' || path.startsWith('/games/')) return '4'
   if (path === '/feedback' || path.startsWith('/feedback/')) return '5'
   if (path === '/history' || path.startsWith('/history/')) return '6'
-  if (path === '/user_home/1') return '7' // 关于作者页面
+  if (config.value && path === `/user_home/${config.value.author_id}`) return '7' // 关于作者页面
   // 匹配 /user_home 或 /user_home/:userId
   if (path.startsWith('/user_home')) return '9-home'
   return '1'
@@ -35,7 +39,6 @@ const handleScroll = () => {
 }
 
 const handleSelect = (key, keyPath) => {
-  console.log(key, keyPath)
   // 退出登录菜单项不触发路由跳转（由 Logout 组件内部处理）
   if (key === '9-logout') {
     return
@@ -58,6 +61,7 @@ const handleSelect = (key, keyPath) => {
   }
 
   // 根据菜单项索引跳转到对应路由
+  const authorId = config.value?.author_id || 1
   const routeMap = {
     '0': '/', // Logo点击回到首页
     '1': '/home', // 博客主页
@@ -66,7 +70,7 @@ const handleSelect = (key, keyPath) => {
     '4': '/games', // 趣味游戏
     '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史
-    '7': '/user_home/1', // 关于作者（跳转到用户ID为1的主页）
+    '7': `/user_home/${authorId}`, // 关于作者（跳转到配置的作者ID主页）
   }
 
   const targetPath = routeMap[key]
@@ -79,7 +83,8 @@ const authStore = useAuthStore()
 const {
   userId,
   avatar,
-  isAuthenticated
+  isAuthenticated,
+  isAdmin
 } = storeToRefs(authStore)
 
 // 跳转到登录页
@@ -130,6 +135,9 @@ onBeforeMount(() => {
 })
 onMounted(() => {
   window.addEventListener('scroll', handleScroll)
+  
+  // 确保同步用户信息
+  authStore.syncFromLocalStorage()
 })
 
 onBeforeUnmount(() => {
@@ -154,8 +162,8 @@ watch(
     <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
       @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">
       <el-menu-item index="0" style="padding-left: 10px;padding-right: 20px">
-        <img style="width: 50px;" src="/icon.png" alt="L-BLOG" />
-        <h1 style="font-size: 20px;font-weight: bolder">L-BLOG</h1>
+        <img style="width: 50px;" src="/icon.png" :alt="config?.blog_name || ''" />
+        <h1 style="font-size: 20px;font-weight: bolder">{{ config?.blog_name || '' }}</h1>
       </el-menu-item>
       <el-menu-item index="1">博客主页</el-menu-item>
       <el-menu-item index="2">流动网盘</el-menu-item>
@@ -185,6 +193,14 @@ watch(
         <template v-if="isAuthenticated">
           <el-menu-item index="9-home" class="avatar-menu-item" :route="userId ? `/user_home/${userId}` : '/user_home'">
             个人主页
+          </el-menu-item>
+          <el-menu-item 
+            v-if="isAdmin" 
+            index="9-admin" 
+            class="avatar-menu-item"
+            @click="router.push('/admin')"
+          >
+            管理面板
           </el-menu-item>
           <el-menu-item index="9-logout" class="avatar-menu-item">
             <Logout />

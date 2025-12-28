@@ -269,10 +269,17 @@ const handleLoginWithCaptcha = async (captchaInfo) => {
                     localStorage.setItem('access_token', response.data.data.access_token)
                     localStorage.setItem('user_info', JSON.stringify(response.data.data.user))
                     auth.setUser(response.data.data.user)
+                    
+                    // 根据管理员身份跳转
+                    if (response.data.data.user.is_admin) {
+                        router.push('/admin')
+                    } else {
+                        router.push('/home')
+                    }
+                } else {
+                    // 跳转到首页
+                    router.push('/home')
                 }
-                
-                // 跳转到首页
-                router.push('/home')
             } else {
                 // 验证码错误或其他业务错误
                 ElMessage.error(response.data.error || '登录失败')

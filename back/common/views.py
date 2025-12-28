@@ -21,7 +21,7 @@ def get_user_info(request):
             with connection.cursor() as cursor:
                 cursor.execute("""
                     SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius,
-                           follow_count, article_count, liked_article_count, follower_count
+                           follow_count, article_count, liked_article_count, follower_count, is_admin
                     FROM users WHERE id = %s
                 """, [user_id])
                 row = cursor.fetchone()
@@ -39,7 +39,8 @@ def get_user_info(request):
                         'follow_count': row[8] if len(row) > 8 else 0,
                         'article_count': row[9] if len(row) > 9 else 0,
                         'liked_article_count': row[10] if len(row) > 10 else 0,
-                        'follower_count': row[11] if len(row) > 11 else 0
+                        'follower_count': row[11] if len(row) > 11 else 0,
+                        'is_admin': bool(row[12]) if len(row) > 12 and row[12] is not None else False
                     }
                     
                     return JsonResponse({

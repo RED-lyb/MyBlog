@@ -4,7 +4,11 @@ import theme from '../components/theme.vue';
 import BlurReveal from './inspira/BlurReveal.vue';
 import indexbutton from './inspira/indexbutton.vue';
 import LetterPullup from './inspira/LetterPullup.vue';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { storeToRefs } from 'pinia'
+import { useConfigStore } from '../stores/config.js'
+const configStore = useConfigStore()
+const { config } = storeToRefs(configStore)
 import { useRouter } from 'vue-router'
 const showComponents = ref({
   first: false,
@@ -46,6 +50,10 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeyPress)
 })
+
+const firstWords = computed(() => {
+  return `该网站是由${config.value?.author || ''}编写的技术网站，会不定期分享个人的计算机学习经验，也欢迎各路大神发布知识与补充，大家一起交流学习`
+})
 </script>
 <template>
 
@@ -69,7 +77,7 @@ onUnmounted(() => {
     <indexbutton @click="go()" style="padding-top: 0.625rem;padding-bottom: 0.3125rem;" />
   </BlurReveal>
 <LetterPullup v-if="showComponents.first"
-    words="该网站是由李远博编写的技术网站，会不定期分享个人的计算机学习经验，也欢迎各路大神发布知识与补充，大家一起交流学习"
+    :words="firstWords"
     :delay="0.04"
   />
   <LetterPullup v-if="showComponents.second"

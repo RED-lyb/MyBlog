@@ -17,6 +17,7 @@
     "@vueuse/core": "^13.7.0",
     "axios": "^1.11.0",
     "canvas-confetti": "^1.9.3",
+    "chart.js": "^4.5.1",
     "daisyui": "latest",
     "element-plus": "^2.11.8",
     "highlight.js": "^11.11.1",

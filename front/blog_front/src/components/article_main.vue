@@ -75,11 +75,29 @@ marked.use({
   }
 })
 
+import { Star, ChatLineRound, View } from '@element-plus/icons-vue'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../stores/user_info.js'
+import { ElMessage } from 'element-plus'
+import CaptchaDialog from './CaptchaDialog.vue'
+
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const { isAuthenticated, userId } = storeToRefs(authStore)
 const article = ref(null)
 const loading = ref(false)
 const error = ref(null)
+const isLiked = ref(false)
+
+const emit = defineEmits(['author-loaded', 'comment-added'])
+
+// 评论Drawer相关
+const commentDrawerVisible = ref(false)
+const commentContent = ref('')
+const commentLoading = ref(false)
+const captchaDialogVisible = ref(false)
+const captchaData = ref(null)
 
 // 跳转到作者主页
 const goToAuthorHome = () => {
@@ -179,6 +197,21 @@ const fetchArticleDetail = async () => {
       article.value.display_avatar = defaultAvatar
       article.value.avatar_loading = true
       fetchUserAvatar()
+      
+      // 通知父组件作者ID已加载
+      emit('author-loaded', article.value.author_id)
+      
+      // 如果用户已登录，检查喜欢状态
+      if (isAuthenticated.value && userId.value) {
+        try {
+          const likeResponse = await apiClient.get(`${import.meta.env.VITE_API_URL}article/${articleId}/like/status/`)
+          if (likeResponse.data?.success) {
+            isLiked.value = likeResponse.data.data.is_liked
+          }
+        } catch (err) {
+          console.error('获取喜欢状态失败:', err)
+        }
+      }
     } else {
       error.value = response.data?.error || '获取文章详情失败'
     }
@@ -188,6 +221,108 @@ const fetchArticleDetail = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 处理喜欢点击事件
+const handleLikeClick = async () => {
+  if (!isAuthenticated.value) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  try {
+    const response = await apiClient.post(`${import.meta.env.VITE_API_URL}article/${route.params.id}/like/`)
+    if (response.data?.success) {
+      isLiked.value = response.data.data.is_liked
+      // 更新文章的喜欢数量
+      if (article.value) {
+        article.value.love_count = response.data.data.is_liked 
+          ? (article.value.love_count || 0) + 1 
+          : Math.max((article.value.love_count || 0) - 1, 0)
+      }
+      ElMessage.success(response.data.message)
+    } else {
+      ElMessage.error(response.data?.error || '操作失败')
+    }
+  } catch (err) {
+    console.error('喜欢操作失败:', err)
+    ElMessage.error(err.response?.data?.error || '操作失败')
+  }
+}
+
+// 处理评论点击事件
+const handleCommentClick = () => {
+  if (!isAuthenticated.value) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  
+  commentContent.value = ''
+  commentDrawerVisible.value = true
+}
+
+// 提交评论
+const handleCommentSubmit = () => {
+  if (!commentContent.value.trim()) {
+    ElMessage.warning('请输入评论内容')
+    return
+  }
+  
+  if (commentContent.value.length > 200) {
+    ElMessage.warning('评论内容不能超过200字')
+    return
+  }
+  
+  // 打开验证码对话框
+  captchaDialogVisible.value = true
+}
+
+// 验证码验证成功回调
+const handleCaptchaSuccess = async (captchaInfo) => {
+  captchaData.value = captchaInfo
+  captchaDialogVisible.value = false
+  
+  commentLoading.value = true
+  try {
+    const response = await apiClient.post(
+      `${import.meta.env.VITE_API_URL}article/${route.params.id}/comments/create/`,
+      {
+        content: commentContent.value,
+        captcha_key: captchaInfo.captcha_key,
+        captcha_value: captchaInfo.captcha_value
+      }
+    )
+    
+    if (response.data?.success) {
+      ElMessage.success('评论发布成功')
+      commentContent.value = ''
+      commentDrawerVisible.value = false
+      // 更新文章的评论数
+      if (article.value) {
+        article.value.comment_count = (article.value.comment_count || 0) + 1
+      }
+      // 通知父组件刷新评论列表
+      emit('comment-added')
+    } else {
+      ElMessage.error(response.data?.error || '发布评论失败')
+    }
+  } catch (err) {
+    console.error('发布评论失败:', err)
+    ElMessage.error(err.response?.data?.error || '发布评论失败')
+  } finally {
+    commentLoading.value = false
+  }
+}
+
+// 验证码取消回调
+const handleCaptchaCancel = () => {
+  captchaDialogVisible.value = false
+}
+
+// 处理Drawer关闭
+const handleDrawerClose = (done) => {
+  commentContent.value = ''
+  done()
 }
 
 // 监听路由参数变化
@@ -238,17 +373,61 @@ onMounted(() => {
           <el-icon><View /></el-icon>
           阅读 {{ article.view_count || 0 }}
         </span>
-        <span class="stat-item">
-          <el-icon><Star /></el-icon>
+        <span 
+          class="stat-item clickable" 
+          :class="{ 'liked': isLiked }"
+          @click="handleLikeClick"
+          :title="isLiked ? '取消喜欢' : '喜欢'"
+        >
+          <el-icon :class="{ 'filled-star': isLiked }"><Star /></el-icon>
           喜欢 {{ article.love_count || 0 }}
         </span>
-        <span class="stat-item">
+        <span 
+          class="stat-item clickable" 
+          @click="handleCommentClick"
+          title="评论"
+        >
           <el-icon><ChatLineRound /></el-icon>
           评论 {{ article.comment_count || 0 }}
         </span>
       </div>
       
     </div>
+    
+    <!-- 评论Drawer -->
+    <el-drawer
+      v-model="commentDrawerVisible"
+      title="发表评论"
+      direction="btt"
+      size="300px"
+      :close-on-click-modal="true"
+      :show-close="true"
+      :before-close="handleDrawerClose"
+    >
+      <div class="comment-drawer-content">
+        <el-input
+          v-model="commentContent"
+          type="textarea"
+          :rows="6"
+          placeholder="请输入评论内容（最多200字）"
+          maxlength="200"
+          show-word-limit
+        />
+        <div class="comment-actions">
+          <el-button @click="commentDrawerVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleCommentSubmit" :loading="commentLoading">
+            发布
+          </el-button>
+        </div>
+      </div>
+    </el-drawer>
+    
+    <!-- 验证码对话框 -->
+    <CaptchaDialog
+      v-model="captchaDialogVisible"
+      @success="handleCaptchaSuccess"
+      @cancel="handleCaptchaCancel"
+    />
   </div>
 </template>
 
@@ -330,6 +509,46 @@ onMounted(() => {
   gap: 5px;
   font-size: 14px;
   color: #858585;
+}
+
+.stat-item.clickable {
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.stat-item.clickable:hover {
+  color: var(--el-color-primary);
+}
+
+.stat-item.clickable:hover .el-icon {
+  color: var(--el-color-primary);
+}
+
+.stat-item.clickable:hover .el-icon.filled-star {
+  fill: var(--el-color-primary);
+}
+
+.stat-item.liked {
+  color: var(--el-color-warning);
+}
+
+.stat-item.liked .el-icon {
+  color: var(--el-color-warning);
+}
+
+.stat-item.liked .el-icon.filled-star {
+  fill: var(--el-color-warning);
+}
+
+.comment-drawer-content {
+  padding: 0;
+}
+
+.comment-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .article-content {
@@ -484,6 +703,9 @@ onMounted(() => {
 .article-content :deep(img) {
   max-width: 100%;
   height: auto;
+}
+:deep(.el-drawer__body){
+  padding-top: 0 !important;
 }
 </style>
 
