@@ -23,7 +23,12 @@ from forgot.views import forgot
 from login.views import login
 from common.captcha_views import get_captcha, verify_captcha, get_captcha_image
 from common.auth_views import refresh_token, logout
-from common.views import get_user_info, get_user_by_id
+from common.views import (
+    get_user_info, get_user_by_id, toggle_follow, check_follow_status,
+    upload_avatar, update_profile, reset_password,
+    get_user_following_list, get_user_followers_list,
+    get_user_liked_articles_list, get_user_articles_list
+)
 
 urlpatterns = [
     path('captcha/', include('captcha.urls')),
@@ -39,6 +44,15 @@ urlpatterns = [
     path('api/auth/logout/', logout),
     path('api/user/info/', get_user_info),
     path('api/user/<int:user_id>/', get_user_by_id, name='get_user_by_id'),  # 根据ID获取用户信息
+    path('api/user/<int:user_id>/follow/', toggle_follow, name='toggle_follow'),  # 关注/取消关注
+    path('api/user/<int:user_id>/follow-status/', check_follow_status, name='check_follow_status'),  # 检查关注状态
+    path('api/user/avatar/upload/', upload_avatar, name='upload_avatar'),  # 上传头像
+    path('api/user/profile/', update_profile, name='update_profile'),  # 更新资料
+    path('api/user/password/reset/', reset_password, name='reset_password'),  # 重设密码
+    path('api/user/<int:user_id>/following/', get_user_following_list, name='get_user_following_list'),  # 获取关注列表
+    path('api/user/<int:user_id>/followers/', get_user_followers_list, name='get_user_followers_list'),  # 获取粉丝列表
+    path('api/user/<int:user_id>/liked-articles/', get_user_liked_articles_list, name='get_user_liked_articles_list'),  # 获取喜欢的文章列表
+    path('api/user/<int:user_id>/articles/', get_user_articles_list, name='get_user_articles_list'),  # 获取发布的文章列表
     path('api/article/', include('article.urls')),  # 文章相关路由
     path('api/network_disk/', include('network_disk.urls')),  # 网盘相关路由
     path('api/admin/', include('admin.urls')),  # 管理员相关路由

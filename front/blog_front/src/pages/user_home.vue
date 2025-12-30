@@ -1,89 +1,89 @@
 <script setup>
 import { onMounted, ref, computed, nextTick, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
-import { useRouter } from 'vue-router'
-import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
+import UserInfoSidebar from '../components/UserInfoSidebar.vue'
 import apiClient from '../lib/api.js'
-import axios from 'axios'
 
 const route = useRoute()
+const router = useRouter()
 const targetUserId = ref(null)
 const targetUser = ref(null)
 const userLoading = ref(false)
 const userError = ref(null)
-
-// 默认头像
-const defaultAvatar = '/default_head.png'
-
-// 构建头像URL
-const buildAvatarUrl = (userId, avatar) => {
-  if (!userId || !avatar) return defaultAvatar
-  const baseUrl = import.meta.env?.VITE_API_FILE_URL || import.meta.env?.VITE_API_URL || ''
-  const avatarFileName = `${userId}${avatar}`
-  if (!baseUrl) return `/api/static/user_heads/${avatarFileName}`
-  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
-  return `${normalizedBase}static/user_heads/${avatarFileName}`
-}
-
-// 获取用户头像URL
-const getUserAvatarUrl = async (userId, avatar) => {
-  if (!userId || !avatar) return defaultAvatar
-  
-  const avatarFileName = `${userId}${avatar}`
-  
-  try {
-    const { data } = await axios.get(`${import.meta.env.VITE_API_URL}home/avatar/`, {
-      params: {
-        file_name: avatarFileName
-      }
-    })
-    if (data?.success && data?.data?.avatar_url) {
-      return data.data.avatar_url
-    } else {
-      return buildAvatarUrl(userId, avatar)
-    }
-  } catch (error) {
-    console.error('获取头像失败', error)
-    return buildAvatarUrl(userId, avatar)
-  }
-}
-
-// 当前用户头像URL
-const currentUserAvatar = ref(defaultAvatar)
-const currentUserAvatarLoading = ref(false)
-
-// 目标用户头像URL
-const targetUserAvatar = ref(defaultAvatar)
-const targetUserAvatarLoading = ref(false)
 
 const authStore = useAuthStore()
 const {
   user,
   isAuthenticated,
   tokenExpired,
-  username,
-  userId,
-  registeredTime,
-  avatar,
-  bgColor,
-  bgPattern,
-  cornerRadius,
-  followCount,
-  articleCount,
-  likedArticleCount,
-  followerCount
+  userId
 } = storeToRefs(authStore)
 const { loading, fetchUserInfo } = useUserInfo()
-const router = useRouter()
 const isLoading = ref(true)
 const layoutReady = ref(false)
 const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
+
+// 判断当前页面类型
+const currentPageType = computed(() => {
+  const path = route.path
+  if (path.includes('/edit')) return 'edit'
+  if (path.includes('/following')) return 'following'
+  if (path.includes('/followers')) return 'followers'
+  if (path.includes('/liked-articles')) return 'liked-articles'
+  if (path.includes('/articles')) return 'articles'
+  return 'home'
+})
+
+// 面包屑导航
+const breadcrumbs = computed(() => {
+  const crumbs = []
+  if (targetUserId.value) {
+    crumbs.push({
+      name: '个人主页',
+      path: `/user_home/${targetUserId.value}`,
+      isLast: currentPageType.value === 'home'
+    })
+    
+    if (currentPageType.value === 'edit') {
+      crumbs.push({
+        name: '编辑资料',
+        path: `/user_home/${targetUserId.value}/edit`,
+        isLast: true
+      })
+    } else if (currentPageType.value === 'following') {
+      crumbs.push({
+        name: '关注列表',
+        path: `/user_home/${targetUserId.value}/following`,
+        isLast: true
+      })
+    } else if (currentPageType.value === 'followers') {
+      crumbs.push({
+        name: '粉丝列表',
+        path: `/user_home/${targetUserId.value}/followers`,
+        isLast: true
+      })
+    } else if (currentPageType.value === 'liked-articles') {
+      crumbs.push({
+        name: '喜欢的文章',
+        path: `/user_home/${targetUserId.value}/liked-articles`,
+        isLast: true
+      })
+    } else if (currentPageType.value === 'articles') {
+      crumbs.push({
+        name: '发布的文章',
+        path: `/user_home/${targetUserId.value}/articles`,
+        isLast: true
+      })
+    }
+  }
+  return crumbs
+})
 
 const markLayoutReady = async () => {
   if (layoutReady.value) return
@@ -106,14 +106,6 @@ const fetchTargetUser = async (userId) => {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${userId}/`)
     if (response.data?.success) {
       targetUser.value = response.data.data.user
-      // 获取目标用户头像
-      if (targetUser.value.avatar) {
-        targetUserAvatarLoading.value = true
-        targetUserAvatar.value = await getUserAvatarUrl(targetUser.value.id, targetUser.value.avatar)
-        targetUserAvatarLoading.value = false
-      } else {
-        targetUserAvatar.value = defaultAvatar
-      }
     } else {
       userError.value = response.data?.error || '获取用户信息失败'
     }
@@ -129,30 +121,29 @@ const fetchTargetUser = async (userId) => {
   }
 }
 
-// 获取当前用户头像
-const fetchCurrentUserAvatar = async () => {
-  if (isAuthenticated.value && user.value && avatar.value) {
-    currentUserAvatarLoading.value = true
-    currentUserAvatar.value = await getUserAvatarUrl(userId.value, avatar.value)
-    currentUserAvatarLoading.value = false
-  } else {
-    currentUserAvatar.value = defaultAvatar
-  }
+
+// 导航到路径
+const navigateToPath = (path) => {
+  router.push(path)
 }
 
 // 监听路由参数变化
-watch(() => route.params.userId, (newUserId) => {
+watch(() => route.params.userId, async (newUserId) => {
   if (newUserId) {
     targetUserId.value = parseInt(newUserId)
-    fetchTargetUser(targetUserId.value)
+    await fetchTargetUser(targetUserId.value)
   } else {
-    // 如果没有路由参数，清空目标用户信息
     targetUser.value = null
     userError.value = null
   }
+}, { immediate: true })
+
+// 监听路由变化，更新面包屑
+watch(() => route.path, () => {
+  // 路由变化时可能需要重新加载数据
 })
-// 页面挂载时刷新用户信息（确保数据最新）
-// 注意：应用启动时已自动获取，这里作为刷新机制
+
+// 页面挂载时刷新用户信息
 onMounted(async () => {
   authStore.syncFromLocalStorage()
 
@@ -160,13 +151,9 @@ onMounted(async () => {
   if (route.params.userId) {
     targetUserId.value = parseInt(route.params.userId)
     await fetchTargetUser(targetUserId.value)
-  } else {
-    // 如果没有路由参数，显示当前登录用户的信息
-    // 等待认证信息加载完成
   }
 
   if (tokenExpired.value) {
-    // token已过期，等待路由守卫处理
     isLoading.value = false
     await markLayoutReady()
     return
@@ -175,7 +162,6 @@ onMounted(async () => {
   const accessToken = localStorage.getItem('access_token')
 
   if (!accessToken) {
-    // 游客模式：没有 token，直接结束 loading
     isLoading.value = false
     await markLayoutReady()
     return
@@ -183,23 +169,13 @@ onMounted(async () => {
 
   try {
     await fetchUserInfo()
-    // 获取当前用户头像
-    await fetchCurrentUserAvatar()
   } catch (error) {
-    // 如果是token过期错误，不显示错误消息，让路由守卫处理
     if (error.message !== 'TOKEN_EXPIRED') {
       // 其他错误可以在这里处理
     }
   } finally {
     isLoading.value = false
     await markLayoutReady()
-  }
-})
-
-// 监听用户信息变化，更新头像
-watch([isAuthenticated, userId, avatar], async () => {
-  if (isAuthenticated.value) {
-    await fetchCurrentUserAvatar()
   }
 })
 </script>
@@ -209,7 +185,6 @@ watch([isAuthenticated, userId, avatar], async () => {
   <div v-if="showPageLoading">
   </div>
   <div v-else>
-
     <div class="common-layout">
       <el-container>
         <el-header style="padding: 0">
@@ -217,116 +192,110 @@ watch([isAuthenticated, userId, avatar], async () => {
         </el-header>
         <el-container>
           <el-aside class="user-aside">
-            <!-- 优先显示目标用户信息（查看别人的主页） -->
-            <template v-if="targetUser">
-              <div class="avatar-container">
-                <el-skeleton :loading="targetUserAvatarLoading" animated>
-                  <template #template>
-                    <el-skeleton-item variant="circle" style="width: 120px; height: 120px;" />
-                  </template>
-                  <template #default>
-                    <img 
-                      :src="targetUserAvatar" 
-                      alt="用户头像" 
-                      class="user-avatar"
-                      @error="targetUserAvatar = defaultAvatar"
-                    />
-                  </template>
-                </el-skeleton>
-              </div>
-              <div class="stats-row">
-                <span class="stat-item">
-                  <span class="stat-label">关注</span>
-                  <span class="stat-value">{{ targetUser.follow_count || 0 }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">喜欢</span>
-                  <span class="stat-value">{{ targetUser.liked_article_count || 0 }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">文章</span>
-                  <span class="stat-value">{{ targetUser.article_count || 0 }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">粉丝</span>
-                  <span class="stat-value">{{ targetUser.follower_count || 0 }}</span>
-                </span>
-              </div>
-              <div class="register-time">
-                注册时间：{{ targetUser.registered_time }}
-              </div>
-            </template>
-            <!-- 显示当前登录用户信息（自己的主页） -->
-            <template v-else-if="isAuthenticated && user">
-              <div class="avatar-container">
-                <el-skeleton :loading="currentUserAvatarLoading" animated>
-                  <template #template>
-                    <el-skeleton-item variant="circle" style="width: 120px; height: 120px;" />
-                  </template>
-                  <template #default>
-                    <img 
-                      :src="currentUserAvatar" 
-                      alt="用户头像" 
-                      class="user-avatar"
-                      @error="currentUserAvatar = defaultAvatar"
-                    />
-                  </template>
-                </el-skeleton>
-              </div>
-              <div class="stats-row">
-                <span class="stat-item">
-                  <span class="stat-label">关注</span>
-                  <span class="stat-value">{{ followCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">喜欢</span>
-                  <span class="stat-value">{{ likedArticleCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">文章</span>
-                  <span class="stat-value">{{ articleCount }}</span>
-                </span>
-                <span class="stat-item">
-                  <span class="stat-label">粉丝</span>
-                  <span class="stat-value">{{ followerCount }}</span>
-                </span>
-              </div>
-              <div class="register-time">
-                注册时间：{{ registeredTime }}
-              </div>
-            </template>
-            <!-- 游客模式 -->
-            <template v-else>
-              <div class="avatar-container">
-                <img 
-                  src="/default_head.png" 
-                  alt="默认头像" 
-                  class="user-avatar"
-                />
-              </div>
-              <div class="guest-message">
-                <p>欢迎，游客！</p>
-                <p>您当前以访客身份浏览</p>
-              </div>
-            </template>
+            <UserInfoSidebar 
+              :user-id="targetUserId || userId"
+              :username="targetUser?.username || user?.username"
+            />
           </el-aside>
           <el-main>
-            <div v-if="userLoading" class="user-loading">加载中...</div>
-            <div v-else-if="userError" class="user-error">{{ userError }}</div>
-            <div v-else-if="targetUser" class="user-info">
-              <h2>用户名：{{ targetUser.username }}</h2>
-              <p>用户ID：{{ targetUser.id }}</p>
-              <p>注册时间：{{ targetUser.registered_time }}</p>
+            <!-- 面包屑导航 -->
+            <div class="breadcrumb-container">
+              <div class="dsi-breadcrumbs text-sm items-center gap-2">
+                <ul>
+                  <li v-for="(crumb, index) in breadcrumbs" :key="crumb.path">
+                    <a 
+                      v-if="!crumb.isLast"
+                      @click.prevent="navigateToPath(crumb.path)"
+                      class="breadcrumb-link"
+                    >
+                      <!-- 个人主页使用房子图标 -->
+                      <svg
+                        v-if="crumb.name === '个人主页'"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        class="h-4 w-4">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                        />
+                      </svg>
+                      <!-- 其他使用右箭头图标 -->
+                      <svg
+                        v-else
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        class="h-4 w-4">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                      {{ crumb.name }}
+                    </a>
+                    
+                    <span v-else class="inline-flex items-center gap-2">
+                      <!-- 编辑资料使用编辑图标 -->
+                      <svg
+                        v-if="crumb.name === '编辑资料'"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        class="h-4 w-4">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                      <!-- 统计列表使用列表图标 -->
+                      <svg
+                        v-else-if="crumb.name.includes('关注') || crumb.name.includes('粉丝') || crumb.name.includes('喜欢') || crumb.name.includes('文章')"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        class="h-4 w-4">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                        />
+                      </svg>
+                      <!-- 默认使用文档图标 -->
+                      <svg
+                        v-else
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        class="h-4 w-4">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      {{ crumb.name }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div v-else-if="isAuthenticated && user" class="user-info">
-              <h2>用户名：{{ username }}</h2>
-              <p>用户ID：{{ userId }}</p>
-              <p>注册时间：{{ registeredTime }}</p>
-              <Logout />
-            </div>
-            <div v-else class="user-info">
-              <p>请先登录</p>
-            </div>
+
+            <!-- 子路由内容 -->
+            <router-view />
           </el-main>
           <el-aside></el-aside>
         </el-container>
@@ -337,6 +306,7 @@ watch([isAuthenticated, userId, avatar], async () => {
     </div>
   </div>
 </template>
+
 <style scoped>
 .el-aside {
   background-color: #00000000;
@@ -356,72 +326,29 @@ watch([isAuthenticated, userId, avatar], async () => {
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
 }
+
 .user-aside {
-  padding: 20px;
+  padding: 0;
+}
+
+.breadcrumb-container {
+  margin: 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
 }
 
-.avatar-container {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.user-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e4e7ed;
-}
-
-.stats-row {
-  width: 100%;
-  display: flex;
-  justify-content: space-around;
+.breadcrumb-link {
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 20px;
-  padding: 10px 0;
-  border-top: 1px solid #e4e7ed;
-  border-bottom: 1px solid #e4e7ed;
+  gap: 4px;
 }
 
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
+.breadcrumb-link:hover {
+  color: #EF5710;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: #909399;
-}
-
-.stat-value {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.register-time {
-  width: 100%;
-  text-align: center;
-  font-size: 12px;
-  color: #909399;
-  padding-top: 10px;
-}
-
-.guest-message {
-  text-align: center;
-  color: #909399;
-}
-
-.guest-message p {
-  margin: 10px 0;
-}
 
 .user-loading,
 .user-error {
@@ -444,5 +371,34 @@ watch([isAuthenticated, userId, avatar], async () => {
 .user-info p {
   margin: 10px 0;
 }
-</style>
 
+.edit-profile-container {
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 24px;
+  margin-bottom: 30px;
+  color: var(--el-text-color-primary);
+}
+
+.form-section {
+  margin-bottom: 40px;
+  padding: 20px;
+  background-color: var(--el-bg-color-page);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+}
+
+.form-section-title {
+  font-size: 18px;
+  margin-bottom: 20px;
+  color: var(--el-text-color-primary);
+  border-bottom: 2px solid var(--el-border-color-light);
+  padding-bottom: 10px;
+}
+
+.user-home-content {
+  padding: 20px;
+}
+</style>

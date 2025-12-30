@@ -101,11 +101,60 @@ const routes=[
   },
   {
     path: '/user_home/:userId',
-    name: 'user_home_with_id',
     component: () => import('../pages/user_home.vue'),
     meta: {
       title: '个人主页|L-BLOG'
-    }
+    },
+    children: [
+      {
+        path: '',
+        name: 'user_home_with_id',
+        component: () => import('../components/user_home_main.vue'),
+        meta: {
+          title: '个人主页|L-BLOG'
+        }
+      },
+      {
+        path: 'edit',
+        name: 'user_home_edit',
+        component: () => import('../components/user_home_edit.vue'),
+        meta: {
+          title: '编辑资料|L-BLOG'
+        }
+      },
+      {
+        path: 'following',
+        name: 'user_home_following',
+        component: () => import('../components/user_home_main.vue'),
+        meta: {
+          title: '关注列表|L-BLOG'
+        }
+      },
+      {
+        path: 'followers',
+        name: 'user_home_followers',
+        component: () => import('../components/user_home_main.vue'),
+        meta: {
+          title: '粉丝列表|L-BLOG'
+        }
+      },
+      {
+        path: 'liked-articles',
+        name: 'user_home_liked_articles',
+        component: () => import('../components/user_home_main.vue'),
+        meta: {
+          title: '喜欢的文章|L-BLOG'
+        }
+      },
+      {
+        path: 'articles',
+        name: 'user_home_articles',
+        component: () => import('../components/user_home_main.vue'),
+        meta: {
+          title: '发布的文章|L-BLOG'
+        }
+      }
+    ]
   },
   {
     path: '/article/:id',

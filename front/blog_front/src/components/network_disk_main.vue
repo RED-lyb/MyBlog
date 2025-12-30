@@ -240,7 +240,6 @@ const handleDeleteSelected = async () => {
               <a 
                 v-if="!crumb.isLast"
                 @click.prevent="emit('navigate-to-path', crumb.path)"
-                class="breadcrumb-link"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

@@ -1,8 +1,11 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../stores/user_info.js'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 const props = defineProps({
   userId: {
@@ -14,6 +17,21 @@ const props = defineProps({
     default: null
   }
 })
+
+const emit = defineEmits(['edit-profile'])
+
+const authStore = useAuthStore()
+const { userId: currentUserId, isAuthenticated } = storeToRefs(authStore)
+const router = useRouter()
+
+// 判断是否是自己的主页
+const isOwnProfile = computed(() => {
+  return isAuthenticated.value && currentUserId.value && props.userId && currentUserId.value === props.userId
+})
+
+// 关注状态
+const isFollowing = ref(false)
+const followLoading = ref(false)
 
 const targetUser = ref(null)
 const userLoading = ref(false)
@@ -94,19 +112,79 @@ const fetchUser = async (userId) => {
   }
 }
 
+// 检查关注状态
+const checkFollowStatus = async () => {
+  if (!isAuthenticated.value || !props.userId || isOwnProfile.value) {
+    isFollowing.value = false
+    return
+  }
+  
+  try {
+    const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${props.userId}/follow-status/`)
+    if (response.data?.success) {
+      isFollowing.value = response.data.data.is_following
+    }
+  } catch (error) {
+    console.error('检查关注状态失败:', error)
+    isFollowing.value = false
+  }
+}
+
+// 切换关注状态
+const handleToggleFollow = async () => {
+  if (!isAuthenticated.value || !props.userId || followLoading.value) {
+    return
+  }
+  
+  followLoading.value = true
+  try {
+    const response = await apiClient.post(`${import.meta.env.VITE_API_URL}user/${props.userId}/follow/`)
+    if (response.data?.success) {
+      isFollowing.value = response.data.data.is_following
+      ElMessage.success(response.data.message)
+      // 刷新用户信息以更新关注数
+      await fetchUser(props.userId)
+    } else {
+      ElMessage.error(response.data?.error || '操作失败')
+    }
+  } catch (error) {
+    console.error('关注操作失败:', error)
+    ElMessage.error(error.response?.data?.error || '操作失败')
+  } finally {
+    followLoading.value = false
+  }
+}
+
+// 编辑资料
+const handleEditProfile = () => {
+  if (props.userId) {
+    router.push(`/user_home/${props.userId}/edit`)
+  }
+}
+
 // 监听 userId 变化
-watch(() => props.userId, (newUserId) => {
+watch(() => props.userId, async (newUserId) => {
   if (newUserId) {
-    fetchUser(newUserId)
+    await fetchUser(newUserId)
+    await checkFollowStatus()
   } else {
     targetUser.value = null
     userError.value = null
+    isFollowing.value = false
   }
 }, { immediate: true })
 
-onMounted(() => {
+// 监听认证状态变化
+watch(() => isAuthenticated.value, () => {
   if (props.userId) {
-    fetchUser(props.userId)
+    checkFollowStatus()
+  }
+})
+
+onMounted(async () => {
+  if (props.userId) {
+    await fetchUser(props.userId)
+    await checkFollowStatus()
   }
 })
 </script>
@@ -132,25 +210,54 @@ onMounted(() => {
         </el-skeleton>
       </div>
       <div class="stats-row">
-        <span class="stat-item">
+        <router-link 
+          :to="`/user_home/${targetUser.id}/following`"
+          class="stat-item stat-link"
+        >
           <span class="stat-label">关注</span>
           <span class="stat-value">{{ targetUser.follow_count || 0 }}</span>
-        </span>
-        <span class="stat-item">
+        </router-link>
+        <router-link 
+          :to="`/user_home/${targetUser.id}/liked-articles`"
+          class="stat-item stat-link"
+        >
           <span class="stat-label">喜欢</span>
           <span class="stat-value">{{ targetUser.liked_article_count || 0 }}</span>
-        </span>
-        <span class="stat-item">
+        </router-link>
+        <router-link 
+          :to="`/user_home/${targetUser.id}/articles`"
+          class="stat-item stat-link"
+        >
           <span class="stat-label">文章</span>
           <span class="stat-value">{{ targetUser.article_count || 0 }}</span>
-        </span>
-        <span class="stat-item">
+        </router-link>
+        <router-link 
+          :to="`/user_home/${targetUser.id}/followers`"
+          class="stat-item stat-link"
+        >
           <span class="stat-label">粉丝</span>
           <span class="stat-value">{{ targetUser.follower_count || 0 }}</span>
-        </span>
+        </router-link>
       </div>
-      <div class="register-time">
-        注册时间：{{ targetUser.registered_time }}
+      <!-- 操作按钮区域 -->
+      <div class="action-buttons">
+        <!-- 如果是自己的主页，显示编辑资料按钮 -->
+        <button
+          v-if="isOwnProfile"
+          class="dsi-btn dsi-btn-primary"
+          @click="handleEditProfile"
+        >
+          编辑资料
+        </button>
+        <!-- 如果是别人的主页，显示关注/取消关注按钮 -->
+        <button
+          v-else-if="isAuthenticated"
+          :class="['dsi-btn', isFollowing ? 'dsi-btn-outline' : 'dsi-btn-primary']"
+          :disabled="followLoading"
+          @click="handleToggleFollow"
+        >
+          {{ followLoading ? '处理中...' : (isFollowing ? '取消关注' : '关注') }}
+        </button>
       </div>
     </template>
   </div>
@@ -198,6 +305,17 @@ onMounted(() => {
   gap: 5px;
 }
 
+.stat-link {
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s;
+}
+
+.stat-link:hover {
+  color: var(--el-color-primary);
+  transform: scale(1.05);
+}
+
 .stat-label {
   font-size: 12px;
   color: #909399;
@@ -208,12 +326,24 @@ onMounted(() => {
   font-weight: bold;
 }
 
-.register-time {
+.action-buttons {
   width: 100%;
-  text-align: center;
-  font-size: 12px;
-  color: #909399;
-  padding-top: 10px;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.action-buttons .dsi-btn {
+  padding: 8px 20px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.action-buttons .dsi-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .user-loading,
