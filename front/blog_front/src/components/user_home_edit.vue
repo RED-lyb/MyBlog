@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/user_info.js'
 import { useUserInfo } from '../lib/authState.js'
 import apiClient from '../lib/api.js'
 import { ElMessage, ElMessageBox, ElDialog } from 'element-plus'
+import { UploadFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,16 +21,14 @@ const {
   isAuthenticated,
   userId,
   bgColor,
-  bgPattern,
-  cornerRadius
+  bgPattern
 } = storeToRefs(authStore)
 const { fetchUserInfo } = useUserInfo()
 
 // 编辑资料相关
 const formData = ref({
   bg_color: '',
-  bg_pattern: '',
-  corner_radius: ''
+  bg_pattern: ''
 })
 const saving = ref(false)
 
@@ -82,14 +81,12 @@ const loadProfile = () => {
   if (targetUser.value) {
     formData.value = {
       bg_color: targetUser.value.bg_color || '',
-      bg_pattern: targetUser.value.bg_pattern || '',
-      corner_radius: targetUser.value.corner_radius || ''
+      bg_pattern: targetUser.value.bg_pattern || ''
     }
   } else if (isAuthenticated.value && user.value) {
     formData.value = {
       bg_color: bgColor.value || '',
-      bg_pattern: bgPattern.value || '',
-      corner_radius: cornerRadius.value || ''
+      bg_pattern: bgPattern.value || ''
     }
   }
 }
@@ -142,14 +139,13 @@ const handleAvatarUpload = async () => {
     })
     
     if (response.data?.success) {
-      ElMessage.success('头像上传成功')
+      ElMessage.success('头像上传成功，页面即将刷新')
       avatarDialogVisible.value = false
       avatarFileList.value = []
-      // 刷新用户信息
-      await fetchUserInfo()
-      if (targetUserId.value) {
-        await fetchTargetUser(targetUserId.value)
-      }
+      // 延迟一下再刷新，让用户看到成功消息
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } else {
       ElMessage.error(response.data?.error || '上传失败')
     }
@@ -239,8 +235,10 @@ onMounted(async () => {
       
       <!-- 上传头像 -->
       <div class="form-section">
-        <h3 class="form-section-title">头像设置</h3>
-        <el-button type="primary" @click="openAvatarDialog">上传头像</el-button>
+        <div class="section-header">
+          <h3 class="form-section-title">头像设置</h3>
+          <el-button type="primary" @click="openAvatarDialog">上传头像</el-button>
+        </div>
         <div class="el-upload__tip">
           支持 jpg、jpeg、png、gif、bmp、webp 格式，文件大小不超过5MB
         </div>
@@ -258,10 +256,12 @@ onMounted(async () => {
           :limit="1"
           accept="image/*"
           :on-exceed="() => ElMessage.warning('只能上传一个头像')"
+          drag
         >
-          <template #trigger>
-            <el-button type="primary">选择头像</el-button>
-          </template>
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">
+            将头像拖到此处，或<em>点击上传</em>
+          </div>
           <template #tip>
             <div class="el-upload__tip">
               支持 jpg、jpeg、png、gif、bmp、webp 格式，文件大小不超过5MB
@@ -282,43 +282,50 @@ onMounted(async () => {
         </template>
       </el-dialog>
 
-      <!-- 个人资料设置 -->
+      <!-- 样式设置 -->
       <div class="form-section">
-        <h3 class="form-section-title">个人资料</h3>
+        <div class="section-header">
+          <h3 class="form-section-title">样式设置</h3>
+          <el-button 
+            type="primary" 
+            :loading="saving"
+            @click="saveProfile"
+          >
+            保存资料
+          </el-button>
+        </div>
         <el-form :model="formData" label-width="120px">
           <el-form-item label="背景颜色">
-            <el-input 
-              v-model="formData.bg_color" 
-              placeholder="例如: #ffffff 或 rgb(255,255,255)"
+            <el-color-picker
+              v-model="formData.bg_color"
+              color-format="hex"
+              size="small"
             />
+            <div class="form-tip">个人中心背景颜色</div>
           </el-form-item>
-          <el-form-item label="背景样式">
-            <el-input 
-              v-model="formData.bg_pattern" 
-              placeholder="背景点缀样式名或URL"
+          <el-form-item label="点缀颜色">
+            <el-color-picker
+              v-model="formData.bg_pattern"
+              color-format="hex"
+              size="small"
             />
-          </el-form-item>
-          <el-form-item label="圆角大小">
-            <el-input 
-              v-model="formData.corner_radius" 
-              placeholder="例如: 8px 或 10%"
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button 
-              type="primary" 
-              :loading="saving"
-              @click="saveProfile"
-            >
-              保存资料
-            </el-button>
+            <div class="form-tip">背景粒子点缀颜色</div>
           </el-form-item>
         </el-form>
       </div>
 
       <!-- 重设密码 -->
       <div class="form-section">
-        <h3 class="form-section-title">重设密码</h3>
+        <div class="section-header">
+          <h3 class="form-section-title">重设密码</h3>
+          <el-button 
+            type="warning" 
+            :loading="resettingPassword"
+            @click="handleResetPassword"
+          >
+            修改密码
+          </el-button>
+        </div>
         <el-form :model="passwordForm" label-width="120px">
           <el-form-item label="旧密码">
             <el-input 
@@ -343,15 +350,6 @@ onMounted(async () => {
               show-password
               placeholder="请再次输入新密码"
             />
-          </el-form-item>
-          <el-form-item>
-            <el-button 
-              type="warning" 
-              :loading="resettingPassword"
-              @click="handleResetPassword"
-            >
-              修改密码
-            </el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -388,18 +386,31 @@ onMounted(async () => {
   border: 1px solid var(--el-border-color-light);
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--el-border-color-light);
+}
+
 .form-section-title {
   font-size: 18px;
-  margin-bottom: 20px;
+  margin: 0;
   color: var(--el-text-color-primary);
-  border-bottom: 2px solid var(--el-border-color-light);
-  padding-bottom: 10px;
 }
 
 .el-upload__tip {
   margin-top: 10px;
   color: var(--el-text-color-regular);
   font-size: 12px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
 }
 </style>
 

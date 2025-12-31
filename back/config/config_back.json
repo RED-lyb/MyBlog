@@ -1,0 +1,25 @@
+{
+    "network_disk": {
+        "cleanup_days": 7
+    },
+    "captcha": {
+        "challenge_funct": "captcha.helpers.random_char_challenge",
+        "length": 4,
+        "timeout": 5,
+        "image_size": [
+            120,
+            40
+        ],
+        "font_size": 20,
+        "background_color": "#ffffff",
+        "foreground_color": "#001100",
+        "noise_functions": [
+            "captcha.helpers.noise_arcs",
+            "captcha.helpers.noise_dots"
+        ]
+    },
+    "jwt": {
+        "access_token_expire_minutes": 60,
+        "refresh_token_expire_days": 30
+    }
+}

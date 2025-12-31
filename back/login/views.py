@@ -73,13 +73,14 @@ def login(request):
                     # path 设置为 '/' 确保所有路径都能携带这个 Cookie
                     # 注意：httponly=True 确保 JavaScript 无法访问这个 Cookie（只能在开发者工具中看到名称，无法读取值）
                     secure_flag = False if getattr(settings, 'DEBUG', True) else True
+                    refresh_token_expire_days = JWTUtils.get_refresh_token_expire_days()
                     response.set_cookie(
                         key='refresh_token',
                         value=refresh_token,
                         httponly=True,  # HttpOnly Cookie，JavaScript 无法访问
                         secure=secure_flag,
                         samesite='Lax',
-                        max_age=JWTUtils.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+                        max_age=refresh_token_expire_days * 24 * 60 * 60,
                         path='/',
                         # 显式设置 domain 为 None，使用默认值（当前域名）
                         domain=None
@@ -121,9 +122,12 @@ def login(request):
                         'field_errors': {'username': f'用户不存在，还有{remaining}次机会'}
                     }, status=400)
 
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f'登录异常: {str(e)}')
+        print(traceback.format_exc())
         return JsonResponse({
             'success': False,
-            'error': '登录异常，请稍后重试',
+            'error': f'登录异常，请稍后重试: {str(e)}',
             'field_errors': {'non_field': '登录异常，请稍后重试'}
         }, status=500)

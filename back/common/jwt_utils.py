@@ -47,9 +47,32 @@ class JWTUtils:
     SECRET_KEY = getattr(settings, 'SECRET_KEY', 'your-secret-key')
     ALGORITHM = 'HS256'
     
-    # Token过期时间
-    ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Access Token 60分钟
-    REFRESH_TOKEN_EXPIRE_DAYS = 30  # Refresh Token 30天
+    # Token过期时间（从配置文件读取）
+    @classmethod
+    def _load_token_config(cls):
+        """加载Token配置"""
+        try:
+            from .config_utils import load_config
+            jwt_config = load_config().get('jwt', {})
+            return {
+                'access_token_expire_minutes': jwt_config.get('access_token_expire_minutes', 60),
+                'refresh_token_expire_days': jwt_config.get('refresh_token_expire_days', 30)
+            }
+        except Exception:
+            return {
+                'access_token_expire_minutes': 60,
+                'refresh_token_expire_days': 30
+            }
+    
+    @classmethod
+    def get_access_token_expire_minutes(cls):
+        """获取Access Token过期时间（分钟）"""
+        return cls._load_token_config()['access_token_expire_minutes']
+    
+    @classmethod
+    def get_refresh_token_expire_days(cls):
+        """获取Refresh Token过期时间（天）"""
+        return cls._load_token_config()['refresh_token_expire_days']
     
     @classmethod
     def generate_access_token(cls, user_id, username):
@@ -60,7 +83,7 @@ class JWTUtils:
             'user_id': user_id,
             'username': username,
             'token_type': 'access',
-            'exp': timezone.now() + datetime.timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES),
+            'exp': timezone.now() + datetime.timedelta(minutes=cls.get_access_token_expire_minutes()),
             'iat': timezone.now(),
             'jti': secrets.token_urlsafe(32)  # JWT ID，用于唯一标识
         }
@@ -77,7 +100,7 @@ class JWTUtils:
             'user_id': user_id,
             'username': username,
             'token_type': 'refresh',
-            'exp': timezone.now() + datetime.timedelta(days=cls.REFRESH_TOKEN_EXPIRE_DAYS),
+            'exp': timezone.now() + datetime.timedelta(days=cls.get_refresh_token_expire_days()),
             'iat': timezone.now(),
             'jti': secrets.token_urlsafe(32)  # JWT ID，用于唯一标识
         }
@@ -147,7 +170,7 @@ class RefreshTokenManager:
         
         # 创建新的refresh token记录
         # 改为完全由数据库计算时间，避免Python与ORM时区转换造成的偏移
-        lifetime_seconds = int(JWTUtils.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60)
+        lifetime_seconds = int(JWTUtils.get_refresh_token_expire_days() * 24 * 60 * 60)
         with connection.cursor() as cursor:
             cursor.execute(
                 """

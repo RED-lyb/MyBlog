@@ -239,6 +239,11 @@ def list_files(request):
         files = []
         directories = []
         
+        # 获取筛选参数（仅在根目录时生效）
+        filter_user_id = request.GET.get('filter_user_id', '').strip()
+        filter_username = request.GET.get('filter_username', '').strip()
+        only_mine = request.GET.get('only_mine', '').strip().lower() == 'true'
+        
         try:
             # 如果是根目录，只显示目录（用户文件夹）
             if len(path_parts) == 0:
@@ -250,6 +255,24 @@ def list_files(request):
                                 user_id = int(item.name)
                                 username = get_username_by_id(user_id)
                                 if username:  # 只显示有效的用户目录
+                                    # 应用筛选条件
+                                    if only_mine and current_user_id:
+                                        # 只看自己：只显示当前用户的目录
+                                        if user_id != current_user_id:
+                                            continue
+                                    elif filter_user_id:
+                                        # 按用户ID筛选（精确匹配）
+                                        try:
+                                            filter_id = int(filter_user_id)
+                                            if user_id != filter_id:
+                                                continue
+                                        except (ValueError, TypeError):
+                                            pass
+                                    elif filter_username:
+                                        # 按用户名筛选（模糊匹配）
+                                        if filter_username.lower() not in username.lower():
+                                            continue
+                                    
                                     file_info = get_file_info(item)
                                     # 使用用户名作为显示名称
                                     file_info['display_name'] = username

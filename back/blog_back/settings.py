@@ -153,15 +153,28 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# 验证码配置
-CAPTCHA_CHALLENGE_FUNCT = 'captcha.helpers.random_char_challenge'
-CAPTCHA_LENGTH = 4
-CAPTCHA_TIMEOUT = 5  # 验证码有效期（分钟）
-CAPTCHA_IMAGE_SIZE = (120, 40)
-CAPTCHA_FONT_SIZE = 20
-CAPTCHA_BACKGROUND_COLOR = '#ffffff'
-CAPTCHA_FOREGROUND_COLOR = '#001100'
-CAPTCHA_NOISE_FUNCTIONS = ('captcha.helpers.noise_arcs', 'captcha.helpers.noise_dots',)
+# 验证码配置（从配置文件读取）
+try:
+    from common.config_utils import load_config
+    captcha_config = load_config().get('captcha', {})
+    CAPTCHA_CHALLENGE_FUNCT = captcha_config.get('challenge_funct', 'captcha.helpers.random_char_challenge')
+    CAPTCHA_LENGTH = captcha_config.get('length', 4)
+    CAPTCHA_TIMEOUT = captcha_config.get('timeout', 5)  # 验证码有效期（分钟）
+    CAPTCHA_IMAGE_SIZE = tuple(captcha_config.get('image_size', [120, 40]))
+    CAPTCHA_FONT_SIZE = captcha_config.get('font_size', 20)
+    CAPTCHA_BACKGROUND_COLOR = captcha_config.get('background_color', '#ffffff')
+    CAPTCHA_FOREGROUND_COLOR = captcha_config.get('foreground_color', '#001100')
+    CAPTCHA_NOISE_FUNCTIONS = tuple(captcha_config.get('noise_functions', ['captcha.helpers.noise_arcs', 'captcha.helpers.noise_dots']))
+except Exception:
+    # 如果读取配置失败，使用默认值
+    CAPTCHA_CHALLENGE_FUNCT = 'captcha.helpers.random_char_challenge'
+    CAPTCHA_LENGTH = 4
+    CAPTCHA_TIMEOUT = 5
+    CAPTCHA_IMAGE_SIZE = (120, 40)
+    CAPTCHA_FONT_SIZE = 20
+    CAPTCHA_BACKGROUND_COLOR = '#ffffff'
+    CAPTCHA_FOREGROUND_COLOR = '#001100'
+    CAPTCHA_NOISE_FUNCTIONS = ('captcha.helpers.noise_arcs', 'captcha.helpers.noise_dots',)
 
 #配置环境检测
 CURRENT_ENV = 'dev'#实际运行时根据环境修改

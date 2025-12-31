@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, ElIcon } from 'element-plus'
-import { Download, Delete, Upload, Plus, UploadFilled } from '@element-plus/icons-vue'
+import { Download, Delete, Upload, Plus, UploadFilled, Search } from '@element-plus/icons-vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
@@ -40,6 +40,11 @@ const uploadFileList = ref([])
 const mkdirDialogVisible = ref(false)
 const newDirName = ref('')
 const isDownloadingFile = ref(false) // 标记是否正在处理文件下载
+
+// 筛选相关（仅在根目录时使用）
+const isRootDirectory = computed(() => !currentPath.value || currentPath.value === '')
+const filterOnlyMine = ref(false)
+const filterUsername = ref('')
 
 // 存储信息
 const storageInfo = ref({
@@ -108,8 +113,20 @@ const fetchFileList = async (path = null) => {
   
   loadingFiles.value = true
   try {
+    // 构建请求参数
+    const params = { path: targetPath }
+    
+    // 仅在根目录时添加筛选参数
+    if (isRootDirectory.value) {
+      if (filterOnlyMine.value && isAuthenticated.value && userId.value) {
+        params.only_mine = 'true'
+      } else if (filterUsername.value) {
+        params.filter_username = filterUsername.value
+      }
+    }
+    
     const response = await apiClient.get(`${apiUrl}network_disk/list/`, {
-      params: { path: targetPath }
+      params
     })
     if (response.data?.success) {
       currentPath.value = response.data.data.current_path
@@ -255,51 +272,66 @@ const handleUpload = async () => {
     return
   }
   
-  // 在上传前检查容量
-  const file = uploadFileList.value[0].raw
-  const fileSizeGB = file.size / (1024 ** 3)
-  const totalGB = storageInfo.value.total_gb
-  const usedGB = storageInfo.value.used_gb
+  // 在上传前检查容量（检查所有文件的总大小）
+  let totalSizeGB = 0
+  for (const fileItem of uploadFileList.value) {
+    if (fileItem.raw) {
+      totalSizeGB += fileItem.raw.size / (1024 ** 3)
+    }
+  }
+  
   const remainingGB = storageInfo.value.remaining_gb
   
-  // 如果文件大小超过剩余容量，提前提示
-  if (fileSizeGB > remainingGB) {
-    ElMessage.error(`存储空间不足，无法上传。文件大小 ${fileSizeGB.toFixed(2)}G，剩余空间 ${remainingGB.toFixed(2)}G`)
+  // 如果文件总大小超过剩余容量，提前提示
+  if (totalSizeGB > remainingGB) {
+    ElMessage.error(`存储空间不足，无法上传。文件总大小 ${totalSizeGB.toFixed(2)}G，剩余空间 ${remainingGB.toFixed(2)}G`)
     return
   }
   
   uploading.value = true
+  let successCount = 0
+  let failCount = 0
+  
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('path', currentPath.value)
-    
-    const response = await apiClient.post(`${apiUrl}network_disk/upload/`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress: (progressEvent) => {
-        // 可以在这里添加进度条，但FullScreenLoading已经足够
-        // const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+    // 逐个上传文件
+    for (const fileItem of uploadFileList.value) {
+      if (!fileItem.raw) continue
+      
+      try {
+        const formData = new FormData()
+        formData.append('file', fileItem.raw)
+        formData.append('path', currentPath.value)
+        
+        const response = await apiClient.post(`${apiUrl}network_disk/upload/`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        if (response.data?.success) {
+          successCount++
+        } else {
+          failCount++
+          console.error('上传失败:', response.data?.error)
+        }
+      } catch (error) {
+        failCount++
+        console.error('上传错误:', error)
       }
-    })
+    }
     
-    if (response.data?.success) {
-      ElMessage.success('上传成功')
+    if (successCount > 0) {
+      ElMessage.success(`成功上传 ${successCount} 个文件${failCount > 0 ? `，${failCount} 个文件上传失败` : ''}`)
       uploadDialogVisible.value = false
       uploadFileList.value = []
       fetchFileList() // 从 URL 读取路径
       fetchStorageInfo() // 更新存储信息
     } else {
-      ElMessage.error(response.data?.error || '上传失败')
+      ElMessage.error('所有文件上传失败')
     }
   } catch (error) {
     console.error('上传错误:', error)
-    if (error.response?.data?.error) {
-      ElMessage.error(error.response.data.error)
-    } else {
-      ElMessage.error('上传失败')
-    }
+    ElMessage.error('上传失败')
   } finally {
     uploading.value = false
   }
@@ -762,6 +794,19 @@ onMounted(async () => {
   
   // 文件列表加载由路由监听器处理（watch with immediate: true）
 })
+
+// 重置筛选条件
+const resetFilters = () => {
+  filterOnlyMine.value = false
+  filterUsername.value = ''
+}
+
+// 监听筛选条件变化
+watch([filterOnlyMine, filterUsername], () => {
+  if (isRootDirectory.value) {
+    fetchFileList()
+  }
+})
 </script>
 
 <template>
@@ -775,6 +820,43 @@ onMounted(async () => {
         <el-container>
           <el-aside v-if="currentOwnerId">
             <UserInfoSidebar :user-id="currentOwnerId" />
+          </el-aside>
+          <el-aside v-else-if="isRootDirectory" class="search-aside">
+            <div class="search-filter-container">
+              <div class="filter-title">
+                <span>搜索筛选</span>
+                <el-icon><Search /></el-icon>
+              </div>
+              
+              <!-- 只看自己 -->
+              <div class="filter-item" v-if="isAuthenticated">
+                <el-checkbox v-model="filterOnlyMine">只看自己</el-checkbox>
+              </div>
+              
+              <!-- 用户搜索 -->
+              <div class="filter-item">
+                <label>用户名</label>
+                <el-input
+                  v-model="filterUsername"
+                  placeholder="模糊匹配"
+                  clearable
+                  size="small"
+                  :disabled="filterOnlyMine"
+                />
+              </div>
+              
+              <!-- 重置按钮 -->
+              <div class="filter-actions">
+                <el-button
+                  type="default"
+                  size="small"
+                  @click="resetFilters"
+                  style="width: 100%;"
+                >
+                  重置筛选
+                </el-button>
+              </div>
+            </div>
           </el-aside>
           <el-aside v-else></el-aside>
           <el-main>
@@ -857,16 +939,21 @@ onMounted(async () => {
       <FullScreenLoading :visible="uploading" />
       <el-upload
         :auto-upload="false"
-        :on-change="(file) => uploadFileList = [file]"
-        :file-list="uploadFileList"
-        :limit="1"
+        v-model:file-list="uploadFileList"
+        :limit="5"
         :disabled="uploading"
         drag
+        multiple
       >
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
         <div class="el-upload__text">
           将文件拖到此处，或<em>点击上传</em>
         </div>
+        <template #tip>
+          <div class="el-upload__tip">
+            最多可上传5个文件
+          </div>
+        </template>
       </el-upload>
       <template #footer>
         <el-button @click="uploadDialogVisible = false" :disabled="uploading">取消</el-button>
@@ -897,6 +984,49 @@ onMounted(async () => {
   top: 60px;
   align-self: flex-start;
   height: calc(100vh - 165px);
+}
+
+.search-aside {
+  background-color: #00000000;
+  width: 280px;
+  position: sticky;
+  top: 60px;
+  align-self: flex-start;
+  height: calc(100vh - 165px);
+  padding: 0;
+  overflow-y: auto;
+}
+
+.search-filter-container {
+  padding: 20px;
+}
+
+.filter-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0 0 20px 0;
+  color: var(--el-text-color-primary);
+  border-bottom: 2px solid var(--el-border-color-light);
+  padding-bottom: 10px;
+}
+
+.filter-item {
+  margin-bottom: 16px;
+}
+
+.filter-item label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+  font-weight: 500;
+}
+
+.filter-actions {
+  margin-top: 20px;
 }
 
 .el-main {
