@@ -8,7 +8,15 @@ export const useConfigStore = defineStore('config', () => {
     blog_name: '',
     github_link: '',
     gitee_link: '',
-    bilibili_link: ''
+    bilibili_link: '',
+    light: {
+      particlesColor: '#00EAFF',
+      bgcolor: '#FFFFFF'
+    },
+    dark: {
+      particlesColor: '#FFFFFF',
+      bgcolor: '#000000'
+    }
   })
   const loading = ref(false)
   const loaded = ref(false)
@@ -19,7 +27,19 @@ export const useConfigStore = defineStore('config', () => {
       const saved = localStorage.getItem('app_config')
       if (saved) {
         const parsed = JSON.parse(saved)
-        config.value = { ...config.value, ...parsed }
+        // 深度合并配置，特别是 light 和 dark 对象
+        config.value = {
+          ...config.value,
+          ...parsed,
+          light: {
+            ...config.value.light,
+            ...(parsed.light || {})
+          },
+          dark: {
+            ...config.value.dark,
+            ...(parsed.dark || {})
+          }
+        }
         loaded.value = true
       }
     } catch (error) {
@@ -46,10 +66,22 @@ export const useConfigStore = defineStore('config', () => {
       syncFromLocalStorage()
       
       // 然后从配置文件加载（覆盖localStorage的值）
-      const response = await fetch('/config.json')
+      const response = await fetch('/config_front.json')
       if (response.ok) {
         const data = await response.json()
-        config.value = { ...config.value, ...data }
+        // 深度合并配置，特别是 light 和 dark 对象
+        config.value = {
+          ...config.value,
+          ...data,
+          light: {
+            ...config.value.light,
+            ...(data.light || {})
+          },
+          dark: {
+            ...config.value.dark,
+            ...(data.dark || {})
+          }
+        }
         persistConfig() // 保存到localStorage
         loaded.value = true
       } else {

@@ -184,18 +184,6 @@ const goToArticle = (articleId) => {
   router.push(`/article/${articleId}`)
 }
 
-// 监听路由变化
-watch(() => route.params.userId, (newUserId) => {
-  if (newUserId) {
-    targetUserId.value = parseInt(newUserId)
-    loadData()
-  }
-}, { immediate: true })
-
-watch(() => currentType.value, () => {
-  loadData()
-})
-
 // 加载数据
 const loadData = () => {
   if (!targetUserId.value) return
@@ -218,6 +206,18 @@ const loadData = () => {
       break
   }
 }
+
+// 监听路由变化
+watch(() => route.params.userId, (newUserId) => {
+  if (newUserId) {
+    targetUserId.value = parseInt(newUserId)
+    loadData()
+  }
+}, { immediate: true })
+
+watch(() => currentType.value, () => {
+  loadData()
+})
 
 onMounted(() => {
   if (route.params.userId) {

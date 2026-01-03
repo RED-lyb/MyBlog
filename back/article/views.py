@@ -14,7 +14,7 @@ from common.captcha_utils import CaptchaUtils, LoginLimitUtils
 @require_GET
 def get_all_articles(request):
     """
-    获取文章列表（支持分页）
+    获取文章列表（支持分页、筛选和排序）
     返回分页后的文章信息
     """
     try:
@@ -28,20 +28,78 @@ def get_all_articles(request):
         if page_size < 1:
             page_size = 4
         
+        # 获取筛选参数
+        author_id = request.GET.get('author_id', '').strip()
+        author_name = request.GET.get('author_name', '').strip()
+        title = request.GET.get('title', '').strip()
+        start_date = request.GET.get('start_date', '').strip()
+        end_date = request.GET.get('end_date', '').strip()
+        
+        # 获取排序参数
+        sort_by = request.GET.get('sort_by', 'published_at')  # 默认按发布时间排序
+        sort_order = request.GET.get('sort_order', 'desc')  # 默认降序
+        
+        # 验证排序字段
+        valid_sort_fields = ['published_at', 'view_count', 'love_count', 'comment_count']
+        if sort_by not in valid_sort_fields:
+            sort_by = 'published_at'
+        
+        # 验证排序方向
+        if sort_order not in ['asc', 'desc']:
+            sort_order = 'desc'
+        
+        # 构建 WHERE 条件
+        where_conditions = []
+        params = []
+        
+        if author_id:
+            try:
+                author_id_int = int(author_id)
+                where_conditions.append("a.author_id = %s")
+                params.append(author_id_int)
+            except ValueError:
+                pass  # 如果 author_id 不是有效整数，忽略
+        
+        if author_name:
+            where_conditions.append("u.username LIKE %s")
+            params.append(f'%{author_name}%')
+        
+        if title:
+            where_conditions.append("a.title LIKE %s")
+            params.append(f'%{title}%')
+        
+        if start_date:
+            where_conditions.append("DATE(a.published_at) >= %s")
+            params.append(start_date)
+        
+        if end_date:
+            where_conditions.append("DATE(a.published_at) <= %s")
+            params.append(end_date)
+        
+        # 构建 WHERE 子句
+        where_clause = ""
+        if where_conditions:
+            where_clause = "WHERE " + " AND ".join(where_conditions)
+        
+        # 构建 ORDER BY 子句
+        order_clause = f"ORDER BY a.{sort_by} {sort_order.upper()}"
+        
         # 计算偏移量
         offset = (page - 1) * page_size
         
         with connection.cursor() as cursor:
             # 先查询总记录数
-            cursor.execute("""
+            count_sql = f"""
                 SELECT COUNT(*) 
-                FROM blog_articles
-            """)
+                FROM blog_articles a
+                LEFT JOIN users u ON a.author_id = u.id
+                {where_clause}
+            """
+            cursor.execute(count_sql, params)
             total_count = cursor.fetchone()[0]
             
             # 查询分页后的文章，并关联用户表获取作者用户名和头像
-            # 按发布时间降序排列（最先发布的在最后面）
-            cursor.execute("""
+            query_sql = f"""
                 SELECT 
                     a.id,
                     a.title,
@@ -55,9 +113,12 @@ def get_all_articles(request):
                     a.published_at
                 FROM blog_articles a
                 LEFT JOIN users u ON a.author_id = u.id
-                ORDER BY a.published_at DESC
+                {where_clause}
+                {order_clause}
                 LIMIT %s OFFSET %s
-            """, [page_size, offset])
+            """
+            query_params = params + [page_size, offset]
+            cursor.execute(query_sql, query_params)
             
             rows = cursor.fetchall()
             

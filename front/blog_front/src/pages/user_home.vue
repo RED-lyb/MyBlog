@@ -93,8 +93,9 @@ const markLayoutReady = async () => {
 
 // 获取目标用户信息
 const fetchTargetUser = async (userId) => {
-  if (!userId) {
+  if (!userId || userId === null || userId === undefined || isNaN(userId)) {
     userError.value = '用户ID不存在'
+    userLoading.value = false
     return
   }
 
@@ -206,7 +207,6 @@ onMounted(async () => {
                     <a 
                       v-if="!crumb.isLast"
                       @click.prevent="navigateToPath(crumb.path)"
-                      class="breadcrumb-link"
                     >
                       <!-- 个人主页使用房子图标 -->
                       <svg
@@ -293,11 +293,9 @@ onMounted(async () => {
                 </ul>
               </div>
             </div>
-
             <!-- 子路由内容 -->
             <router-view />
           </el-main>
-          <el-aside></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -323,6 +321,7 @@ onMounted(async () => {
   padding: 0px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
+  margin-right: 100px;
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
 }
@@ -336,19 +335,6 @@ onMounted(async () => {
   display: flex;
   align-items: center;
 }
-
-.breadcrumb-link {
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.breadcrumb-link:hover {
-  color: #EF5710;
-}
-
 
 .user-loading,
 .user-error {

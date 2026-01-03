@@ -835,20 +835,54 @@ def delete_network_file(request):
 @require_http_methods(["GET"])
 def get_config(request):
     """
-    获取全局配置
+    获取全局配置（前端配置 + 后端配置）
     """
     try:
-        # 配置文件路径
-        config_path = Path(settings.BASE_DIR).parent / 'front' / 'blog_front' / 'public' / 'config.json'
+        # 前端配置文件路径
+        front_config_path = Path(settings.BASE_DIR).parent / 'front' / 'blog_front' / 'public' / 'config_front.json'
+        # 后端配置文件路径
+        back_config_path = Path(settings.BASE_DIR) / 'config' / 'config_back.json'
         
-        if not config_path.exists():
-            return JsonResponse({
-                'success': False,
-                'error': '配置文件不存在'
-            }, status=404)
+        config_data = {}
         
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config_data = json.load(f)
+        # 读取前端配置
+        if front_config_path.exists():
+            try:
+                with open(front_config_path, 'r', encoding='utf-8') as f:
+                    front_config = json.load(f)
+                    config_data.update(front_config)
+            except Exception as e:
+                print(f'读取前端配置失败: {str(e)}')
+        
+        # 读取后端配置
+        if back_config_path.exists():
+            try:
+                with open(back_config_path, 'r', encoding='utf-8') as f:
+                    back_config = json.load(f)
+                    # 合并后端配置
+                    for key, value in back_config.items():
+                        if key not in config_data:
+                            config_data[key] = value
+                        elif isinstance(config_data[key], dict) and isinstance(value, dict):
+                            config_data[key].update(value)
+                        else:
+                            config_data[key] = value
+            except Exception as e:
+                print(f'读取后端配置失败: {str(e)}')
+        
+        # 如果两个配置文件都不存在，返回默认配置
+        if not config_data:
+            from common.config_utils import load_config
+            default_back_config = load_config()
+            config_data = {
+                'author_id': 1,
+                'author': '',
+                'blog_name': '',
+                'github_link': '',
+                'gitee_link': '',
+                'bilibili_link': '',
+                **default_back_config
+            }
         
         return JsonResponse({
             'success': True,
@@ -866,7 +900,7 @@ def get_config(request):
 @require_http_methods(["PUT"])
 def update_config(request):
     """
-    更新全局配置
+    更新全局配置（分别保存前端和后端配置）
     """
     try:
         data = json.loads(request.body.decode())
@@ -880,16 +914,61 @@ def update_config(request):
                     'error': f'缺少必需字段: {field}'
                 }, status=400)
         
-        # 配置文件路径
-        config_path = Path(settings.BASE_DIR).parent / 'front' / 'blog_front' / 'public' / 'config.json'
+        # 前端配置文件路径
+        front_config_path = Path(settings.BASE_DIR).parent / 'front' / 'blog_front' / 'public' / 'config_front.json'
+        # 后端配置文件路径
+        back_config_path = Path(settings.BASE_DIR) / 'config' / 'config_back.json'
         
-        # 保存配置
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        # 分离前端和后端配置
+        front_config = {
+            'author_id': data.get('author_id', 1),
+            'author': data.get('author', ''),
+            'blog_name': data.get('blog_name', ''),
+            'github_link': data.get('github_link', ''),
+            'gitee_link': data.get('gitee_link', ''),
+            'bilibili_link': data.get('bilibili_link', '')
+        }
+        
+        # 添加主题颜色配置
+        if 'light' in data:
+            front_config['light'] = data.get('light', {})
+        if 'dark' in data:
+            front_config['dark'] = data.get('dark', {})
+        
+        back_config = {
+            'network_disk': data.get('network_disk', {}),
+            'captcha': data.get('captcha', {}),
+            'jwt': data.get('jwt', {})
+        }
+        
+        # 保存前端配置
+        try:
+            front_config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(front_config_path, 'w', encoding='utf-8') as f:
+                json.dump(front_config, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'保存前端配置失败: {str(e)}'
+            }, status=500)
+        
+        # 保存后端配置
+        try:
+            back_config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(back_config_path, 'w', encoding='utf-8') as f:
+                json.dump(back_config, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'保存后端配置失败: {str(e)}'
+            }, status=500)
+        
+        # 合并返回完整配置
+        merged_config = {**front_config, **back_config}
         
         return JsonResponse({
             'success': True,
-            'data': data,
+            'data': merged_config,
             'message': '配置更新成功'
         })
     except Exception as e:

@@ -9,6 +9,8 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import '@/assets/element-plus-override.css' // 在 Element Plus CSS 之后加载，确保覆盖生效
+import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import 'dayjs/locale/zh-cn' // 日期组件需要 dayjs 的中文语言包
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { useAuthStore } from './stores/user_info.js'
 import { useConfigStore } from './stores/config.js'
@@ -19,7 +21,9 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
-app.use(ElementPlus)
+app.use(ElementPlus, {
+  locale: zhCn,
+})
 app.use(pinia)
 app.use(router)
 

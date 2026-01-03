@@ -1,6 +1,6 @@
 """
 网盘文件定时清理管理命令
-每天0:00执行，删除files文件夹下最近修改时间超过7天的文件和文件夹
+每天0:00执行，删除files文件夹下最近修改时间超过配置天数的文件和文件夹
 
 使用方法：
 python manage.py cleanup_old_files
@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from common.config_utils import get_config_value
 
 
 class Command(BaseCommand):
@@ -140,8 +141,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--days',
             type=int,
-            default=7,
-            help='删除多少天前修改的文件（默认7天）'
+            default=None,
+            help='删除多少天前修改的文件（如果不指定，则从配置文件读取）'
         )
         parser.add_argument(
             '--dry-run',
@@ -155,7 +156,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # 优先使用命令行参数，如果没有则从配置文件读取
         days = options['days']
+        if days is None:
+            days = get_config_value('network_disk.cleanup_days', 7)
+        
         dry_run = options['dry_run']
         no_log = options.get('no_log', False)
         

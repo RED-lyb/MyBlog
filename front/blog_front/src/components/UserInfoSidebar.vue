@@ -76,8 +76,9 @@ const getUserAvatarUrl = async (userId, avatar) => {
 
 // 获取用户信息
 const fetchUser = async (userId) => {
-  if (!userId) {
+  if (!userId || userId === null || userId === undefined) {
     targetUser.value = null
+    userLoading.value = false
     return
   }
 
@@ -218,6 +219,13 @@ onMounted(async () => {
           <span class="stat-value">{{ targetUser.follow_count || 0 }}</span>
         </router-link>
         <router-link 
+          :to="`/user_home/${targetUser.id}/followers`"
+          class="stat-item stat-link"
+        >
+          <span class="stat-label">粉丝</span>
+          <span class="stat-value">{{ targetUser.follower_count || 0 }}</span>
+        </router-link>
+        <router-link 
           :to="`/user_home/${targetUser.id}/liked-articles`"
           class="stat-item stat-link"
         >
@@ -230,13 +238,6 @@ onMounted(async () => {
         >
           <span class="stat-label">文章</span>
           <span class="stat-value">{{ targetUser.article_count || 0 }}</span>
-        </router-link>
-        <router-link 
-          :to="`/user_home/${targetUser.id}/followers`"
-          class="stat-item stat-link"
-        >
-          <span class="stat-label">粉丝</span>
-          <span class="stat-value">{{ targetUser.follower_count || 0 }}</span>
         </router-link>
       </div>
       <!-- 操作按钮区域 -->
@@ -312,7 +313,6 @@ onMounted(async () => {
 }
 
 .stat-link:hover {
-  color: var(--el-color-primary);
   transform: scale(1.05);
 }
 

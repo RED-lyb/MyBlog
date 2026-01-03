@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import page_number from "./page_number.vue"
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
@@ -10,6 +10,20 @@ import { usePaginationStore } from '../stores/pagination.js'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessage } from 'element-plus'
 import { Star, ChatLineRound, View, Calendar } from '@element-plus/icons-vue'
+
+// 从父组件获取筛选和排序参数
+const searchFilters = inject('searchFilters', ref({
+  author_id: '',
+  author_name: '',
+  title: '',
+  start_date: '',
+  end_date: ''
+}))
+
+const sortOptions = inject('sortOptions', ref({
+  sort_by: 'published_at',
+  sort_order: 'desc'
+}))
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -169,11 +183,33 @@ const fetchArticles = async (showLoading = true) => {
   }
   error.value = null
   try {
+    // 构建请求参数，包含筛选和排序
+    const params = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+      sort_by: sortOptions.value.sort_by,
+      sort_order: sortOptions.value.sort_order
+    }
+    
+    // 添加筛选参数（只添加非空值）
+    if (searchFilters.value.author_id) {
+      params.author_id = searchFilters.value.author_id
+    }
+    if (searchFilters.value.author_name) {
+      params.author_name = searchFilters.value.author_name
+    }
+    if (searchFilters.value.title) {
+      params.title = searchFilters.value.title
+    }
+    if (searchFilters.value.start_date) {
+      params.start_date = searchFilters.value.start_date
+    }
+    if (searchFilters.value.end_date) {
+      params.end_date = searchFilters.value.end_date
+    }
+    
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
-      params: {
-        page: currentPage.value,
-        page_size: pageSize.value
-      }
+      params
     })
     if (response.data?.success) {
       const data = response.data.data
@@ -217,11 +253,33 @@ const fetchArticles = async (showLoading = true) => {
           if (oldPageSize !== pageSize.value) {
             // 保持 loading 状态，重新请求文章（不显示新的 loading，因为已经在 loading 中）
             try {
+              // 构建请求参数，包含筛选和排序
+              const params = {
+                page: currentPage.value,
+                page_size: pageSize.value,
+                sort_by: sortOptions.value.sort_by,
+                sort_order: sortOptions.value.sort_order
+              }
+              
+              // 添加筛选参数（只添加非空值）
+              if (searchFilters.value.author_id) {
+                params.author_id = searchFilters.value.author_id
+              }
+              if (searchFilters.value.author_name) {
+                params.author_name = searchFilters.value.author_name
+              }
+              if (searchFilters.value.title) {
+                params.title = searchFilters.value.title
+              }
+              if (searchFilters.value.start_date) {
+                params.start_date = searchFilters.value.start_date
+              }
+              if (searchFilters.value.end_date) {
+                params.end_date = searchFilters.value.end_date
+              }
+              
               const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
-                params: {
-                  page: currentPage.value,
-                  page_size: pageSize.value
-                }
+                params
               })
               if (response.data?.success) {
                 const data = response.data.data
@@ -283,6 +341,24 @@ watch(pageSize, async () => {
     await fetchArticles(false)
   }
 })
+
+// 监听筛选参数变化
+watch(() => searchFilters.value, () => {
+  if (isInitialized.value) {
+    // 重置到第一页
+    paginationStore.setCurrentPage(1)
+    fetchArticles()
+  }
+}, { deep: true })
+
+// 监听排序参数变化
+watch(() => sortOptions.value, () => {
+  if (isInitialized.value) {
+    // 重置到第一页
+    paginationStore.setCurrentPage(1)
+    fetchArticles()
+  }
+}, { deep: true })
 
 // 处理文章点击事件
 const handleArticleClick = (article) => {
