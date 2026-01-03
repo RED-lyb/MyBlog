@@ -204,6 +204,27 @@ CREATE TABLE `django_session` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `feedbacks`
+--
+
+DROP TABLE IF EXISTS `feedbacks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `feedbacks` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `issue_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题类型（如：BUG、建议、功能请求等）',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题描述',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '问题提出时间，默认服务器系统时间',
+  `is_resolved` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否解决，0-未解决，1-已解决',
+  `resolved_at` datetime DEFAULT NULL COMMENT '解决时间，未解决时为NULL',
+  PRIMARY KEY (`id`),
+  KEY `idx_issue_type` (`issue_type`),
+  KEY `idx_is_resolved` (`is_resolved`),
+  KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='反馈意见表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `refresh_tokens`
 --
 
@@ -222,6 +243,22 @@ CREATE TABLE `refresh_tokens` (
   KEY `refresh_tok_token_h_2fa7c6_idx` (`token_hash`),
   KEY `refresh_tok_expires_a128d9_idx` (`expires_at`)
 ) ENGINE=InnoDB AUTO_INCREMENT=262 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `update_history`
+--
+
+DROP TABLE IF EXISTS `update_history`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `update_history` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间，默认服务器系统时间',
+  `update_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '更新内容描述',
+  PRIMARY KEY (`id`),
+  KEY `idx_update_time` (`update_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新史表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -399,4 +436,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-28 21:53:19
+-- Dump completed on 2026-01-04  0:04:12
