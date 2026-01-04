@@ -56,4 +56,6 @@ urlpatterns = [
     path('api/article/', include('article.urls')),  # 文章相关路由
     path('api/network_disk/', include('network_disk.urls')),  # 网盘相关路由
     path('api/admin/', include('admin.urls')),  # 管理员相关路由
+    path('api/history/', include('history.urls')),  # 更新历史相关路由
+    path('api/feedback/', include('feedback.urls')),  # 反馈相关路由
 ]

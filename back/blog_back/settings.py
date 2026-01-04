@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'login',
     'article',                      # 文章应用
     'network_disk',                # 网盘应用
+    'history',                      # 更新历史应用
+    'feedback',                     # 反馈应用
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [

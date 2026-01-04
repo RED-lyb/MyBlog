@@ -12,6 +12,7 @@ declare module 'vue' {
     CaptchaDialog: typeof import('./src/components/CaptchaDialog.vue')['default']
     CommentList: typeof import('./src/components/CommentList.vue')['default']
     CreateButton: typeof import('./src/components/CreateButton.vue')['default']
+    FeedbackButton: typeof import('./src/components/FeedbackButton.vue')['default']
     Footer: typeof import('./src/components/Footer.vue')['default']
     FullScreenLoading: typeof import('./src/components/FullScreenLoading.vue')['default']
     Head: typeof import('./src/components/Head.vue')['default']

@@ -30,8 +30,8 @@ CREATE TABLE `article_comments` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间，默认服务器系统时间',
   PRIMARY KEY (`id`),
   KEY `idx_article_id` (`article_id`),
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_created_at` (`created_at`),
+  KEY `idx_article_comment_user_id` (`user_id`),
+  KEY `idx_article_comment_created_at` (`created_at`),
   CONSTRAINT `article_comments_ibfk_1` FOREIGN KEY (`article_id`) REFERENCES `blog_articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `article_comments_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章评论表';
@@ -45,10 +45,14 @@ CREATE TABLE `article_comments` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
-    UPDATE blog_articles 
-    SET comment_count = comment_count + 1 
-    WHERE id = NEW.article_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = comment_count + 1 
+
+    WHERE id = NEW.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -64,10 +68,14 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
-    UPDATE blog_articles 
-    SET comment_count = GREATEST(comment_count - 1, 0)
-    WHERE id = OLD.article_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = GREATEST(comment_count - 1, 0)
+
+    WHERE id = OLD.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -107,10 +115,14 @@ CREATE TABLE `blog_articles` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_insert` AFTER INSERT ON `blog_articles` FOR EACH ROW BEGIN
-    UPDATE users 
-    SET article_count = article_count + 1 
-    WHERE id = NEW.author_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_insert` AFTER INSERT ON `blog_articles` FOR EACH ROW BEGIN
+
+    UPDATE users 
+
+    SET article_count = article_count + 1 
+
+    WHERE id = NEW.author_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -126,10 +138,14 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_delete` AFTER DELETE ON `blog_articles` FOR EACH ROW BEGIN
-    UPDATE users 
-    SET article_count = article_count - 1 
-    WHERE id = OLD.author_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_article_count_on_delete` AFTER DELETE ON `blog_articles` FOR EACH ROW BEGIN
+
+    UPDATE users 
+
+    SET article_count = article_count - 1 
+
+    WHERE id = OLD.author_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -212,15 +228,18 @@ DROP TABLE IF EXISTS `feedbacks`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `feedbacks` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
-  `issue_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题类型（如：BUG、建议、功能请求等）',
+  `user_id` int unsigned DEFAULT NULL COMMENT '提出用户ID，外键关联 users 表，NULL表示匿名反馈',
+  `issue_type` enum('使用错误','功能建议') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题类型：使用错误、功能建议',
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题描述',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '问题提出时间，默认服务器系统时间',
-  `is_resolved` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否解决，0-未解决，1-已解决',
+  `is_resolved` enum('未解决','已解决','未采纳') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '未解决' COMMENT '解决状态：未解决、已解决、未采纳',
   `resolved_at` datetime DEFAULT NULL COMMENT '解决时间，未解决时为NULL',
   PRIMARY KEY (`id`),
+  KEY `idx_feedback_user_id` (`user_id`),
   KEY `idx_issue_type` (`issue_type`),
   KEY `idx_is_resolved` (`is_resolved`),
-  KEY `idx_created_at` (`created_at`)
+  KEY `idx_feedback_created_at` (`created_at`),
+  CONSTRAINT `feedbacks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='反馈意见表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -254,11 +273,11 @@ DROP TABLE IF EXISTS `update_history`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `update_history` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间，默认服务器系统时间',
+  `update_time` date NOT NULL DEFAULT (CURRENT_DATE) COMMENT '更新日期，默认服务器系统日期',
   `update_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '更新内容描述',
   PRIMARY KEY (`id`),
   KEY `idx_update_time` (`update_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新史表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新历史表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -288,16 +307,26 @@ CREATE TABLE `user_follows` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_insert` AFTER INSERT ON `user_follows` FOR EACH ROW BEGIN
-    -- 更新关注者的关注数
-    UPDATE users 
-    SET follow_count = follow_count + 1 
-    WHERE id = NEW.follower_id;
-    
-    -- 更新被关注者的粉丝数
-    UPDATE users 
-    SET follower_count = follower_count + 1 
-    WHERE id = NEW.following_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_insert` AFTER INSERT ON `user_follows` FOR EACH ROW BEGIN
+
+    -- 更新关注者的关注数
+
+    UPDATE users 
+
+    SET follow_count = follow_count + 1 
+
+    WHERE id = NEW.follower_id;
+
+    
+
+    -- 更新被关注者的粉丝数
+
+    UPDATE users 
+
+    SET follower_count = follower_count + 1 
+
+    WHERE id = NEW.following_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -313,16 +342,26 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_delete` AFTER DELETE ON `user_follows` FOR EACH ROW BEGIN
-    -- 更新关注者的关注数
-    UPDATE users 
-    SET follow_count = follow_count - 1 
-    WHERE id = OLD.follower_id;
-    
-    -- 更新被关注者的粉丝数
-    UPDATE users 
-    SET follower_count = follower_count - 1 
-    WHERE id = OLD.following_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_follow_stats_on_delete` AFTER DELETE ON `user_follows` FOR EACH ROW BEGIN
+
+    -- 更新关注者的关注数
+
+    UPDATE users 
+
+    SET follow_count = follow_count - 1 
+
+    WHERE id = OLD.follower_id;
+
+    
+
+    -- 更新被关注者的粉丝数
+
+    UPDATE users 
+
+    SET follower_count = follower_count - 1 
+
+    WHERE id = OLD.following_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -357,16 +396,26 @@ CREATE TABLE `user_liked_articles` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_insert` AFTER INSERT ON `user_liked_articles` FOR EACH ROW BEGIN
-    -- 更新用户的喜欢文章数
-    UPDATE users 
-    SET liked_article_count = liked_article_count + 1 
-    WHERE id = NEW.user_id;
-    
-    -- 更新文章的喜欢数
-    UPDATE blog_articles 
-    SET love_count = love_count + 1 
-    WHERE id = NEW.article_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_insert` AFTER INSERT ON `user_liked_articles` FOR EACH ROW BEGIN
+
+    -- 更新用户的喜欢文章数
+
+    UPDATE users 
+
+    SET liked_article_count = liked_article_count + 1 
+
+    WHERE id = NEW.user_id;
+
+    
+
+    -- 更新文章的喜欢数
+
+    UPDATE blog_articles 
+
+    SET love_count = love_count + 1 
+
+    WHERE id = NEW.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -382,16 +431,26 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_delete` AFTER DELETE ON `user_liked_articles` FOR EACH ROW BEGIN
-    -- 更新用户的喜欢文章数
-    UPDATE users 
-    SET liked_article_count = liked_article_count - 1 
-    WHERE id = OLD.user_id;
-    
-    -- 更新文章的点赞数
-    UPDATE blog_articles 
-    SET love_count = love_count - 1 
-    WHERE id = OLD.article_id;
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_liked_article_count_on_delete` AFTER DELETE ON `user_liked_articles` FOR EACH ROW BEGIN
+
+    -- 更新用户的喜欢文章数
+
+    UPDATE users 
+
+    SET liked_article_count = liked_article_count - 1 
+
+    WHERE id = OLD.user_id;
+
+    
+
+    -- 更新文章的点赞数
+
+    UPDATE blog_articles 
+
+    SET love_count = love_count - 1 
+
+    WHERE id = OLD.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;

@@ -109,7 +109,9 @@ import {
   Fold,
   Expand,
   SwitchButton,
-  HomeFilled
+  HomeFilled,
+  Clock,
+  ChatDotRound
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -175,6 +177,16 @@ const menuItems = computed(() => [
     path: '/admin/network-disk',
     label: '网盘管理',
     icon: Folder
+  },
+  {
+    path: '/admin/history',
+    label: '更新管理',
+    icon: Clock
+  },
+  {
+    path: '/admin/feedback',
+    label: '反馈管理',
+    icon: ChatDotRound
   },
   {
     path: '/admin/config',

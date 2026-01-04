@@ -1,8 +1,43 @@
-#导出数据库
+# ========================================
+# 数据库管理命令
+# ========================================
+
+# 1. 导出数据库（包含数据）
 mysqldump -u 用户名 -p 数据库名 > webproject.sql
-#导出数据库结构不导出数据
+
+# 2. 导出数据库结构（不包含数据，包含 DROP TABLE）
 mysqldump -u 用户名 -p 数据库名 --no-data > webproject.sql
-#脚本直接导出数据库
+
+# 3. 导出数据库结构（不包含数据，不包含 DROP TABLE - 安全导出）
+mysqldump -u 用户名 -p 数据库名 --no-data --skip-add-drop-table > webproject_safe.sql
+
+# 4. 使用脚本导出（Windows）
 export_database.bat admin webproject webproject.sql
-#导入数据库
+
+# 5. 使用安全脚本导出（Windows - 推荐用于服务器更新）
+export_database_safe.bat admin webproject webproject_safe.sql
+
+# 6. 使用安全脚本导出（Linux - 推荐用于服务器更新）
+chmod +x export_database_safe.sh
+./export_database_safe.sh admin webproject webproject_safe.sql
+
+# ========================================
+# 导入数据库
+# ========================================
+
+# 导入数据库（首次部署）
 mysql -u admin -p webproject < webproject.sql
+
+# 导入数据库（安全更新 - 不会删除现有数据）
+mysql -u admin -p webproject < webproject_safe.sql
+
+# ========================================
+# 重要提示
+# ========================================
+# 1. webproject.sql 包含 DROP TABLE 语句，会删除所有数据
+#    仅用于首次部署或完全重建数据库
+#
+# 2. webproject_safe.sql 不包含 DROP TABLE 语句，可以安全导入
+#    如果表已存在，CREATE TABLE 会失败，但不会影响现有数据
+# 3. 在生产环境更新前，请务必备份数据库！
+#    备份命令: mysqldump -u admin -p webproject > backup_$(date +%Y%m%d_%H%M%S).sql

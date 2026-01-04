@@ -36,9 +36,9 @@ echo.
 REM Temporary SQL file
 set TEMP_FILE=%OUTPUT_FILE%.tmp
 
-REM Step 1: Export database structure with UTF-8 encoding
+REM Step 1: Export database structure with UTF-8 encoding (without DROP TABLE)
 echo [1/3] Exporting database structure...
-mysqldump -u %DB_USER% -p --no-data --default-character-set=utf8mb4 --set-charset --single-transaction %DB_NAME% > "%TEMP_FILE%"
+mysqldump -u %DB_USER% -p --no-data --skip-add-drop-table --default-character-set=utf8mb4 --set-charset --single-transaction %DB_NAME% > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo Error: Database export failed!

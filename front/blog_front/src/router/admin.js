@@ -39,6 +39,22 @@ const adminRoutes = [
     }
   },
   {
+    path: 'history',
+    name: 'admin_history',
+    component: () => import('../pages/admin/HistoryManage.vue'),
+    meta: {
+      title: '更新历史|L-BLOG管理后台'
+    }
+  },
+  {
+    path: 'feedback',
+    name: 'admin_feedback',
+    component: () => import('../pages/admin/FeedbackManage.vue'),
+    meta: {
+      title: '反馈管理|L-BLOG管理后台'
+    }
+  },
+  {
     path: 'config',
     name: 'admin_config',
     component: () => import('../pages/admin/ConfigManage.vue'),
