@@ -2,42 +2,73 @@
 # 数据库管理命令
 # ========================================
 
-# 1. 导出数据库（包含数据）
-mysqldump -u 用户名 -p 数据库名 > webproject.sql
+# ========================================
+# 导出脚本
+# ========================================
 
-# 2. 导出数据库结构（不包含数据，包含 DROP TABLE）
-mysqldump -u 用户名 -p 数据库名 --no-data > webproject.sql
-
-# 3. 导出数据库结构（不包含数据，不包含 DROP TABLE - 安全导出）
-mysqldump -u 用户名 -p 数据库名 --no-data --skip-add-drop-table > webproject_safe.sql
-
-# 4. 使用脚本导出（Windows）
+# 1. 导出数据库结构（不包含数据，不包含 DROP TABLE）- 安全更新
+#    用法: export_database.bat [用户名] [数据库名] [输出文件]
 export_database.bat admin webproject webproject.sql
 
-# 5. 使用安全脚本导出（Windows - 推荐用于服务器更新）
-export_database_safe.bat admin webproject webproject_safe.sql
-
-# 6. 使用安全脚本导出（Linux - 推荐用于服务器更新）
-chmod +x export_database_safe.sh
-./export_database_safe.sh admin webproject webproject_safe.sql
+# 2. 全量导出数据库（结构 + 数据 + DROP TABLE）- 完整备份/恢复
+#    用法: export_database_full.bat [用户名] [数据库名] [输出文件]
+export_database_full.bat admin webproject webproject_full.sql
 
 # ========================================
+# 导入脚本
+# ========================================
+
+# 1. 安全模式导入（添加 IF NOT EXISTS 到 CREATE TABLE）
+#    用法: import_database.bat [用户名] [数据库名] [sql文件] [模式]
+import_database.bat admin webproject webproject.sql safe
+
+# 2. 强制模式导入（跳过错误继续执行）
+import_database.bat admin webproject webproject.sql force
+
+# 3. 删除模式导入（执行 DROP TABLE 如果存在）
+import_database.bat admin webproject webproject_full.sql drop
+
+# ========================================
+# 手动命令
+# ========================================
+
+# 导出数据库（包含数据）
+mysqldump -u 用户名 -p 数据库名 > backup.sql
+
+# 导出数据库结构（不包含数据，包含 DROP TABLE）
+mysqldump -u 用户名 -p 数据库名 --no-data > structure.sql
+
+# 导出数据库结构（不包含数据，不包含 DROP TABLE - 安全）
+mysqldump -u 用户名 -p 数据库名 --no-data --skip-add-drop-table > structure_safe.sql
+
+# 只导出数据（不包含结构）
+mysqldump -u 用户名 -p 数据库名 --no-create-info > data_only.sql
+
 # 导入数据库
-# ========================================
+mysql -u 用户名 -p 数据库名 < backup.sql
 
-# 导入数据库（首次部署）
-mysql -u admin -p webproject < webproject.sql
-
-# 导入数据库（安全更新 - 不会删除现有数据）
-mysql -u admin -p webproject < webproject_safe.sql
+# 强制导入（跳过错误）
+mysql -u 用户名 -p --force 数据库名 < backup.sql
 
 # ========================================
 # 重要提示
 # ========================================
-# 1. webproject.sql 包含 DROP TABLE 语句，会删除所有数据
-#    仅用于首次部署或完全重建数据库
+# 1. export_database.bat
+#    - 只导出结构（不包含数据）
+#    - 不包含 DROP TABLE 语句
+#    - 安全用于更新现有数据库
+#    - 适用于: 架构更新、结构变更
 #
-# 2. webproject_safe.sql 不包含 DROP TABLE 语句，可以安全导入
-#    如果表已存在，CREATE TABLE 会失败，但不会影响现有数据
-# 3. 在生产环境更新前，请务必备份数据库！
+# 2. export_database_full.bat
+#    - 导出结构 + 数据
+#    - 包含 DROP TABLE 语句
+#    - 适用于: 完整备份、完全恢复、初始设置
+#    - 警告: 导入时会删除现有表！
+#
+# 3. import_database.bat 模式:
+#    - safe: 添加 IF NOT EXISTS 到 CREATE TABLE（推荐）
+#    - force: 跳过错误继续执行
+#    - drop: 按原样执行文件（可能包含 DROP TABLE）
+#
+# 4. 导入前请务必备份数据库！
 #    备份命令: mysqldump -u admin -p webproject > backup_$(date +%Y%m%d_%H%M%S).sql

@@ -319,7 +319,7 @@ onMounted(async () => {
         <div class="section-header">
           <h3 class="form-section-title">重设密码</h3>
           <el-button 
-            type="warning" 
+            type="primary" 
             :loading="resettingPassword"
             @click="handleResetPassword"
           >

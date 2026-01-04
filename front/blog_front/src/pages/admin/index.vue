@@ -62,7 +62,7 @@
         </el-button>
         <br/>
         <el-button 
-          type="primary" 
+          type="success" 
           plain 
           size="small" 
           @click="router.push('/home')"
