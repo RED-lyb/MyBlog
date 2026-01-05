@@ -18,7 +18,7 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <el-button type="primary" @click="handleSearch">
+      <el-button type="primary" plain @click="handleSearch">
         <el-icon><Search /></el-icon>
         搜索
       </el-button>
@@ -51,19 +51,20 @@
       </el-table-column>
       <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleEdit(row)">
+          <el-button link type="primary" plain @click="handleEdit(row)">
             <el-icon><Edit /></el-icon>
             编辑
           </el-button>
           <el-button 
             link 
+            plain
             :type="row.is_admin ? 'warning' : 'success'" 
             @click="handleToggleAdmin(row)"
           >
             <el-icon><UserFilled /></el-icon>
             {{ row.is_admin ? '取消管理员' : '设为管理员' }}
           </el-button>
-          <el-button link type="danger" @click="handleDelete(row)">
+          <el-button link type="danger" plain @click="handleDelete(row)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
@@ -114,8 +115,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button plain @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="handleSubmit" :loading="submitting">
           确定
         </el-button>
       </template>

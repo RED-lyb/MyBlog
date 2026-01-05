@@ -118,8 +118,8 @@ const handleSubmit = async () => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button plain @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="handleSubmit" :loading="submitting">
           提交
         </el-button>
       </template>

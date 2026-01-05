@@ -27,7 +27,7 @@
         <el-option label="已解决" value="已解决" />
         <el-option label="未采纳" value="未采纳" />
       </el-select>
-      <el-button @click="resetFilters">重置</el-button>
+      <el-button plain @click="resetFilters">重置</el-button>
     </div>
     
     <!-- 反馈表格 -->
@@ -64,11 +64,11 @@
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleEditStatus(row)">
+          <el-button link type="primary" plain @click="handleEditStatus(row)">
             <el-icon><Edit /></el-icon>
             编辑状态
           </el-button>
-          <el-button link type="danger" @click="handleDelete(row)">
+          <el-button link type="danger" plain @click="handleDelete(row)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
@@ -110,8 +110,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="statusDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmitStatus" :loading="submitting">
+        <el-button plain @click="statusDialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="handleSubmitStatus" :loading="submitting">
           确定
         </el-button>
       </template>

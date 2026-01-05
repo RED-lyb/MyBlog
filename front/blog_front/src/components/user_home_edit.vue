@@ -237,7 +237,7 @@ onMounted(async () => {
       <div class="form-section">
         <div class="section-header">
           <h3 class="form-section-title">头像设置</h3>
-          <el-button type="primary" @click="openAvatarDialog">上传头像</el-button>
+          <el-button type="primary" plain @click="openAvatarDialog">上传头像</el-button>
         </div>
         <div class="el-upload__tip">
           支持 jpg、jpeg、png、gif、bmp、webp 格式，文件大小不超过5MB
@@ -270,9 +270,10 @@ onMounted(async () => {
         </el-upload>
         <template #footer>
           <span class="dialog-footer">
-            <el-button @click="avatarDialogVisible = false">取消</el-button>
+            <el-button plain @click="avatarDialogVisible = false">取消</el-button>
             <el-button 
               type="primary" 
+              plain
               :loading="uploadingAvatar"
               @click="handleAvatarUpload"
             >
@@ -288,6 +289,7 @@ onMounted(async () => {
           <h3 class="form-section-title">样式设置</h3>
           <el-button 
             type="primary" 
+            plain
             :loading="saving"
             @click="saveProfile"
           >
@@ -320,6 +322,7 @@ onMounted(async () => {
           <h3 class="form-section-title">重设密码</h3>
           <el-button 
             type="primary" 
+            plain
             :loading="resettingPassword"
             @click="handleResetPassword"
           >

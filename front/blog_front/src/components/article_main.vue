@@ -414,8 +414,8 @@ onMounted(() => {
           show-word-limit
         />
         <div class="comment-actions">
-          <el-button @click="commentDrawerVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleCommentSubmit" :loading="commentLoading">
+          <el-button plain @click="commentDrawerVisible = false">取消</el-button>
+          <el-button type="primary" plain @click="handleCommentSubmit" :loading="commentLoading">
             发布
           </el-button>
         </div>

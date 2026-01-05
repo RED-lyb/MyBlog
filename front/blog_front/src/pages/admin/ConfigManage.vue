@@ -2,7 +2,7 @@
   <div class="config-manage-container">
     <div class="page-header">
       <h1 class="page-title">全局配置</h1>
-      <el-button type="primary" @click="handleSave" :loading="saving">
+      <el-button type="primary" plain @click="handleSave" :loading="saving">
         <el-icon><Check /></el-icon>
         保存配置
       </el-button>

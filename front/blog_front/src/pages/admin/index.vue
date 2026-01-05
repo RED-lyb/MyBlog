@@ -7,6 +7,7 @@
         <el-button 
           :icon="sidebarCollapsed ? Expand : Fold" 
           circle 
+          plain
           size="small"
           @click="toggleSidebar"
           class="toggle-btn"

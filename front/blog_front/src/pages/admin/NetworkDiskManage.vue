@@ -32,7 +32,7 @@
       </el-table-column>
       <el-table-column label="操作" width="120" fixed="right">
         <template #default="{ row }">
-          <el-button link type="danger" @click="handleDelete(row)">
+          <el-button link type="danger" plain @click="handleDelete(row)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
@@ -42,7 +42,7 @@
     
     <!-- 批量操作 -->
     <div v-if="selectedFiles.length > 0" class="batch-actions">
-      <el-button type="danger" @click="handleBatchDelete">
+      <el-button type="danger" plain @click="handleBatchDelete">
         <el-icon><Delete /></el-icon>
         批量删除 ({{ selectedFiles.length }})
       </el-button>

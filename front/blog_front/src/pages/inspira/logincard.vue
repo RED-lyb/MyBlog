@@ -547,7 +547,7 @@ const handleRegisterWithCaptcha = async (captchaInfo) => {
                                     <el-option v-for="item in questions" :key="item.value" :label="item.label"
                                         :value="item.value" />
                                     <template #footer>
-                                        <el-button v-if="!isAdding" text bg size="small" @click="onAddOption">
+                                        <el-button v-if="!isAdding" text bg size="small" plain @click="onAddOption">
                                             输入自定义问题
                                         </el-button>
                                         <template v-else>
@@ -558,10 +558,10 @@ const handleRegisterWithCaptcha = async (captchaInfo) => {
                                                         placeholder="请输入自定义问题" size="small" />
                                                 </el-form-item>
                                             </el-form>
-                                            <el-button type="primary" size="small" @click="onConfirm">
+                                            <el-button type="primary" size="small" plain @click="onConfirm">
                                                 确认
                                             </el-button>
-                                            <el-button size="small" @click="clear">取消</el-button>
+                                            <el-button size="small" plain @click="clear">取消</el-button>
                                         </template>
                                     </template>
                                 </el-select>

@@ -429,9 +429,9 @@ watch(() => props.visible, (newValue) => {
     </el-header>
 
     <el-main class="button-container">
-      <el-button @click="pre" :disabled="active === 0">上一步</el-button>
-      <el-button @click="next" v-if="active < 2">下一步</el-button>
-      <el-button @click="submit" v-else>提交</el-button>
+      <el-button plain @click="pre" :disabled="active === 0">上一步</el-button>
+      <el-button plain @click="next" v-if="active < 2">下一步</el-button>
+      <el-button plain @click="submit" v-else>提交</el-button>
     </el-main>
 
     <el-footer>

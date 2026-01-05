@@ -331,6 +331,7 @@ onMounted(async () => {
                         :icon="Edit" 
                         size="small" 
                         text
+                        plain
                         @click="handleEdit(feedback)"
                       >
                         编辑
@@ -339,6 +340,7 @@ onMounted(async () => {
                         :icon="Delete" 
                         size="small" 
                         text
+                        plain
                         type="danger"
                         @click="handleDelete(feedback)"
                       >
@@ -397,8 +399,8 @@ onMounted(async () => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleEditSubmit" :loading="editSubmitting">
+        <el-button plain @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="handleEditSubmit" :loading="editSubmitting">
           确定
         </el-button>
       </template>

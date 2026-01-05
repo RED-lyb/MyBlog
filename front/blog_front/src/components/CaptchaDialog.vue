@@ -45,8 +45,8 @@
     
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleCancel" :disabled="loading">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="loading">
+        <el-button plain @click="handleCancel" :disabled="loading">取消</el-button>
+        <el-button type="primary" plain @click="handleSubmit" :loading="loading">
           验证
         </el-button>
       </div>

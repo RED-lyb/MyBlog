@@ -850,6 +850,7 @@ watch([filterOnlyMine, filterUsername], () => {
                 <el-button
                   type="default"
                   size="small"
+                  plain
                   @click="resetFilters"
                   style="width: 100%;"
                 >
@@ -956,8 +957,8 @@ watch([filterOnlyMine, filterUsername], () => {
         </template>
       </el-upload>
       <template #footer>
-        <el-button @click="uploadDialogVisible = false" :disabled="uploading">取消</el-button>
-        <el-button type="primary" @click="handleUpload" :loading="uploading">确定</el-button>
+        <el-button plain @click="uploadDialogVisible = false" :disabled="uploading">取消</el-button>
+        <el-button type="primary" plain @click="handleUpload" :loading="uploading">确定</el-button>
       </template>
     </el-dialog>
 
@@ -969,8 +970,8 @@ watch([filterOnlyMine, filterUsername], () => {
         @keyup.enter="createDirectory"
       />
       <template #footer>
-        <el-button @click="mkdirDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="createDirectory">确定</el-button>
+        <el-button plain @click="mkdirDialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="createDirectory">确定</el-button>
       </template>
     </el-dialog>
   </div>

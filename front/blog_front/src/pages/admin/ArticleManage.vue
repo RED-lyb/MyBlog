@@ -2,7 +2,7 @@
   <div class="article-manage-container">
     <div class="page-header">
       <h1 class="page-title">文章管理</h1>
-      <el-button type="primary" @click="handleCreate">
+      <el-button type="primary" plain @click="handleCreate">
         <el-icon><Plus /></el-icon>
         新建文章
       </el-button>
@@ -22,7 +22,7 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <el-button type="primary" @click="handleSearch">
+      <el-button type="primary" plain @click="handleSearch">
         <el-icon><Search /></el-icon>
         搜索
       </el-button>
@@ -50,11 +50,11 @@
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleEdit(row)">
+          <el-button link type="primary" plain @click="handleEdit(row)">
             <el-icon><Edit /></el-icon>
             编辑
           </el-button>
-          <el-button link type="danger" @click="handleDelete(row)">
+          <el-button link type="danger" plain @click="handleDelete(row)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
@@ -104,8 +104,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button plain @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" plain @click="handleSubmit" :loading="submitting">
           确定
         </el-button>
       </template>

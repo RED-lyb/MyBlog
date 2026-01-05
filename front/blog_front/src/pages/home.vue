@@ -247,6 +247,7 @@ const resetFilters = () => {
                 <el-button
                   type="default"
                   size="small"
+                  plain
                   @click="resetFilters"
                   style="width: 100%;"
                 >
