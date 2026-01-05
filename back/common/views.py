@@ -4,6 +4,7 @@ from django.views.decorators.http import require_http_methods
 from django.db import connection
 from django.contrib.auth.hashers import make_password, check_password
 from common.jwt_utils import jwt_required
+from common.captcha_utils import captcha_required
 from common.user_relation_utils import follow_user, unfollow_user, is_following
 import os
 import json
@@ -592,10 +593,11 @@ def get_user_articles_list(request, user_id):
 
 @csrf_exempt
 @jwt_required
+@captcha_required
 @require_http_methods(["POST"])
 def reset_password(request):
     """
-    重设密码（需要验证旧密码）
+    重设密码（需要验证旧密码和验证码）
     """
     try:
         current_user_id = getattr(request, 'user_id', None)
@@ -612,7 +614,23 @@ def reset_password(request):
         if not old_password or not new_password:
             return JsonResponse({
                 'success': False,
-                'error': '旧密码和新密码不能为空'
+                'error': '旧密码和新密码不能为空',
+                'field_errors': {
+                    'old_password': '请输入旧密码' if not old_password else '',
+                    'new_password': '请输入新密码' if not new_password else ''
+                }
+            }, status=400)
+        
+        # 验证新密码格式（与注册时一致）
+        from register.views import _validate_password
+        password_error = _validate_password(new_password)
+        if password_error:
+            return JsonResponse({
+                'success': False,
+                'error': password_error,
+                'field_errors': {
+                    'new_password': password_error
+                }
             }, status=400)
         
         # 验证旧密码
@@ -654,4 +672,105 @@ def reset_password(request):
         return JsonResponse({
             'success': False,
             'error': f'修改失败: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@jwt_required
+@captcha_required
+@require_http_methods(["POST"])
+def reset_security_question(request):
+    """
+    重设密保问题和答案（需要验证原密保答案和验证码）
+    """
+    try:
+        current_user_id = getattr(request, 'user_id', None)
+        if not current_user_id:
+            return JsonResponse({
+                'success': False,
+                'error': '请先登录'
+            }, status=401)
+        
+        data = json.loads(request.body.decode())
+        old_answer = data.get('old_answer', '').strip()
+        new_protect = data.get('new_protect', '').strip()
+        new_answer = data.get('new_answer', '').strip()
+        
+        # 验证输入
+        if not old_answer or not new_protect or not new_answer:
+            return JsonResponse({
+                'success': False,
+                'error': '原密保答案、新密保问题和新密保答案不能为空',
+                'field_errors': {
+                    'old_answer': '请输入原密保答案' if not old_answer else '',
+                    'new_protect': '请选择或输入新密保问题' if not new_protect else '',
+                    'new_answer': '请输入新密保答案' if not new_answer else ''
+                }
+            }, status=400)
+        
+        # 验证新密保问题格式（允许自定义问题，与注册时一致）
+        import re
+        if not re.fullmatch(r'[\u4e00-\u9fa5A-Za-z0-9]+', new_protect):
+            return JsonResponse({
+                'success': False,
+                'error': '密保问题只能包含中文、英文和数字',
+                'field_errors': {
+                    'new_protect': '密保问题只能包含中文、英文和数字'
+                }
+            }, status=400)
+        
+        # 验证新密保答案格式
+        from register.views import _validate_answer
+        answer_error = _validate_answer(new_answer)
+        if answer_error:
+            return JsonResponse({
+                'success': False,
+                'error': answer_error,
+                'field_errors': {
+                    'new_answer': answer_error
+                }
+            }, status=400)
+        
+        # 验证原密保答案
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT answer FROM users WHERE id = %s", [current_user_id])
+            row = cursor.fetchone()
+            
+            if not row:
+                return JsonResponse({
+                    'success': False,
+                    'error': '用户不存在'
+                }, status=404)
+            
+            stored_answer_hash = row[0]
+            if not check_password(old_answer, stored_answer_hash):
+                return JsonResponse({
+                    'success': False,
+                    'error': '原密保答案错误',
+                    'field_errors': {
+                        'old_answer': '原密保答案错误'
+                    }
+                }, status=400)
+            
+            # 更新密保问题和答案
+            hashed_new_answer = make_password(new_answer)
+            cursor.execute(
+                "UPDATE users SET protect = %s, answer = %s WHERE id = %s",
+                [new_protect, hashed_new_answer, current_user_id]
+            )
+        
+        return JsonResponse({
+            'success': True,
+            'message': '密保设置成功'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': '请求数据格式错误'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'设置失败: {str(e)}'
         }, status=500)

@@ -3,40 +3,25 @@
     <div class="page-header">
       <h1 class="page-title">反馈管理</h1>
     </div>
-    
+
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <el-select
-        v-model="filters.issue_type"
-        placeholder="问题类型"
-        clearable
-        style="width: 150px; margin-right: 12px;"
-        @change="handleFilter"
-      >
+      <el-select v-model="filters.issue_type" placeholder="问题类型" clearable style="width: 150px; margin-right: 12px;"
+        @change="handleFilter">
         <el-option label="使用错误" value="使用错误" />
         <el-option label="功能建议" value="功能建议" />
       </el-select>
-      <el-select
-        v-model="filters.is_resolved"
-        placeholder="解决状态"
-        clearable
-        style="width: 150px; margin-right: 12px;"
-        @change="handleFilter"
-      >
+      <el-select v-model="filters.is_resolved" placeholder="解决状态" clearable style="width: 150px; margin-right: 12px;"
+        @change="handleFilter">
         <el-option label="未解决" value="未解决" />
         <el-option label="已解决" value="已解决" />
         <el-option label="未采纳" value="未采纳" />
       </el-select>
       <el-button plain @click="resetFilters">重置</el-button>
     </div>
-    
+
     <!-- 反馈表格 -->
-    <el-table
-      v-loading="loading"
-      :data="feedbackList"
-      stripe
-      style="width: 100%"
-    >
+    <el-table v-loading="loading" :data="feedbackList" stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="username" label="用户" width="120">
         <template #default="{ row }">
@@ -52,7 +37,21 @@
       </el-table-column>
       <el-table-column prop="is_resolved" label="解决状态" width="120">
         <template #default="{ row }">
+
           <el-tag :type="getStatusType(row.is_resolved)">
+
+            <div class="inline-grid *:[grid-area:1/1]" v-if="row.is_resolved === '未解决'">
+              <div class="dsi-status dsi-status-error animate-ping"></div>
+              <div class="dsi-status dsi-status-error"></div>
+            </div>
+            <div class="inline-grid *:[grid-area:1/1]" v-else-if="row.is_resolved === '已解决'">
+              <div class="dsi-status dsi-status-success animate-ping"></div>
+              <div class="dsi-status dsi-status-success"></div>
+            </div>
+            <div class="inline-grid *:[grid-area:1/1]" v-else-if="row.is_resolved === '未采纳'">
+              <div class="dsi-status dsi-status-warning animate-ping"></div>
+              <div class="dsi-status dsi-status-warning"></div>
+            </div>
             {{ row.is_resolved }}
           </el-tag>
         </template>
@@ -65,44 +64,33 @@
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" plain @click="handleEditStatus(row)">
-            <el-icon><Edit /></el-icon>
+            <el-icon>
+              <Edit />
+            </el-icon>
             编辑状态
           </el-button>
           <el-button link type="danger" plain @click="handleDelete(row)">
-            <el-icon><Delete /></el-icon>
+            <el-icon>
+              <Delete />
+            </el-icon>
             删除
           </el-button>
         </template>
       </el-table-column>
     </el-table>
-    
+
     <!-- 分页 -->
     <div class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handlePageChange"
-      />
+      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
+        :total="total" layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
+        @current-change="handlePageChange" />
     </div>
-    
+
     <!-- 编辑状态对话框 -->
-    <el-dialog
-      v-model="statusDialogVisible"
-      title="编辑反馈状态"
-      width="500px"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-model="statusDialogVisible" title="编辑反馈状态" width="500px" :close-on-click-modal="false">
       <el-form label-width="100px">
         <el-form-item label="解决状态">
-          <el-select
-            v-model="statusFormData.is_resolved"
-            placeholder="请选择状态"
-            style="width: 100%"
-          >
+          <el-select v-model="statusFormData.is_resolved" placeholder="请选择状态" style="width: 100%">
             <el-option label="未解决" value="未解决" />
             <el-option label="已解决" value="已解决" />
             <el-option label="未采纳" value="未采纳" />
@@ -153,7 +141,7 @@ const formatDateTime = (dateString) => {
 
 const getStatusType = (status) => {
   const statusMap = {
-    '未解决': 'info',
+    '未解决': 'danger',
     '已解决': 'success',
     '未采纳': 'warning'
   }
@@ -167,16 +155,16 @@ const fetchFeedbacks = async () => {
       page: currentPage.value,
       page_size: pageSize.value
     }
-    
+
     if (filters.value.issue_type) {
       params.issue_type = filters.value.issue_type
     }
     if (filters.value.is_resolved) {
       params.is_resolved = filters.value.is_resolved
     }
-    
+
     const response = await apiClient.get(`${apiUrl}feedback/admin/list/`, { params })
-    
+
     if (response.data.success) {
       feedbackList.value = response.data.data.feedbacks || []
       total.value = response.data.data.total || 0
@@ -234,7 +222,7 @@ const handleSubmitStatus = async () => {
       `${apiUrl}feedback/admin/${statusFormData.value.id}/update-status/`,
       { is_resolved: statusFormData.value.is_resolved }
     )
-    
+
     if (response.data.success) {
       ElMessage.success('状态更新成功')
       statusDialogVisible.value = false
@@ -262,7 +250,7 @@ const handleDelete = (row) => {
   ).then(async () => {
     try {
       const response = await apiClient.delete(`${apiUrl}feedback/admin/${row.id}/delete/`)
-      
+
       if (response.data.success) {
         ElMessage.success('删除成功')
         fetchFeedbacks()
@@ -273,7 +261,7 @@ const handleDelete = (row) => {
       console.error('删除反馈错误:', error)
       ElMessage.error('删除失败')
     }
-  }).catch(() => {})
+  }).catch(() => { })
 }
 
 onMounted(() => {
@@ -313,4 +301,3 @@ onMounted(() => {
   justify-content: flex-end;
 }
 </style>
-

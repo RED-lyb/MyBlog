@@ -59,7 +59,7 @@ const formatDateTime = (dateString) => {
 // 获取状态标签类型
 const getStatusType = (status) => {
   const statusMap = {
-    '未解决': 'info',
+    '未解决': 'danger',
     '已解决': 'success',
     '未采纳': 'warning'
   }
@@ -82,9 +82,9 @@ const fetchFeedbackList = async (issueType = '') => {
     if (issueType) {
       params.issue_type = issueType
     }
-    
+
     const response = await apiClient.get(`${apiUrl}feedback/list/`, { params })
-    
+
     if (response.data.success) {
       feedbackList.value = response.data.data.feedbacks || []
     } else {
@@ -139,7 +139,7 @@ const handleEditSubmit = async () => {
         description: editFormData.value.description
       }
     )
-    
+
     if (response.data.success) {
       ElMessage.success('反馈更新成功')
       editDialogVisible.value = false
@@ -173,7 +173,7 @@ const handleDelete = (feedback) => {
   ).then(async () => {
     try {
       const response = await apiClient.delete(`${apiUrl}feedback/${feedback.id}/delete/`)
-      
+
       if (response.data.success) {
         ElMessage.success('删除成功')
         // 刷新列表
@@ -189,7 +189,7 @@ const handleDelete = (feedback) => {
       console.error('删除反馈错误:', error)
       ElMessage.error('删除失败')
     }
-  }).catch(() => {})
+  }).catch(() => { })
 }
 
 // 页面挂载时刷新用户信息（确保数据最新）
@@ -234,31 +234,21 @@ onMounted(async () => {
     <div class="common-layout">
       <el-container>
         <el-header style="padding: 0">
+
           <Head />
         </el-header>
         <el-container>
           <el-aside>
             <!-- 选择面板 -->
             <div class="panel-list">
-              <div 
-                class="panel-item"
-                :class="{ active: selectedPanel === 'intro' }"
-                @click="selectPanel('intro')"
-              >
+              <div class="panel-item" :class="{ active: selectedPanel === 'intro' }" @click="selectPanel('intro')">
                 <span>反馈介绍</span>
               </div>
-              <div 
-                class="panel-item"
-                :class="{ active: selectedPanel === 'error' }"
-                @click="selectPanel('error')"
-              >
+              <div class="panel-item" :class="{ active: selectedPanel === 'error' }" @click="selectPanel('error')">
                 <span>使用错误</span>
               </div>
-              <div 
-                class="panel-item"
-                :class="{ active: selectedPanel === 'suggestion' }"
-                @click="selectPanel('suggestion')"
-              >
+              <div class="panel-item" :class="{ active: selectedPanel === 'suggestion' }"
+                @click="selectPanel('suggestion')">
                 <span>功能建议</span>
               </div>
             </div>
@@ -297,53 +287,49 @@ onMounted(async () => {
                 </el-card>
               </div>
             </div>
-            
+
             <!-- 反馈列表 -->
             <div v-else class="feedback-list-content">
               <h1>{{ selectedPanel === 'error' ? '使用错误' : '功能建议' }}</h1>
-              
+
               <div v-if="loadingFeedback" class="loading-feedback">
-                <el-icon class="is-loading"><Loading /></el-icon>
+                <el-icon class="is-loading">
+                  <Loading />
+                </el-icon>
                 <span>加载中...</span>
               </div>
-              
+
               <div v-else-if="feedbackList.length === 0" class="empty-feedback">
                 暂无反馈
               </div>
-              
+
               <div v-else class="feedback-items">
-                <el-card 
-                  v-for="feedback in feedbackList" 
-                  :key="feedback.id"
-                  shadow="hover"
-                  class="feedback-item"
-                >
+                <el-card v-for="feedback in feedbackList" :key="feedback.id" shadow="hover" class="feedback-item">
                   <div class="feedback-header">
                     <div class="feedback-meta">
                       <span class="feedback-user">{{ feedback.username }}</span>
                       <el-tag :type="getStatusType(feedback.is_resolved)" size="small">
+                        <div class="inline-grid *:[grid-area:1/1]" v-if="feedback.is_resolved === '未解决'">
+                          <div class="dsi-status dsi-status-error animate-ping"></div>
+                          <div class="dsi-status dsi-status-error"></div>
+                        </div>
+                        <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '已解决'">
+                          <div class="dsi-status dsi-status-success animate-ping"></div>
+                          <div class="dsi-status dsi-status-success"></div>
+                        </div>
+                        <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '未采纳'">
+                          <div class="dsi-status dsi-status-warning animate-ping"></div>
+                          <div class="dsi-status dsi-status-warning"></div>
+                        </div>
                         {{ feedback.is_resolved }}
                       </el-tag>
                       <span class="feedback-time">{{ formatDateTime(feedback.created_at) }}</span>
                     </div>
                     <div v-if="isMyFeedback(feedback)" class="feedback-actions">
-                      <el-button 
-                        :icon="Edit" 
-                        size="small" 
-                        text
-                        plain
-                        @click="handleEdit(feedback)"
-                      >
+                      <el-button :icon="Edit" size="small" text plain @click="handleEdit(feedback)">
                         编辑
                       </el-button>
-                      <el-button 
-                        :icon="Delete" 
-                        size="small" 
-                        text
-                        plain
-                        type="danger"
-                        @click="handleDelete(feedback)"
-                      >
+                      <el-button :icon="Delete" size="small" text plain type="danger" @click="handleDelete(feedback)">
                         删除
                       </el-button>
                     </div>
@@ -370,32 +356,17 @@ onMounted(async () => {
     </div>
 
     <!-- 编辑对话框 -->
-    <el-dialog
-      v-model="editDialogVisible"
-      title="编辑反馈"
-      width="600px"
-      :close-on-click-modal="false"
-    >
+    <el-dialog v-model="editDialogVisible" title="编辑反馈" width="600px" :close-on-click-modal="false">
       <el-form label-width="100px">
         <el-form-item label="问题类型">
-          <el-select
-            v-model="editFormData.issue_type"
-            placeholder="请选择问题类型"
-            style="width: 100%"
-          >
+          <el-select v-model="editFormData.issue_type" placeholder="请选择问题类型" style="width: 100%">
             <el-option label="使用错误" value="使用错误" />
             <el-option label="功能建议" value="功能建议" />
           </el-select>
         </el-form-item>
         <el-form-item label="问题描述">
-          <el-input
-            v-model="editFormData.description"
-            type="textarea"
-            :rows="8"
-            placeholder="请详细描述您遇到的问题或建议"
-            maxlength="1000"
-            show-word-limit
-          />
+          <el-input v-model="editFormData.description" type="textarea" :rows="8" placeholder="请详细描述您遇到的问题或建议"
+            maxlength="1000" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>

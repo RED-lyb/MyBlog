@@ -245,7 +245,7 @@ onMounted(async () => {
         <!-- 如果是自己的主页，显示编辑资料按钮 -->
         <button
           v-if="isOwnProfile"
-          class="dsi-btn dsi-btn-primary"
+          class="dsi-btn dsi-btn-warning dsi-btn-outline"
           @click="handleEditProfile"
         >
           编辑资料
@@ -253,7 +253,7 @@ onMounted(async () => {
         <!-- 如果是别人的主页，显示关注/取消关注按钮 -->
         <button
           v-else-if="isAuthenticated"
-          :class="['dsi-btn', isFollowing ? 'dsi-btn-outline' : 'dsi-btn-primary']"
+          :class="['dsi-btn', isFollowing ? 'dsi-btn-outline' : 'dsi-btn-warning']"
           :disabled="followLoading"
           @click="handleToggleFollow"
         >

@@ -324,6 +324,8 @@ onMounted(async () => {
   margin-right: 100px;
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .user-aside {

@@ -65,6 +65,15 @@ quit;
 cd my-blog/back/depend_manage
 mysql -u admin -p webproject < ./webproject.sql
 ```
+* 初始化首个用户（创建第一个管理员用户，同时也是作者用户）
+```bash
+# 注意：
+# 1. 密码需符合规则：至少8位，包含数字、大写字母、小写字母
+# 2. 密保答案只能包含中文、英文和数字
+# 3. 用户名不能使用数据库保留字（如SELECT、INSERT等）
+cd my-blog/back/depend_manage
+python init_admin_user.py <用户名> <密码> <密保问题> <密保答案>
+```
 * 修改webproject\back\blog_back\set_dev.py
   * 将['PASSWORD': '密码',]改为自己配置的数据库密码
 * 安装前端依赖
@@ -166,6 +175,15 @@ quit;
 * 导入数据库字段
 ```bash
 mysql -u admin -p webproject < /webproject/my-blog/back/depend_manage/webproject.sql
+```
+* 初始化管理员用户（创建第一个管理员用户，同时也是作者用户）
+```bash
+# 注意：
+# 1. 密码需符合规则：至少8位，包含数字、大写字母、小写字母
+# 2. 密保答案只能包含中文、英文和数字
+# 3. 用户名不能使用数据库保留字（如SELECT、INSERT等）
+cd /webproject/my-blog/back/depend_manage
+python3.12 init_admin_user.py <用户名> <密码> <密保问题> <密保答案>
 ```
 * 安装数据库开发工具组和要所用到的依赖
 ```bash

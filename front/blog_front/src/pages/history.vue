@@ -163,7 +163,7 @@ onMounted(async () => {
               </div>
             </div>
             <div v-else class="empty-content">
-              <p>请从左侧选择一条更新历史</p>
+              <p>暂无更新历史</p>
             </div>
           </el-main>
           <el-aside></el-aside>

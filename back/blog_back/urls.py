@@ -27,7 +27,8 @@ from common.views import (
     get_user_info, get_user_by_id, toggle_follow, check_follow_status,
     upload_avatar, update_profile, reset_password,
     get_user_following_list, get_user_followers_list,
-    get_user_liked_articles_list, get_user_articles_list
+    get_user_liked_articles_list, get_user_articles_list,
+    reset_security_question
 )
 
 urlpatterns = [
@@ -49,6 +50,7 @@ urlpatterns = [
     path('api/user/avatar/upload/', upload_avatar, name='upload_avatar'),  # 上传头像
     path('api/user/profile/', update_profile, name='update_profile'),  # 更新资料
     path('api/user/password/reset/', reset_password, name='reset_password'),  # 重设密码
+    path('api/user/security-question/reset/', reset_security_question, name='reset_security_question'),  # 重设密保
     path('api/user/<int:user_id>/following/', get_user_following_list, name='get_user_following_list'),  # 获取关注列表
     path('api/user/<int:user_id>/followers/', get_user_followers_list, name='get_user_followers_list'),  # 获取粉丝列表
     path('api/user/<int:user_id>/liked-articles/', get_user_liked_articles_list, name='get_user_liked_articles_list'),  # 获取喜欢的文章列表
