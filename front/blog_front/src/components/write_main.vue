@@ -18,6 +18,8 @@ import json from 'highlight.js/lib/languages/json'
 import bash from 'highlight.js/lib/languages/bash'
 import sql from 'highlight.js/lib/languages/sql'
 import php from 'highlight.js/lib/languages/php'
+import cpp from 'highlight.js/lib/languages/cpp'
+import c from 'highlight.js/lib/languages/c'
 // 导入自定义的代码高亮样式
 import '@/assets/highlight.css'
 
@@ -36,6 +38,9 @@ hljs.registerLanguage('json', json)
 hljs.registerLanguage('bash', bash)
 hljs.registerLanguage('sql', sql)
 hljs.registerLanguage('php', php)
+hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('c++', cpp)
+hljs.registerLanguage('c', c)
 
 // 标题和内容
 const title = ref('')

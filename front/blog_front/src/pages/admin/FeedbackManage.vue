@@ -6,36 +6,49 @@
 
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <el-select v-model="filters.issue_type" placeholder="问题类型" clearable style="width: 150px; margin-right: 12px;"
-        @change="handleFilter">
-        <el-option label="使用错误" value="使用错误" />
-        <el-option label="功能建议" value="功能建议" />
-      </el-select>
-      <el-select v-model="filters.is_resolved" placeholder="解决状态" clearable style="width: 150px; margin-right: 12px;"
-        @change="handleFilter">
-        <el-option label="未解决" value="未解决" />
-        <el-option label="已解决" value="已解决" />
-        <el-option label="未采纳" value="未采纳" />
-      </el-select>
-      <el-button plain @click="resetFilters">重置</el-button>
+      <div class="filter-left">
+        <el-select v-model="filters.issue_type" placeholder="问题类型" clearable style="width: 150px; margin-right: 12px;"
+          @change="handleFilter">
+          <el-option label="使用错误" value="使用错误" />
+          <el-option label="功能建议" value="功能建议" />
+        </el-select>
+        <el-select v-model="filters.is_resolved" placeholder="解决状态" clearable style="width: 150px; margin-right: 12px;"
+          @change="handleFilter">
+          <el-option label="未解决" value="未解决" />
+          <el-option label="已解决" value="已解决" />
+          <el-option label="未采纳" value="未采纳" />
+        </el-select>
+        <el-button plain @click="resetFilters">重置</el-button>
+      </div>
+      <div class="filter-right" v-if="selectedFeedbacks.length > 0">
+        <el-button type="danger" plain @click="handleBatchDelete">
+          <el-icon><Delete /></el-icon>
+          删除
+        </el-button>
+      </div>
     </div>
 
     <!-- 反馈表格 -->
-    <el-table v-loading="loading" :data="feedbackList" stripe style="width: 100%">
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="username" label="用户" width="120">
+    <el-table v-loading="loading" :data="feedbackList" stripe table-layout="auto" @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="55" />
+      <el-table-column prop="id" label="ID" width="80" align="center" />
+      <el-table-column prop="username" label="用户" width="120" align="center">
         <template #default="{ row }">
           {{ row.username || '匿名用户' }}
         </template>
       </el-table-column>
-      <el-table-column prop="issue_type" label="问题类型" width="120" />
-      <el-table-column prop="description" label="问题描述" min-width="300" show-overflow-tooltip />
-      <el-table-column prop="created_at" label="提交时间" width="180">
+      <el-table-column prop="issue_type" label="问题类型" width="120" align="center" />
+      <el-table-column prop="description" label="问题描述" min-width="300" align="center" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="description-link" @click="showDescriptionDialog(row)">{{ row.description }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="created_at" label="提交时间" width="180" align="center">
         <template #default="{ row }">
           {{ formatDateTime(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column prop="is_resolved" label="解决状态" width="120">
+      <el-table-column prop="is_resolved" label="解决状态" width="120" align="center">
         <template #default="{ row }">
 
           <el-tag :type="getStatusType(row.is_resolved)">
@@ -56,12 +69,12 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="resolved_at" label="处理时间" width="180">
+      <el-table-column prop="resolved_at" label="处理时间" width="180" align="center">
         <template #default="{ row }">
           {{ row.resolved_at ? formatDateTime(row.resolved_at) : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="200" align="center">
         <template #default="{ row }">
           <el-button link type="primary" plain @click="handleEditStatus(row)">
             <el-icon>
@@ -81,10 +94,26 @@
 
     <!-- 分页 -->
     <div class="pagination-container">
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[10, 20, 50, 100]"
-        :total="total" layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-        @current-change="handlePageChange" />
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handlePageChange"
+      />
     </div>
+
+    <!-- 问题描述对话框 -->
+    <el-dialog v-model="descriptionDialogVisible" title="问题描述详情" width="600px" :close-on-click-modal="false">
+      <div class="description-content">
+        <pre>{{ currentDescription }}</pre>
+      </div>
+      <template #footer>
+        <el-button type="primary" plain @click="descriptionDialogVisible = false">确定</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 编辑状态对话框 -->
     <el-dialog v-model="statusDialogVisible" title="编辑反馈状态" width="500px" :close-on-click-modal="false">
@@ -120,6 +149,7 @@ const feedbackList = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const selectedFeedbacks = ref([])
 
 const filters = ref({
   issue_type: '',
@@ -132,6 +162,9 @@ const statusFormData = ref({
   id: null,
   is_resolved: ''
 })
+
+const descriptionDialogVisible = ref(false)
+const currentDescription = ref('')
 
 const formatDateTime = (dateString) => {
   if (!dateString) return '-'
@@ -226,7 +259,7 @@ const handleSubmitStatus = async () => {
     if (response.data.success) {
       ElMessage.success('状态更新成功')
       statusDialogVisible.value = false
-      fetchFeedbacks()
+      await fetchFeedbacks()
     } else {
       ElMessage.error(response.data.error || '更新失败')
     }
@@ -236,6 +269,15 @@ const handleSubmitStatus = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+const handleSelectionChange = (selection) => {
+  selectedFeedbacks.value = selection
+}
+
+const showDescriptionDialog = (row) => {
+  currentDescription.value = row.description
+  descriptionDialogVisible.value = true
 }
 
 const handleDelete = (row) => {
@@ -253,13 +295,60 @@ const handleDelete = (row) => {
 
       if (response.data.success) {
         ElMessage.success('删除成功')
-        fetchFeedbacks()
+        await fetchFeedbacks()
       } else {
         ElMessage.error(response.data.error || '删除失败')
       }
     } catch (error) {
       console.error('删除反馈错误:', error)
       ElMessage.error('删除失败')
+    }
+  }).catch(() => { })
+}
+
+const handleBatchDelete = () => {
+  if (selectedFeedbacks.value.length === 0) {
+    ElMessage.warning('请选择要删除的反馈')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedFeedbacks.value.length} 条反馈吗？`,
+    '确认批量删除',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      let successCount = 0
+      let failCount = 0
+      
+      for (const feedback of selectedFeedbacks.value) {
+        try {
+          const response = await apiClient.delete(`${apiUrl}feedback/admin/${feedback.id}/delete/`)
+          if (response.data.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          failCount++
+        }
+      }
+      
+      if (failCount === 0) {
+        ElMessage.success(`成功删除 ${successCount} 条反馈`)
+      } else {
+        ElMessage.warning(`成功删除 ${successCount} 条反馈，失败 ${failCount} 条`)
+      }
+      
+      selectedFeedbacks.value = []
+      await fetchFeedbacks()
+    } catch (error) {
+      console.error('批量删除反馈错误:', error)
+      ElMessage.error('批量删除失败')
     }
   }).catch(() => { })
 }
@@ -292,12 +381,67 @@ onMounted(() => {
 .filter-bar {
   margin-bottom: 20px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
+}
+
+.filter-left {
+  display: flex;
+  align-items: center;
+}
+
+.filter-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.description-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.description-link:hover {
+  color: var(--el-color-primary-light-3);
+}
+
+/* 确保省略号也有链接样式 */
+.el-table__cell .description-link {
+  color: var(--el-color-primary) !important;
+}
+
+.el-table__cell .description-link:hover {
+  color: var(--el-color-primary-light-3) !important;
+}
+
+/* 覆盖Element Plus表格单元格的省略号样式 */
+.el-table__cell:has(.description-link) {
+  color: var(--el-color-primary);
+}
+
+.el-table__cell:has(.description-link) .el-tooltip__trigger {
+  color: var(--el-color-primary);
+}
+
+.description-content {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: var(--el-bg-color-page);
+  border-radius: 4px;
+}
+
+.description-content pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: var(--el-text-color-primary);
 }
 </style>

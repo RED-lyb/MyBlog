@@ -9,6 +9,7 @@ import { ElMessage, ElMessageBox, ElDialog } from 'element-plus'
 import { UploadFilled, EditPen, Notebook, Lock } from '@element-plus/icons-vue'
 import CaptchaDialog from './CaptchaDialog.vue'
 import { showGuestDialog } from '../lib/guestDialog.js'
+import FullScreenLoading from '../pages/FullScreenLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,9 +31,11 @@ const { fetchUserInfo } = useUserInfo()
 // 编辑资料相关
 const formData = ref({
   bg_color: '',
-  bg_pattern: ''
+  bg_pattern: '',
+  bio: ''
 })
 const saving = ref(false)
+const showLoading = ref(false)
 
 // 上传头像相关
 const avatarDialogVisible = ref(false)
@@ -199,14 +202,16 @@ const loadProfile = () => {
   if (targetUser.value) {
     formData.value = {
       bg_color: targetUser.value.bg_color || '',
-      bg_pattern: targetUser.value.bg_pattern || ''
+      bg_pattern: targetUser.value.bg_pattern || '',
+      bio: targetUser.value.bio || ''
     }
     // 加载密保问题
     currentProtectQuestion.value = targetUser.value.protect || ''
   } else if (isAuthenticated.value && user.value) {
     formData.value = {
       bg_color: bgColor.value || '',
-      bg_pattern: bgPattern.value || ''
+      bg_pattern: bgPattern.value || '',
+      bio: user.value.bio || ''
     }
     // 从用户信息中获取密保问题
     fetchCurrentUserProtect()
@@ -228,21 +233,28 @@ const fetchCurrentUserProtect = async () => {
 // 保存资料
 const saveProfile = async () => {
   saving.value = true
+  showLoading.value = true
   try {
     const response = await apiClient.post(`${import.meta.env.VITE_API_URL}user/profile/`, formData.value)
     if (response.data?.success) {
-      ElMessage.success('资料保存成功')
+      ElMessage.success('资料保存成功，页面即将刷新')
       // 刷新用户信息
       await fetchUserInfo()
       if (targetUserId.value) {
         await fetchTargetUser(targetUserId.value)
       }
+      // 延迟一下再刷新，让用户看到成功消息
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } else {
       ElMessage.error(response.data?.error || '保存失败')
+      showLoading.value = false
     }
   } catch (error) {
     console.error('保存资料失败:', error)
     ElMessage.error(error.response?.data?.error || '保存失败')
+    showLoading.value = false
   } finally {
     saving.value = false
   }
@@ -310,6 +322,7 @@ const handleResetPassword = async () => {
 // 验证码验证成功后的密码重置
 const handleResetPasswordWithCaptcha = async (captchaInfo) => {
   resettingPassword.value = true
+  showLoading.value = true
   try {
     const response = await apiClient.post(`${import.meta.env.VITE_API_URL}user/password/reset/`, {
       old_password: passwordForm.value.old_password,
@@ -319,18 +332,14 @@ const handleResetPasswordWithCaptcha = async (captchaInfo) => {
     })
     
     if (response.data?.success) {
-      ElMessage.success('密码修改成功')
-      passwordForm.value = {
-        old_password: '',
-        new_password: '',
-        confirm_password: ''
-      }
-      // 清除表单验证状态
-      if (passwordFormRef.value) {
-        passwordFormRef.value.clearValidate()
-      }
+      ElMessage.success('密码修改成功，页面即将刷新')
+      // 延迟一下再刷新，让用户看到成功消息
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } else {
       ElMessage.error(response.data?.error || '修改失败')
+      showLoading.value = false
       // 如果是验证码错误，重新弹出验证码对话框
       if (response.data?.error && response.data.error.includes('验证码')) {
         passwordCaptchaError.value = true
@@ -352,6 +361,7 @@ const handleResetPasswordWithCaptcha = async (captchaInfo) => {
   } catch (error) {
     console.error('修改密码失败:', error)
     let errorMessage = '修改失败'
+    showLoading.value = false
     
     if (error.response) {
       if (error.response.status === 404) {
@@ -433,6 +443,7 @@ const handleResetSecurityQuestion = async () => {
 // 验证码验证成功后的密保重置
 const handleResetSecurityQuestionWithCaptcha = async (captchaInfo) => {
   resettingSecurity.value = true
+  showLoading.value = true
   try {
     const response = await apiClient.post(`${import.meta.env.VITE_API_URL}user/security-question/reset/`, {
       old_answer: securityForm.value.old_answer,
@@ -443,19 +454,14 @@ const handleResetSecurityQuestionWithCaptcha = async (captchaInfo) => {
     })
     
     if (response.data?.success) {
-      ElMessage.success('密保修改成功')
-      securityForm.value = {
-        old_answer: '',
-        new_protect: '',
-        new_answer: ''
-      }
-      // 刷新用户信息
-      await fetchUserInfo()
-      if (targetUserId.value) {
-        await fetchTargetUser(targetUserId.value)
-      }
+      ElMessage.success('密保修改成功，页面即将刷新')
+      // 延迟一下再刷新，让用户看到成功消息
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } else {
       ElMessage.error(response.data?.error || '修改失败')
+      showLoading.value = false
       // 如果是验证码错误，重新弹出验证码对话框
       if (response.data?.error && response.data.error.includes('验证码')) {
         securityCaptchaError.value = true
@@ -476,6 +482,7 @@ const handleResetSecurityQuestionWithCaptcha = async (captchaInfo) => {
   } catch (error) {
     console.error('修改密保失败:', error)
     let errorMessage = '修改失败'
+    showLoading.value = false
     
     if (error.response) {
       if (error.response.status === 404) {
@@ -607,6 +614,7 @@ onMounted(async () => {
 </script>
 
 <template>
+  <FullScreenLoading :visible="showLoading" />
   <div class="edit-profile-container">
     <div v-if="userLoading" class="user-loading">加载中...</div>
     <div v-else-if="userError" class="user-error">{{ userError }}</div>
@@ -663,6 +671,34 @@ onMounted(async () => {
         </template>
       </el-dialog>
 
+      <!-- 个人介绍 -->
+      <div class="form-section">
+        <div class="section-header">
+          <h3 class="form-section-title">个人介绍</h3>
+          <el-button 
+            type="primary" 
+            plain
+            :loading="saving"
+            @click="saveProfile"
+          >
+            保存介绍
+          </el-button>
+        </div>
+        <el-form :model="formData" label-width="120px">
+          <el-form-item label="个人介绍">
+            <el-input
+              v-model="formData.bio"
+              type="textarea"
+              :rows="6"
+              placeholder="请输入个人介绍"
+              maxlength="1000"
+              show-word-limit
+            />
+            <div class="form-tip">个人介绍将显示在个人主页</div>
+          </el-form-item>
+        </el-form>
+      </div>
+
       <!-- 样式设置 -->
       <div class="form-section">
         <div class="section-header">
@@ -673,7 +709,7 @@ onMounted(async () => {
             :loading="saving"
             @click="saveProfile"
           >
-            保存资料
+            保存样式
           </el-button>
         </div>
         <el-form :model="formData" label-width="120px">
@@ -699,7 +735,7 @@ onMounted(async () => {
       <!-- 重设密码 -->
       <div class="form-section">
         <div class="section-header">
-          <h3 class="form-section-title">重设密码</h3>
+          <h3 class="form-section-title">修改密码</h3>
           <el-button 
             type="primary" 
             plain
@@ -743,7 +779,7 @@ onMounted(async () => {
       <!-- 重设密保 -->
       <div class="form-section">
         <div class="section-header">
-          <h3 class="form-section-title">重设密保</h3>
+          <h3 class="form-section-title">修改密保</h3>
           <el-button 
             type="primary" 
             plain

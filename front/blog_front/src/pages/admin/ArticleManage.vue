@@ -2,30 +2,34 @@
   <div class="article-manage-container">
     <div class="page-header">
       <h1 class="page-title">文章管理</h1>
-      <el-button type="primary" plain @click="handleCreate">
-        <el-icon><Plus /></el-icon>
-        新建文章
-      </el-button>
     </div>
     
     <!-- 搜索栏 -->
-    <div class="search-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索文章标题或作者"
-        clearable
-        @clear="handleSearch"
-        @keyup.enter="handleSearch"
-        style="width: 300px"
-      >
-        <template #prefix>
+    <div class="filter-bar">
+      <div class="filter-left">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索文章标题或作者"
+          clearable
+          @clear="handleSearch"
+          @keyup.enter="handleSearch"
+          style="width: 300px; margin-right: 12px;"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" plain @click="handleSearch">
           <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      <el-button type="primary" plain @click="handleSearch">
-        <el-icon><Search /></el-icon>
-        搜索
-      </el-button>
+          搜索
+        </el-button>
+      </div>
+      <div class="filter-right" v-if="selectedArticles.length > 0">
+        <el-button type="danger" plain @click="handleBatchDelete">
+          <el-icon><Delete /></el-icon>
+          删除
+        </el-button>
+      </div>
     </div>
     
     <!-- 文章表格 -->
@@ -33,22 +37,23 @@
       v-loading="loading"
       :data="articles"
       stripe
-      style="width: 100%"
+      table-layout="auto"
+      class="article-table"
       @selection-change="handleSelectionChange"
     >
       <el-table-column type="selection" width="55" />
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="author_name" label="作者" width="120" />
-      <el-table-column prop="view_count" label="浏览量" width="100" />
-      <el-table-column prop="love_count" label="喜欢数" width="100" />
-      <el-table-column prop="comment_count" label="评论数" width="100" />
-      <el-table-column prop="published_at" label="发布时间" width="180">
+      <el-table-column prop="id" label="ID" width="80" align="center" />
+      <el-table-column prop="title" label="标题" min-width="200" align="center" show-overflow-tooltip />
+      <el-table-column prop="author_name" label="作者" width="120" align="center" />
+      <el-table-column prop="view_count" label="浏览量" width="100" align="center" />
+      <el-table-column prop="love_count" label="喜欢数" width="100" align="center" />
+      <el-table-column prop="comment_count" label="评论数" width="100" align="center" />
+      <el-table-column prop="published_at" label="发布时间" width="180" align="center">
         <template #default="{ row }">
           {{ formatDate(row.published_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
           <el-button link type="primary" plain @click="handleEdit(row)">
             <el-icon><Edit /></el-icon>
@@ -116,7 +121,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Edit, Delete } from '@element-plus/icons-vue'
 import apiClient from '../../lib/api.js'
 
 const apiUrl = import.meta.env.VITE_API_URL
@@ -201,16 +206,6 @@ const handleSelectionChange = (selection) => {
   selectedArticles.value = selection
 }
 
-const handleCreate = () => {
-  dialogTitle.value = '新建文章'
-  formData.value = {
-    id: null,
-    title: '',
-    content: '',
-    author_id: null
-  }
-  dialogVisible.value = true
-}
 
 const handleEdit = (row) => {
   dialogTitle.value = '编辑文章'
@@ -302,6 +297,53 @@ const handleDelete = (row) => {
   }).catch(() => {})
 }
 
+const handleBatchDelete = () => {
+  if (selectedArticles.value.length === 0) {
+    ElMessage.warning('请选择要删除的文章')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedArticles.value.length} 篇文章吗？`,
+    '确认批量删除',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      let successCount = 0
+      let failCount = 0
+      
+      for (const article of selectedArticles.value) {
+        try {
+          const response = await apiClient.delete(`${apiUrl}admin/articles/${article.id}/delete/`)
+          if (response.data.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          failCount++
+        }
+      }
+      
+      if (failCount === 0) {
+        ElMessage.success(`成功删除 ${successCount} 篇文章`)
+      } else {
+        ElMessage.warning(`成功删除 ${successCount} 篇文章，失败 ${failCount} 篇`)
+      }
+      
+      selectedArticles.value = []
+      fetchArticles()
+    } catch (error) {
+      console.error('批量删除文章错误:', error)
+      ElMessage.error('批量删除失败')
+    }
+  }).catch(() => {})
+}
+
 onMounted(() => {
   fetchArticles()
 })
@@ -327,10 +369,21 @@ onMounted(() => {
   color: var(--el-text-color-primary);
 }
 
-.search-bar {
-  display: flex;
-  gap: 12px;
+.filter-bar {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-left {
+  display: flex;
+  align-items: center;
+}
+
+.filter-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .pagination-container {
@@ -338,5 +391,6 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
 }
+
 </style>
 

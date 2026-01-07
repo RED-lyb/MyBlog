@@ -4,12 +4,18 @@ import { useRoute, useRouter } from 'vue-router'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import RadiantText from '../pages/inspira/RadiantText.vue'
 
 const route = useRoute()
 const router = useRouter()
 const targetUserId = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// 用户信息
+const targetUser = ref(null)
+const userLoading = ref(false)
+const userError = ref(null)
 
 // 列表数据
 const followingList = ref([])
@@ -43,9 +49,9 @@ const buildAvatarUrl = (userId, avatar) => {
 // 获取用户头像URL
 const getUserAvatarUrl = async (userId, avatar) => {
   if (!userId || !avatar) return defaultAvatar
-  
+
   const avatarFileName = `${userId}${avatar}`
-  
+
   try {
     const { data } = await axios.get(`${import.meta.env.VITE_API_URL}home/avatar/`, {
       params: {
@@ -66,10 +72,10 @@ const getUserAvatarUrl = async (userId, avatar) => {
 // 获取关注列表
 const fetchFollowingList = async () => {
   if (!targetUserId.value) return
-  
+
   loading.value = true
   error.value = null
-  
+
   try {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${targetUserId.value}/following/`)
     if (response.data?.success) {
@@ -96,10 +102,10 @@ const fetchFollowingList = async () => {
 // 获取粉丝列表
 const fetchFollowersList = async () => {
   if (!targetUserId.value) return
-  
+
   loading.value = true
   error.value = null
-  
+
   try {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${targetUserId.value}/followers/`)
     if (response.data?.success) {
@@ -126,10 +132,10 @@ const fetchFollowersList = async () => {
 // 获取喜欢的文章列表
 const fetchLikedArticlesList = async () => {
   if (!targetUserId.value) return
-  
+
   loading.value = true
   error.value = null
-  
+
   try {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${targetUserId.value}/liked-articles/`)
     if (response.data?.success) {
@@ -148,10 +154,10 @@ const fetchLikedArticlesList = async () => {
 // 获取发布的文章列表
 const fetchArticlesList = async () => {
   if (!targetUserId.value) return
-  
+
   loading.value = true
   error.value = null
-  
+
   try {
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${targetUserId.value}/articles/`)
     if (response.data?.success) {
@@ -184,11 +190,41 @@ const goToArticle = (articleId) => {
   router.push(`/article/${articleId}`)
 }
 
+// 获取用户信息
+const fetchUserInfo = async () => {
+  if (!targetUserId.value) return
+
+  userLoading.value = true
+  userError.value = null
+  targetUser.value = null
+
+  try {
+    const response = await apiClient.get(`${import.meta.env.VITE_API_URL}user/${targetUserId.value}/`)
+    if (response.data?.success) {
+      targetUser.value = response.data.data.user
+    } else {
+      userError.value = response.data?.error || '获取用户信息失败'
+    }
+  } catch (err) {
+    if (err.response?.status === 404) {
+      userError.value = '用户不存在'
+    } else {
+      userError.value = err.message || '请求失败'
+    }
+    console.error('获取用户信息错误:', err)
+  } finally {
+    userLoading.value = false
+  }
+}
+
 // 加载数据
 const loadData = () => {
   if (!targetUserId.value) return
-  
+
   switch (currentType.value) {
+    case 'home':
+      fetchUserInfo()
+      break
     case 'following':
       fetchFollowingList()
       break
@@ -200,9 +236,6 @@ const loadData = () => {
       break
     case 'articles':
       fetchArticlesList()
-      break
-    default:
-      // 主页，不加载数据
       break
   }
 }
@@ -230,10 +263,20 @@ onMounted(() => {
 <template>
   <div class="user-home-main">
     <!-- 主页内容 -->
-    <div v-if="currentType === 'home'" class="home-content">
-      <div class="welcome-message">
-        <h2>欢迎来到个人主页</h2>
-        <p>点击左侧统计数字查看详细信息</p>
+    <div v-if="currentType === 'home'">
+      <div v-if="userLoading" class="loading">加载中...</div>
+      <div v-else-if="userError" class="error">{{ userError }}</div>
+      <div v-else class="welcome-message">
+
+        <div class="user-introduction">
+          <RadiantText
+            class="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-neutral-600 hover:duration-300 hover:dark:text-neutral-400"
+            :duration="5">
+            <span class="text-3xl font-bold">个人介绍</span>
+          </RadiantText>
+          <p v-if="targetUser?.bio">{{ targetUser.bio }}</p>
+          <p v-else class="empty-introduction">该用户还没有个人介绍</p>
+        </div>
       </div>
     </div>
 
@@ -244,12 +287,7 @@ onMounted(() => {
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else-if="followingList.length === 0" class="empty">暂无关注</div>
       <div v-else class="user-list">
-        <div
-          v-for="user in followingList"
-          :key="user.id"
-          class="user-item"
-          @click="goToUserHome(user.id)"
-        >
+        <div v-for="user in followingList" :key="user.id" class="user-item" @click="goToUserHome(user.id)">
           <img :src="user.avatarUrl" :alt="user.username" class="user-avatar" />
           <div class="user-info">
             <div class="user-name">{{ user.username }}</div>
@@ -270,12 +308,7 @@ onMounted(() => {
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else-if="followersList.length === 0" class="empty">暂无粉丝</div>
       <div v-else class="user-list">
-        <div
-          v-for="user in followersList"
-          :key="user.id"
-          class="user-item"
-          @click="goToUserHome(user.id)"
-        >
+        <div v-for="user in followersList" :key="user.id" class="user-item" @click="goToUserHome(user.id)">
           <img :src="user.avatarUrl" :alt="user.username" class="user-avatar" />
           <div class="user-info">
             <div class="user-name">{{ user.username }}</div>
@@ -296,12 +329,8 @@ onMounted(() => {
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else-if="likedArticlesList.length === 0" class="empty">暂无喜欢的文章</div>
       <div v-else class="article-list">
-        <div
-          v-for="article in likedArticlesList"
-          :key="article.id"
-          class="article-item"
-          @click="goToArticle(article.id)"
-        >
+        <div v-for="article in likedArticlesList" :key="article.id" class="article-item"
+          @click="goToArticle(article.id)">
           <h3 class="article-title">{{ article.title }}</h3>
           <p class="article-content">{{ article.content }}</p>
           <div class="article-meta">
@@ -322,12 +351,7 @@ onMounted(() => {
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else-if="articlesList.length === 0" class="empty">暂无发布的文章</div>
       <div v-else class="article-list">
-        <div
-          v-for="article in articlesList"
-          :key="article.id"
-          class="article-item"
-          @click="goToArticle(article.id)"
-        >
+        <div v-for="article in articlesList" :key="article.id" class="article-item" @click="goToArticle(article.id)">
           <h3 class="article-title">{{ article.title }}</h3>
           <p class="article-content">{{ article.content }}</p>
           <div class="article-meta">
@@ -347,10 +371,7 @@ onMounted(() => {
   padding: 20px;
 }
 
-.home-content {
-  text-align: center;
-  padding: 60px 20px;
-}
+
 
 .welcome-message h2 {
   margin-bottom: 20px;
@@ -359,6 +380,33 @@ onMounted(() => {
 
 .welcome-message p {
   color: var(--el-text-color-regular);
+}
+
+.user-introduction {
+  padding: 20px;
+  background-color: var(--el-bg-color-page);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+  text-align: left;
+}
+
+.intro-title {
+  display: block;
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .intro-title {
+    font-size: 28px;
+  }
+}
+
+.empty-introduction {
+  color: var(--el-text-color-secondary);
+  font-style: italic;
 }
 
 .list-content {
@@ -475,4 +523,3 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 </style>
-

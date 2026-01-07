@@ -5,23 +5,31 @@
     </div>
     
     <!-- 搜索栏 -->
-    <div class="search-bar">
-      <el-input
-        v-model="searchKeyword"
-        placeholder="搜索用户名"
-        clearable
-        @clear="handleSearch"
-        @keyup.enter="handleSearch"
-        style="width: 300px"
-      >
-        <template #prefix>
+    <div class="filter-bar">
+      <div class="filter-left">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索用户名"
+          clearable
+          @clear="handleSearch"
+          @keyup.enter="handleSearch"
+          style="width: 300px; margin-right: 12px;"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" plain @click="handleSearch">
           <el-icon><Search /></el-icon>
-        </template>
-      </el-input>
-      <el-button type="primary" plain @click="handleSearch">
-        <el-icon><Search /></el-icon>
-        搜索
-      </el-button>
+          搜索
+        </el-button>
+      </div>
+      <div class="filter-right" v-if="selectedUsers.length > 0">
+        <el-button type="danger" plain @click="handleBatchDelete">
+          <el-icon><Delete /></el-icon>
+          删除
+        </el-button>
+      </div>
     </div>
     
     <!-- 用户表格 -->
@@ -29,27 +37,29 @@
       v-loading="loading"
       :data="users"
       stripe
-      style="width: 100%"
+      table-layout="auto"
+      @selection-change="handleSelectionChange"
     >
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="username" label="用户名" width="150" />
-      <el-table-column prop="registered_time" label="注册时间" width="180">
+      <el-table-column type="selection" width="55" />
+      <el-table-column prop="id" label="ID" width="80" align="center" />
+      <el-table-column prop="username" label="用户名" width="150" align="center" />
+      <el-table-column prop="registered_time" label="注册时间" width="180" align="center">
         <template #default="{ row }">
           {{ formatDate(row.registered_time) }}
         </template>
       </el-table-column>
-      <el-table-column prop="follow_count" label="关注数" width="100" />
-      <el-table-column prop="article_count" label="文章数" width="100" />
-      <el-table-column prop="liked_article_count" label="喜欢数" width="100" />
-      <el-table-column prop="follower_count" label="粉丝数" width="100" />
-      <el-table-column prop="is_admin" label="管理员" width="100">
+      <el-table-column prop="follow_count" label="关注数" width="100" align="center" />
+      <el-table-column prop="article_count" label="文章数" width="100" align="center" />
+      <el-table-column prop="liked_article_count" label="喜欢数" width="100" align="center" />
+      <el-table-column prop="follower_count" label="粉丝数" width="100" align="center" />
+      <el-table-column prop="is_admin" label="管理员" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="row.is_admin ? 'success' : 'info'">
             {{ row.is_admin ? '是' : '否' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" align="center" min-width="200">
         <template #default="{ row }">
           <el-button link type="primary" plain @click="handleEdit(row)">
             <el-icon><Edit /></el-icon>
@@ -84,6 +94,7 @@
         @current-change="handlePageChange"
       />
     </div>
+    
     
     <!-- 编辑对话框 -->
     <el-dialog
@@ -138,6 +149,7 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const searchKeyword = ref('')
+const selectedUsers = ref([])
 
 const dialogVisible = ref(false)
 const submitting = ref(false)
@@ -283,6 +295,10 @@ const handleToggleAdmin = (row) => {
   }).catch(() => {})
 }
 
+const handleSelectionChange = (selection) => {
+  selectedUsers.value = selection
+}
+
 const handleDelete = (row) => {
   ElMessageBox.confirm(
     `确定要删除用户"${row.username}"吗？此操作不可恢复！`,
@@ -305,6 +321,53 @@ const handleDelete = (row) => {
     } catch (error) {
       console.error('删除用户错误:', error)
       ElMessage.error('删除用户失败')
+    }
+  }).catch(() => {})
+}
+
+const handleBatchDelete = () => {
+  if (selectedUsers.value.length === 0) {
+    ElMessage.warning('请选择要删除的用户')
+    return
+  }
+  
+  ElMessageBox.confirm(
+    `确定要删除选中的 ${selectedUsers.value.length} 个用户吗？此操作不可恢复！`,
+    '确认批量删除',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      let successCount = 0
+      let failCount = 0
+      
+      for (const user of selectedUsers.value) {
+        try {
+          const response = await apiClient.delete(`${apiUrl}admin/users/${user.id}/delete/`)
+          if (response.data.success) {
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (error) {
+          failCount++
+        }
+      }
+      
+      if (failCount === 0) {
+        ElMessage.success(`成功删除 ${successCount} 个用户`)
+      } else {
+        ElMessage.warning(`成功删除 ${successCount} 个用户，失败 ${failCount} 个`)
+      }
+      
+      selectedUsers.value = []
+      fetchUsers()
+    } catch (error) {
+      console.error('批量删除用户错误:', error)
+      ElMessage.error('批量删除失败')
     }
   }).catch(() => {})
 }
@@ -334,10 +397,21 @@ onMounted(() => {
   color: var(--el-text-color-primary);
 }
 
-.search-bar {
-  display: flex;
-  gap: 12px;
+.filter-bar {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.filter-left {
+  display: flex;
+  align-items: center;
+}
+
+.filter-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .pagination-container {

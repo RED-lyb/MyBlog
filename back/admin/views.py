@@ -633,6 +633,13 @@ def update_user(request, user_id):
 def delete_user(request, user_id):
     """
     删除用户
+    递归删除用户相关的所有数据：
+    1. 删除用户发表的文章（会级联删除文章评论）
+    2. 删除用户的关注关系（follower_id 和 following_id）
+    3. 删除用户的点赞记录（user_liked_articles）
+    4. 删除用户的刷新令牌（refresh_tokens）
+    5. 反馈记录会自动设置为 NULL（ON DELETE SET NULL）
+    6. 最后删除用户本身
     """
     try:
         # 不能删除自己
@@ -643,6 +650,7 @@ def delete_user(request, user_id):
             }, status=400)
         
         with connection.cursor() as cursor:
+            # 检查用户是否存在
             cursor.execute("SELECT id FROM users WHERE id = %s", [user_id])
             if not cursor.fetchone():
                 return JsonResponse({
@@ -650,6 +658,22 @@ def delete_user(request, user_id):
                     'error': '用户不存在'
                 }, status=404)
             
+            # 1. 删除用户发表的文章（会级联删除文章评论和点赞记录）
+            cursor.execute("DELETE FROM blog_articles WHERE author_id = %s", [user_id])
+            
+            # 2. 删除用户的关注关系（作为关注者）
+            cursor.execute("DELETE FROM user_follows WHERE follower_id = %s", [user_id])
+            
+            # 3. 删除用户的关注关系（作为被关注者）
+            cursor.execute("DELETE FROM user_follows WHERE following_id = %s", [user_id])
+            
+            # 4. 删除用户的点赞记录
+            cursor.execute("DELETE FROM user_liked_articles WHERE user_id = %s", [user_id])
+            
+            # 5. 删除用户的刷新令牌
+            cursor.execute("DELETE FROM refresh_tokens WHERE user_id = %s", [user_id])
+            
+            # 6. 删除用户本身（feedbacks 表的 user_id 会自动设置为 NULL）
             cursor.execute("DELETE FROM users WHERE id = %s", [user_id])
             
             return JsonResponse({

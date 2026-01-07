@@ -157,7 +157,7 @@ watch(
 </script>
 
 <template>
-  <el-affix>
+  <el-affix :offset="0">
     <div class="header-mask" :class="{ 'mask-active': showMask }">
     <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
       @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">
@@ -176,7 +176,7 @@ watch(
         <theme size="2.5" />
       </el-menu-item>
       <el-sub-menu index="9" class="avatar-sub-menu" popper-class="avatar-submenu"
-        :popper-style="{ marginLeft: '-10px' }" style="padding-right: 10px;">
+        :popper-style="{ marginLeft: '-10px' }" style="padding-right: 0px;">
         <template #title>
           <div class="avatar-trigger" style="margin-right: 20px;padding-right: 0px;">
             <el-skeleton :loading="avatarLoading" animated
