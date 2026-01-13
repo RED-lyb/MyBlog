@@ -1,9 +1,33 @@
 <script setup>
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useColorMode } from '@vueuse/core'
 import { useConfigStore } from '../stores/config.js'
+import { useAuthStore } from '../stores/user_info.js'
 
+const colorMode = useColorMode()
 const configStore = useConfigStore()
+const authStore = useAuthStore()
 const { config } = storeToRefs(configStore)
+const { bgColor: userBgColor } = storeToRefs(authStore)
+
+// 计算背景颜色：优先使用用户数据库中的颜色，如果为空则使用配置文件的值，最后使用默认值
+const backgroundColor = computed(() => {
+  // 优先使用用户数据库中的背景颜色
+  if (userBgColor.value && userBgColor.value.trim() !== '') {
+    return userBgColor.value
+  }
+  
+  // 其次使用配置文件中的颜色（根据当前主题模式）
+  const mode = colorMode.value === 'dark' ? 'dark' : 'light'
+  const configBg = config.value[mode]?.bgcolor
+  if (configBg) {
+    return configBg
+  }
+  
+  // 最后使用默认值
+  return mode === 'dark' ? '#000000' : '#FFFFFF'
+})
 </script>
 <template>
   <div class="footer">
@@ -59,8 +83,8 @@ const { config } = storeToRefs(configStore)
 .copyright {
   margin-top: 0.5rem;
 }
-::v-deep(.el-divider__text.is-center) {
-  background-color: var(--background);
+:deep(.el-divider__text) {
+  background-color: v-bind(backgroundColor) !important;
 }
 
 .line {

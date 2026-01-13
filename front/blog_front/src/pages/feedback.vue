@@ -117,7 +117,9 @@ onMounted(async () => {
               </div>
             </div>
           </el-aside>
-          <FeedbackMain ref="feedbackMainRef" v-model:selected-panel="selectedPanel" />
+          <el-main>
+            <FeedbackMain ref="feedbackMainRef" v-model:selected-panel="selectedPanel" />
+          </el-main>
           <el-aside>
             <FeedbackButton />
           </el-aside>
@@ -141,6 +143,16 @@ onMounted(async () => {
   height: calc(100vh - 165px);
   overflow-y: auto;
   padding: 10px;
+}
+
+.el-main {
+  background-color: #00000000;
+  min-height: max(570px, calc(100vh - 165px));
+  padding: 20px 20px 20px 20px;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .panel-list {

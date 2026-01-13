@@ -199,6 +199,9 @@ onMounted(async () => {
             />
           </el-aside>
           <el-main>
+            <div class="content-header">
+              <h1>个人主页</h1>
+            </div>
             <!-- 面包屑导航 -->
             <div class="breadcrumb-container">
               <div class="dsi-breadcrumbs text-sm items-center gap-2">
@@ -281,6 +284,7 @@ onMounted(async () => {
             <!-- 子路由内容 -->
             <router-view />
           </el-main>
+          <el-aside></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -303,14 +307,20 @@ onMounted(async () => {
 .el-main {
   background-color: #00000000;
   min-height: max(570px, calc(100vh - 165px));
-  padding: 0px 20px 20px 20px;
+  padding: 20px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
-  margin-right: 100px;
   border-radius: 8px;
   box-shadow: var(--el-box-shadow-light);
-  overflow-y: auto;
-  overflow-x: hidden;
+}
+
+
+.content-header {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .user-aside {

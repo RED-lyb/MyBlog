@@ -45,3 +45,6 @@ back/api/static/
 # 其他
 .DS_Store
 Thumbs.db
+
+# Cursor
+.cursor/

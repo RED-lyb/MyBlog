@@ -987,17 +987,6 @@ watch([filterOnlyMine, filterUsername], () => {
   height: calc(100vh - 165px);
 }
 
-.search-aside {
-  background-color: #00000000;
-  width: 280px;
-  position: sticky;
-  top: 60px;
-  align-self: flex-start;
-  height: calc(100vh - 165px);
-  padding: 0;
-  overflow-y: auto;
-}
-
 .search-filter-container {
   padding: 20px;
 }
@@ -1033,7 +1022,7 @@ watch([filterOnlyMine, filterUsername], () => {
 .el-main {
   background-color: #00000000;
   min-height: max(570px, calc(100vh - 165px));
-  padding: 0px 20px 20px 20px;
+  padding: 20px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;

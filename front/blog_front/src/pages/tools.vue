@@ -8,6 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
+import Tools_main from '../components/tools_main.vue'
 
 const authStore = useAuthStore()
 const {
@@ -83,8 +84,7 @@ onMounted(async () => {
           <el-aside>
           </el-aside>
           <el-main>
-            <h1>实用工具</h1>
-            <p>这里是实用工具的内容区域</p>
+            <Tools_main />
           </el-main>
           <el-aside></el-aside>
         </el-container>
@@ -108,7 +108,7 @@ onMounted(async () => {
 .el-main {
   background-color: #00000000;
   min-height: max(570px, calc(100vh - 165px));
-  padding: 0px 20px 20px 20px;
+  padding: 20px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;

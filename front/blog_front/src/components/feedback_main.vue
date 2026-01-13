@@ -183,106 +183,105 @@ defineExpose({
 </script>
 
 <template>
-  <el-main>
-    <!-- 反馈介绍 -->
-    <div v-if="selectedPanel === 'intro'" class="feedback-content">
+  <!-- 反馈介绍 -->
+  <div v-if="selectedPanel === 'intro'">
+    <div class="content-header">
       <h1>意见反馈</h1>
-      <p class="feedback-description">
-        欢迎您提出宝贵的意见和建议！我非常重视每一位用户的反馈，会认真对待每一条反馈。
-      </p>
-      <div class="feedback-info">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>反馈说明</span>
-            </div>
-          </template>
-          <div class="info-content">
-            <p><strong>问题类型：</strong></p>
-            <ul>
-              <li><strong>使用错误：</strong>在使用过程中遇到的问题、BUG等</li>
-              <li><strong>功能建议：</strong>对新功能的需求或改进建议</li>
-            </ul>
-            <p style="margin-top: 16px;"><strong>反馈流程：</strong></p>
-            <ol>
-              <li>点击右侧"反馈"按钮</li>
-              <li>选择问题类型</li>
-              <li>详细描述问题或建议</li>
-              <li>提交反馈</li>
-            </ol>
-            <p style="margin-top: 16px; color: var(--el-text-color-secondary);">
-              我会尽快处理您的反馈，感谢您的支持！
-            </p>
-          </div>
-        </el-card>
-      </div>
     </div>
+    <p class="feedback-description">
+      欢迎您提出宝贵的意见和建议！我非常重视每一位用户的反馈，会认真对待每一条反馈。
+    </p>
+    <div class="feedback-info">
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <span>反馈说明</span>
+          </div>
+        </template>
+        <div class="info-content">
+          <p><strong>问题类型：</strong></p>
+          <ul>
+            <li><strong>使用错误：</strong>在使用过程中遇到的问题、BUG等</li>
+            <li><strong>功能建议：</strong>对新功能的需求或改进建议</li>
+          </ul>
+          <p style="margin-top: 16px;"><strong>反馈流程：</strong></p>
+          <ol>
+            <li>点击右侧"反馈"按钮</li>
+            <li>选择问题类型</li>
+            <li>详细描述问题或建议</li>
+            <li>提交反馈</li>
+          </ol>
+          <p style="margin-top: 16px; color: var(--el-text-color-secondary);">
+            我会尽快处理您的反馈，感谢您的支持！
+          </p>
+        </div>
+      </el-card>
+    </div>
+  </div>
 
-    <!-- 反馈列表 -->
-    <div v-else class="feedback-list-content">
+  <!-- 反馈列表 -->
+  <div v-else>
+    <div class="content-header">
       <h1>{{ selectedPanel === 'error' ? '使用错误' : '功能建议' }}</h1>
-
-      <div v-if="loadingFeedback" class="loading-feedback">
-        <el-icon class="is-loading">
-          <Loading />
-        </el-icon>
-        <span>加载中...</span>
-      </div>
-
-      <div v-else-if="feedbackList.length === 0" class="empty-feedback">
-        暂无反馈
-      </div>
-
-      <div v-else class="feedback-items">
-        <el-card v-for="feedback in feedbackList" :key="feedback.id" shadow="hover" class="feedback-item">
-          <div class="feedback-header">
-            <div class="feedback-meta">
-              <span class="feedback-user">{{ feedback.username }}</span>
-              <el-tag :type="getStatusType(feedback.is_resolved)" size="small">
-                <div class="inline-grid *:[grid-area:1/1]" v-if="feedback.is_resolved === '未解决'">
-                  <div class="dsi-status dsi-status-error animate-ping"></div>
-                  <div class="dsi-status dsi-status-error"></div>
-                </div>
-                <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '已解决'">
-                  <div class="dsi-status dsi-status-success animate-ping"></div>
-                  <div class="dsi-status dsi-status-success"></div>
-                </div>
-                <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '未采纳'">
-                  <div class="dsi-status dsi-status-warning animate-ping"></div>
-                  <div class="dsi-status dsi-status-warning"></div>
-                </div>
-                {{ feedback.is_resolved }}
-              </el-tag>
-              <span class="feedback-time">{{ formatDateTime(feedback.created_at) }}</span>
-            </div>
-            <div v-if="isMyFeedback(feedback)" class="feedback-actions">
-              <button 
-                class="dsi-btn dsi-btn-outline dsi-btn-info"
-                @click="handleEdit(feedback)"
-              >
-                <el-icon><Edit /></el-icon>
-                编辑
-              </button>
-              <button 
-                class="dsi-btn dsi-btn-outline dsi-btn-error"
-                @click="handleDelete(feedback)"
-              >
-                <el-icon><Delete /></el-icon>
-                删除
-              </button>
-            </div>
-          </div>
-          <div class="feedback-description">
-            <pre>{{ feedback.description }}</pre>
-          </div>
-          <div v-if="feedback.resolved_at" class="feedback-resolved">
-            <span class="resolved-label">处理时间：</span>
-            <span>{{ formatDateTime(feedback.resolved_at) }}</span>
-          </div>
-        </el-card>
-      </div>
     </div>
-  </el-main>
+    <div v-if="loadingFeedback" class="loading-feedback">
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon>
+      <span>加载中...</span>
+    </div>
+
+    <div v-else-if="feedbackList.length === 0" class="empty-feedback">
+      暂无反馈
+    </div>
+
+    <div v-else class="feedback-items">
+      <el-card v-for="feedback in feedbackList" :key="feedback.id" shadow="hover" class="feedback-item">
+        <div class="feedback-header">
+          <div class="feedback-meta">
+            <span class="feedback-user">{{ feedback.username }}</span>
+            <el-tag :type="getStatusType(feedback.is_resolved)" size="small">
+              <div class="inline-grid *:[grid-area:1/1]" v-if="feedback.is_resolved === '未解决'">
+                <div class="dsi-status dsi-status-error animate-ping"></div>
+                <div class="dsi-status dsi-status-error"></div>
+              </div>
+              <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '已解决'">
+                <div class="dsi-status dsi-status-success animate-ping"></div>
+                <div class="dsi-status dsi-status-success"></div>
+              </div>
+              <div class="inline-grid *:[grid-area:1/1]" v-else-if="feedback.is_resolved === '未采纳'">
+                <div class="dsi-status dsi-status-warning animate-ping"></div>
+                <div class="dsi-status dsi-status-warning"></div>
+              </div>
+              {{ feedback.is_resolved }}
+            </el-tag>
+            <span class="feedback-time">{{ formatDateTime(feedback.created_at) }}</span>
+          </div>
+          <div v-if="isMyFeedback(feedback)" class="feedback-actions">
+            <button class="dsi-btn dsi-btn-outline dsi-btn-info" @click="handleEdit(feedback)">
+              <el-icon>
+                <Edit />
+              </el-icon>
+              编辑
+            </button>
+            <button class="dsi-btn dsi-btn-outline dsi-btn-error" @click="handleDelete(feedback)">
+              <el-icon>
+                <Delete />
+              </el-icon>
+              删除
+            </button>
+          </div>
+        </div>
+        <div class="feedback-description">
+          <pre>{{ feedback.description }}</pre>
+        </div>
+        <div v-if="feedback.resolved_at" class="feedback-resolved">
+          <span class="resolved-label">处理时间：</span>
+          <span>{{ formatDateTime(feedback.resolved_at) }}</span>
+        </div>
+      </el-card>
+    </div>
+  </div>
 
   <!-- 编辑对话框 -->
   <el-dialog v-model="editDialogVisible" title="编辑反馈" width="600px" :close-on-click-modal="false">
@@ -308,27 +307,12 @@ defineExpose({
 </template>
 
 <style scoped>
-.el-main {
-  background-color: #00000000;
-  min-height: max(570px, calc(100vh - 165px));
-  padding: 20px;
-  border: 1px solid var(--el-border-color-light);
-  margin-top: 10px;
-  border-radius: 8px;
-  box-shadow: var(--el-box-shadow-light);
-}
-
-.feedback-content {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.feedback-content h1,
-.feedback-list-content h1 {
+.content-header {
   font-size: 28px;
   font-weight: bold;
-  margin: 0 0 16px 0;
-  color: var(--el-text-color-primary);
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .feedback-description {
@@ -362,11 +346,6 @@ defineExpose({
 
 .info-content li {
   margin: 8px 0;
-}
-
-.feedback-list-content {
-  max-width: 1000px;
-  margin: 0 auto;
 }
 
 .loading-feedback,
@@ -459,14 +438,15 @@ defineExpose({
   font-weight: 500;
   margin-right: 4px;
 }
-.dsi-btn{
+
+.dsi-btn {
   height: 25px;
   font-weight: 400;
   font-size: 12px;
   border: 1px solid;
 }
-.dsi-btn:hover{
+
+.dsi-btn:hover {
   border: 1px solid var(--dsi-btn-bg);
 }
 </style>
-

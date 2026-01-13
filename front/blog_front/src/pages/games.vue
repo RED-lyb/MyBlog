@@ -8,6 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
+import Games_main from '../components/games_main.vue'
 import { showGuestDialog } from '../lib/guestDialog.js'
 
 const authStore = useAuthStore()
@@ -96,8 +97,7 @@ onMounted(async () => {
           <el-aside>
           </el-aside>
           <el-main>
-            <h1>趣味游戏</h1>
-            <p>这里是趣味游戏的内容区域</p>
+            <Games_main />
           </el-main>
           <el-aside></el-aside>
         </el-container>
@@ -121,7 +121,7 @@ onMounted(async () => {
 .el-main {
   background-color: #00000000;
   min-height: max(570px, calc(100vh - 165px));
-  padding: 0px 20px 20px 20px;
+  padding: 20px 20px 20px 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;

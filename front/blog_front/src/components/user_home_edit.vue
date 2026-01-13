@@ -260,6 +260,59 @@ const saveProfile = async () => {
   }
 }
 
+// 恢复默认样式
+const resetStyle = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要恢复默认样式吗？这将清空背景颜色和点缀颜色。',
+      '确认恢复默认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    saving.value = true
+    showLoading.value = true
+    
+    try {
+      const response = await apiClient.post(`${import.meta.env.VITE_API_URL}user/profile/`, {
+        bg_color: '',
+        bg_pattern: '',
+        bio: formData.value.bio // 保留个人介绍不变
+      })
+      
+      if (response.data?.success) {
+        ElMessage.success('样式已恢复默认，页面即将刷新')
+        // 更新本地表单数据
+        formData.value.bg_color = ''
+        formData.value.bg_pattern = ''
+        // 刷新用户信息
+        await fetchUserInfo()
+        if (targetUserId.value) {
+          await fetchTargetUser(targetUserId.value)
+        }
+        // 延迟一下再刷新，让用户看到成功消息
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
+      } else {
+        ElMessage.error(response.data?.error || '恢复失败')
+        showLoading.value = false
+      }
+    } catch (error) {
+      console.error('恢复默认样式失败:', error)
+      ElMessage.error(error.response?.data?.error || '恢复失败')
+      showLoading.value = false
+    } finally {
+      saving.value = false
+    }
+  } catch {
+    // 用户取消操作
+  }
+}
+
 // 打开头像上传弹窗
 const openAvatarDialog = () => {
   avatarDialogVisible.value = true
@@ -619,7 +672,6 @@ onMounted(async () => {
     <div v-if="userLoading" class="user-loading">加载中...</div>
     <div v-else-if="userError" class="user-error">{{ userError }}</div>
     <div v-else class="edit-profile-content">
-      <h2 class="section-title">编辑资料</h2>
       
       <!-- 上传头像 -->
       <div class="form-section">
@@ -703,14 +755,24 @@ onMounted(async () => {
       <div class="form-section">
         <div class="section-header">
           <h3 class="form-section-title">样式设置</h3>
-          <el-button 
-            type="primary" 
-            plain
-            :loading="saving"
-            @click="saveProfile"
-          >
-            保存样式
-          </el-button>
+          <div class="section-actions">
+            <el-button 
+              type="default" 
+              plain
+              :loading="saving"
+              @click="resetStyle"
+            >
+              恢复默认
+            </el-button>
+            <el-button 
+              type="primary" 
+              plain
+              :loading="saving"
+              @click="saveProfile"
+            >
+              保存样式
+            </el-button>
+          </div>
         </div>
         <el-form :model="formData" label-width="120px">
           <el-form-item label="背景颜色">
@@ -883,11 +945,6 @@ onMounted(async () => {
   color: #f56c6c;
 }
 
-.section-title {
-  font-size: 24px;
-  margin-bottom: 30px;
-  color: var(--el-text-color-primary);
-}
 
 .form-section {
   margin-bottom: 40px;
@@ -904,6 +961,12 @@ onMounted(async () => {
   margin-bottom: 20px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--el-border-color-light);
+}
+
+.section-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .form-section-title {

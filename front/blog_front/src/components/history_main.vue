@@ -78,33 +78,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <el-main>
-    <div v-if="selectedHistory" class="history-content">
-      <div class="content-header">
-        <h2>更新历史</h2>
-        <div class="content-time">{{ formatDate(selectedHistory.update_time) }}</div>
-      </div>
-      <div class="content-body">
-        <pre class="content-text">{{ selectedHistory.update_content }}</pre>
-      </div>
+  <div v-if="selectedHistory" class="history-content">
+    <div class="content-header">
+      <h1>更新历史</h1>
     </div>
-    <div v-else class="empty-content">
-      <p>暂无更新历史</p>
+
+    <div class="content-body">
+      <pre class="content-text">{{ selectedHistory.update_content }}</pre>
     </div>
-  </el-main>
+  </div>
+  <div v-else class="empty-content">
+    <p>暂无更新历史</p>
+  </div>
 </template>
 
 <style scoped>
-.el-main {
-  background-color: #00000000;
-  min-height: max(570px, calc(100vh - 165px));
-  padding: 20px;
-  border: 1px solid var(--el-border-color-light);
-  margin-top: 10px;
-  border-radius: 8px;
-  box-shadow: var(--el-box-shadow-light);
-}
-
 .history-content {
   height: 100%;
   display: flex;
@@ -112,20 +100,16 @@ onMounted(() => {
 }
 
 .content-header {
+  font-size: 28px;
+  font-weight: bold;
   margin-bottom: 20px;
   padding-bottom: 15px;
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
-.content-header h2 {
-  margin: 0 0 8px 0;
-  font-size: 24px;
+.content-header h1 {
+  margin: 0;
   color: var(--el-text-color-primary);
-}
-
-.content-time {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
 }
 
 .content-body {

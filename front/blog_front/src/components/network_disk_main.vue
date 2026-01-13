@@ -230,6 +230,9 @@ const handleDeleteSelected = async () => {
 </script>
 
 <template>
+      <div class="content-header">
+        <h1>流动网盘</h1>
+      </div>
   <div class="network-disk-container">
     <!-- 路径导航和操作按钮 -->
     <div class="breadcrumb-container">
@@ -383,8 +386,12 @@ const handleDeleteSelected = async () => {
 </template>
 
 <style scoped>
-.network-disk-container {
-  max-width: 1400px;
+.content-header {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .breadcrumb-container {

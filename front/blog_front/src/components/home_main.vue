@@ -10,6 +10,7 @@ import { usePaginationStore } from '../stores/pagination.js'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessage } from 'element-plus'
 import { Star, ChatLineRound, View, Calendar } from '@element-plus/icons-vue'
+import c from 'highlight.js/lib/languages/c'
 
 // 从父组件获取筛选和排序参数
 const searchFilters = inject('searchFilters', ref({
@@ -71,7 +72,7 @@ const calculatePageSize = () => {
   
   const container = containerRef.value
   const containerHeight = container.offsetHeight || container.clientHeight
-  
+  console.log(containerHeight)
   // 如果高度异常，跳过计算
   if (containerHeight < 100) return
   
@@ -453,7 +454,9 @@ onUnmounted(() => {
   <div class="home-main-container" ref="containerRef">
     <!-- 全屏加载动画 -->
     <FullScreenLoading :visible="loading" />
-    
+    <div class="content-header">
+        <h1>博客主页</h1>
+      </div>
     <!-- 文章列表区域 -->
       <div v-if="error" class="error">错误: {{ error }}</div>
       <div v-else class="articles-list" ref="articlesListRef">
@@ -515,17 +518,16 @@ onUnmounted(() => {
   </div>
 </template>
 <style scoped>
-.home-main-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  padding-top: 10px;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 0px;
-  overflow-y: auto;
+.content-header {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
-
+.home-main-container{
+  height: 100%;
+}
 .error,
 .empty {
   text-align: center;

@@ -160,7 +160,9 @@ onMounted(async () => {
               </div>
             </div>
           </el-aside>
-          <HistoryMain ref="historyMainRef" :selected-history="selectedHistory" />
+          <el-main>
+            <HistoryMain ref="historyMainRef" :selected-history="selectedHistory" />
+          </el-main>
           <el-aside></el-aside>
         </el-container>
         <el-footer style="padding: 0">
@@ -210,7 +212,6 @@ onMounted(async () => {
 
 .history-date {
   font-size: 14px;
-  font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
@@ -223,6 +224,16 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+}
+
+.el-main {
+  background-color: #00000000;
+  min-height: max(570px, calc(100vh - 165px));
+  padding: 20px 20px 20px 20px;
+  border: 1px solid var(--el-border-color-light);
+  margin-top: 10px;
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
 
 </style>
