@@ -109,20 +109,14 @@
         :rules="formRules"
         label-width="100px"
       >
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="formData.username" disabled />
-        </el-form-item>
         <el-form-item label="头像URL" prop="avatar">
           <el-input v-model="formData.avatar" placeholder="请输入头像URL" />
         </el-form-item>
         <el-form-item label="背景色" prop="bg_color">
-          <el-input v-model="formData.bg_color" placeholder="CSS颜色值，如 #ffffff" />
+          <el-input v-model="formData.bg_color" placeholder="CSS颜色值" />
         </el-form-item>
         <el-form-item label="背景样式" prop="bg_pattern">
           <el-input v-model="formData.bg_pattern" placeholder="背景点缀样式" />
-        </el-form-item>
-        <el-form-item label="圆角大小" prop="corner_radius">
-          <el-input v-model="formData.corner_radius" placeholder="如 10px 或 10%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -156,18 +150,12 @@ const submitting = ref(false)
 const formRef = ref(null)
 const formData = ref({
   id: null,
-  username: '',
   avatar: '',
   bg_color: '',
-  bg_pattern: '',
-  corner_radius: ''
+  bg_pattern: ''
 })
 
-const formRules = {
-  username: [
-    { required: true, message: '用户名不能为空', trigger: 'blur' }
-  ]
-}
+const formRules = {}
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
@@ -221,11 +209,9 @@ const handleEdit = async (row) => {
     if (response.data.success) {
       formData.value = {
         id: response.data.data.id,
-        username: response.data.data.username,
         avatar: response.data.data.avatar || '',
         bg_color: response.data.data.bg_color || '',
-        bg_pattern: response.data.data.bg_pattern || '',
-        corner_radius: response.data.data.corner_radius || ''
+        bg_pattern: response.data.data.bg_pattern || ''
       }
       dialogVisible.value = true
     } else {

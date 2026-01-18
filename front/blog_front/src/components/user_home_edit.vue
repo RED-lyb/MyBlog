@@ -949,7 +949,7 @@ onMounted(async () => {
 .form-section {
   margin-bottom: 40px;
   padding: 20px;
-  background-color: var(--el-bg-color-page);
+  background-color: rgba(245, 245, 245, 0.1);;
   border-radius: 8px;
   border: 1px solid var(--el-border-color-light);
 }

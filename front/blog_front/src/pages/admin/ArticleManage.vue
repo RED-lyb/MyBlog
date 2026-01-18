@@ -96,9 +96,6 @@
         <el-form-item label="标题" prop="title">
           <el-input v-model="formData.title" placeholder="请输入文章标题" />
         </el-form-item>
-        <el-form-item label="作者ID" prop="author_id">
-          <el-input-number v-model="formData.author_id" :min="1" />
-        </el-form-item>
         <el-form-item label="内容" prop="content">
           <el-input
             v-model="formData.content"

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import apiClient from '../lib/api.js'
@@ -18,7 +18,6 @@ import json from 'highlight.js/lib/languages/json'
 import bash from 'highlight.js/lib/languages/bash'
 import sql from 'highlight.js/lib/languages/sql'
 import php from 'highlight.js/lib/languages/php'
-import cpp from 'highlight.js/lib/languages/cpp'
 import c from 'highlight.js/lib/languages/c'
 
 // 注册常用语言
@@ -33,8 +32,7 @@ hljs.registerLanguage('json', json)
 hljs.registerLanguage('bash', bash)
 hljs.registerLanguage('sql', sql)
 hljs.registerLanguage('php', php)
-hljs.registerLanguage('cpp', cpp)
-hljs.registerLanguage('c++', cpp)
+hljs.registerLanguage('c++', c)
 hljs.registerLanguage('c', c)
 
 // 配置marked使用highlight.js进行代码高亮
@@ -46,15 +44,30 @@ marked.use({
     code(token) {
       let codeStr = token.text || token.code || token.raw || ''
       const lang = token.lang || ''
-      
+
       // 清理代码块标记
       codeStr = codeStr.replace(/^```+\s*/gm, '').replace(/\s*```+$/gm, '').trim()
-      
+
+      // 生成唯一的代码块ID
+      const codeBlockId = `code-block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
       // 如果有语言标识且该语言已注册，使用highlight.js进行高亮
       if (lang && hljs.getLanguage(lang)) {
         try {
           const highlighted = hljs.highlight(codeStr, { language: lang })
-          return `<pre class="hljs"><code class="language-${lang}">${highlighted.value}</code></pre>`
+          return `
+<div class="code-block-wrapper" data-code-id="${codeBlockId}">
+  <div class="code-block-header">
+    <span class="code-block-lang">${lang}</span>
+    <button class="code-block-copy-btn" onclick="copyCodeBlock('${codeBlockId}')" title="复制代码">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
+  </div>
+  <pre class="hljs"><code class="language-${lang}" data-code-content="${encodeURIComponent(codeStr)}">${highlighted.value}</code></pre>
+</div>`
         } catch (err) {
           // 如果高亮失败，降级为转义代码
           const escaped = codeStr
@@ -63,10 +76,22 @@ marked.use({
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;')
-          return `<pre class="hljs"><code class="language-${lang}">${escaped}</code></pre>`
+          return `
+<div class="code-block-wrapper" data-code-id="${codeBlockId}">
+  <div class="code-block-header">
+    <span class="code-block-lang">${lang}</span>
+    <button class="code-block-copy-btn" onclick="copyCodeBlock('${codeBlockId}')" title="复制代码">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
+  </div>
+  <pre class="hljs"><code class="language-${lang}" data-code-content="${encodeURIComponent(codeStr)}">${escaped}</code></pre>
+</div>`
         }
       }
-      
+
       // 如果没有指定语言或语言未注册，直接转义代码
       const escaped = codeStr
         .replace(/&/g, '&amp;')
@@ -75,7 +100,20 @@ marked.use({
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;')
       const langClass = lang ? `language-${lang}` : ''
-      return `<pre class="hljs"><code class="${langClass}">${escaped}</code></pre>`
+      const langDisplay = lang || 'code'
+      return `
+<div class="code-block-wrapper" data-code-id="${codeBlockId}">
+  <div class="code-block-header">
+    <span class="code-block-lang">${langDisplay}</span>
+    <button class="code-block-copy-btn" onclick="copyCodeBlock('${codeBlockId}')" title="复制代码">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
+  </div>
+  <pre class="hljs"><code class="${langClass}" data-code-content="${encodeURIComponent(codeStr)}">${escaped}</code></pre>
+</div>`
     }
   }
 })
@@ -338,6 +376,30 @@ watch(() => route.params.id, () => {
 // 组件挂载时获取文章详情
 onMounted(() => {
   fetchArticleDetail()
+
+  // 注册全局复制函数
+  window.copyCodeBlock = (codeBlockId) => {
+    const codeBlock = document.querySelector(`[data-code-id="${codeBlockId}"]`)
+    if (!codeBlock) return
+
+    const codeElement = codeBlock.querySelector('code[data-code-content]')
+    if (!codeElement) return
+
+    const codeContent = decodeURIComponent(codeElement.getAttribute('data-code-content'))
+
+    navigator.clipboard.writeText(codeContent).then(() => {
+      ElMessage.success('代码已复制到剪贴板')
+    }).catch(() => {
+      ElMessage.error('复制失败')
+    })
+  }
+})
+
+onUnmounted(() => {
+  // 清理全局函数
+  if (window.copyCodeBlock) {
+    delete window.copyCodeBlock
+  }
 })
 </script>
 
@@ -680,11 +742,57 @@ onMounted(() => {
 }
 
 /* 代码块样式 */
-.article-content :deep(pre) {
+.article-content :deep(.code-block-wrapper) {
+  margin: 1em 0;
+  border-radius: 8px;
+  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 6px !important;
-  margin: 1em 0 !important;
+}
+
+.article-content :deep(.code-block-header) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(200, 200, 200, 0.2);
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.article-content :deep(.code-block-lang) {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--el-text-color-secondary);
+  text-transform: uppercase;
+}
+
+.article-content :deep(.code-block-copy-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+  transition: all 0.2s;
+}
+
+.article-content :deep(.code-block-copy-btn:hover) {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+}
+
+.article-content :deep(.code-block-copy-btn:active) {
+  background: var(--el-color-primary-light-7);
+}
+
+.article-content :deep(pre) {
+  /* 使用半透明背景，适配亮色和暗色主题 */
+  background: rgba(245, 245, 245, 0.2);
+  border-radius: 0 0 8px 8px !important;
+  margin: 0 !important;
   padding: 16px !important;
   overflow-x: auto !important;
 }

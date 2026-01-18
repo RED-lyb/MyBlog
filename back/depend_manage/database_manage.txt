@@ -15,20 +15,6 @@ export_database.bat admin webproject webproject.sql
 export_database_full.bat admin webproject webproject_full.sql
 
 # ========================================
-# 导入脚本
-# ========================================
-
-# 1. 安全模式导入（添加 IF NOT EXISTS 到 CREATE TABLE）
-#    用法: import_database.bat [用户名] [数据库名] [sql文件] [模式]
-import_database.bat admin webproject webproject.sql safe
-
-# 2. 强制模式导入（跳过错误继续执行）
-import_database.bat admin webproject webproject.sql force
-
-# 3. 删除模式导入（执行 DROP TABLE 如果存在）
-import_database.bat admin webproject webproject_full.sql drop
-
-# ========================================
 # 手动命令
 # ========================================
 

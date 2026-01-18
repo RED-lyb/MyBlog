@@ -152,7 +152,7 @@ onMounted(async () => {
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }
 
 .panel-list {
@@ -163,7 +163,7 @@ onMounted(async () => {
 
 .panel-item {
   padding: 15px 20px;
-  background-color: var(--el-bg-color);
+  background-color: rgba(245, 245, 245, 0.1);;
   border: 1px solid var(--el-border-color-light);
   border-radius: 6px;
   cursor: pointer;

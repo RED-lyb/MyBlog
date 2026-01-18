@@ -434,7 +434,7 @@ const handleDeleteSelected = async () => {
 }
 
 .file-list-container {
-  background-color: var(--el-bg-color);
+  background-color: rgba(245, 245, 245, 0.1);;
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
   padding: 10px;
@@ -463,14 +463,62 @@ const handleDeleteSelected = async () => {
 
 .el-table {
   --el-table-border-color: var(--el-border-color-lighter);
+  background-color: transparent !important;
 }
 
+/* 表格整体背景透明 */
+.el-table :deep(.el-table__inner-wrapper) {
+  background-color: transparent !important;
+}
+
+.el-table :deep(.el-table__header-wrapper) {
+  background-color: transparent !important;
+}
+
+.el-table :deep(.el-table__body-wrapper) {
+  background-color: transparent !important;
+}
+
+/* 表头单元格透明 */
+.el-table :deep(.el-table__header) {
+  background-color: transparent !important;
+}
+
+.el-table :deep(.el-table__header th.el-table__cell) {
+  background-color: transparent !important;
+}
+
+/* 表格行透明 */
 .el-table :deep(.el-table__row) {
   cursor: default;
+  background-color: transparent !important;
 }
 
+/* 斑马纹行也透明 */
+.el-table :deep(.el-table__row.el-table__row--striped) {
+  background-color: rgba(200, 200,200,0.1) !important;
+}
+
+/* 表格单元格透明 */
+.el-table :deep(.el-table__cell) {
+  background-color: transparent !important;
+}
+
+.el-table :deep(td.el-table__cell) {
+  background-color: transparent !important;
+}
+
+.el-table :deep(th.el-table__cell) {
+  background-color: transparent !important;
+}
+
+/* 悬停效果 - 使用半透明或移除 */
 .el-table :deep(.el-table__row:hover) {
-  background-color: var(--el-fill-color-light);
+  background-color: rgb(253, 233, 230,0.2) !important;
+}
+
+.el-table :deep(.el-table__row:hover td.el-table__cell) {
+  background-color: transparent !important;
 }
 .dsi-btn{
   height: 25px;

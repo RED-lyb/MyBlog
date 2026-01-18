@@ -28,7 +28,7 @@ def get_user_info(request):
         try:
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, bio, corner_radius,
+                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, bio,
                            follow_count, article_count, liked_article_count, follower_count, is_admin
                     FROM users WHERE id = %s
                 """, [user_id])
@@ -44,12 +44,11 @@ def get_user_info(request):
                         'bg_color': row[5],
                         'bg_pattern': row[6],
                         'bio': row[7],
-                        'corner_radius': row[8],
-                        'follow_count': row[9] if len(row) > 9 else 0,
-                        'article_count': row[10] if len(row) > 10 else 0,
-                        'liked_article_count': row[11] if len(row) > 11 else 0,
-                        'follower_count': row[12] if len(row) > 12 else 0,
-                        'is_admin': bool(row[13]) if len(row) > 13 and row[13] is not None else False
+                        'follow_count': row[8] if len(row) > 8 else 0,
+                        'article_count': row[9] if len(row) > 9 else 0,
+                        'liked_article_count': row[10] if len(row) > 10 else 0,
+                        'follower_count': row[11] if len(row) > 11 else 0,
+                        'is_admin': bool(row[12]) if len(row) > 12 and row[12] is not None else False
                     }
                     
                     return JsonResponse({
@@ -99,7 +98,7 @@ def get_user_by_id(request, user_id):
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, bio, corner_radius,
+                SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, bio,
                        follow_count, article_count, liked_article_count, follower_count
                 FROM users WHERE id = %s
             """, [user_id])
@@ -115,11 +114,10 @@ def get_user_by_id(request, user_id):
                     'bg_color': row[5],
                     'bg_pattern': row[6],
                     'bio': row[7],
-                    'corner_radius': row[8],
-                    'follow_count': row[9] if len(row) > 9 else 0,
-                    'article_count': row[10] if len(row) > 10 else 0,
-                    'liked_article_count': row[11] if len(row) > 11 else 0,
-                    'follower_count': row[12] if len(row) > 12 else 0
+                    'follow_count': row[8] if len(row) > 8 else 0,
+                    'article_count': row[9] if len(row) > 9 else 0,
+                    'liked_article_count': row[10] if len(row) > 10 else 0,
+                    'follower_count': row[11] if len(row) > 11 else 0
                 }
                 
                 return JsonResponse({
@@ -337,7 +335,7 @@ def upload_avatar(request):
 @require_http_methods(["POST"])
 def update_profile(request):
     """
-    更新用户资料（bg_color, bg_pattern, bio, corner_radius）
+    更新用户资料（bg_color, bg_pattern, bio）
     """
     try:
         current_user_id = getattr(request, 'user_id', None)
@@ -351,7 +349,6 @@ def update_profile(request):
         bg_color = data.get('bg_color', '').strip()
         bg_pattern = data.get('bg_pattern', '').strip()
         bio = data.get('bio', '').strip()
-        corner_radius = data.get('corner_radius', '').strip()
         
         # 构建更新SQL
         updates = []
@@ -368,10 +365,6 @@ def update_profile(request):
         if 'bio' in data:
             updates.append('bio = %s')
             params.append(bio if bio else None)
-        
-        if corner_radius is not None:
-            updates.append('corner_radius = %s')
-            params.append(corner_radius if corner_radius else None)
         
         if not updates:
             return JsonResponse({

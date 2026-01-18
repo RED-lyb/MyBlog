@@ -13,7 +13,6 @@ const sanitizeUser = (rawUser) => {
     avatar: rawUser.avatar ?? '',
     bg_color: rawUser.bg_color ?? '',
     bg_pattern: rawUser.bg_pattern ?? '',
-    corner_radius: rawUser.corner_radius ?? '',
     follow_count: rawUser.follow_count ?? 0,
     article_count: rawUser.article_count ?? 0,
     liked_article_count: rawUser.liked_article_count ?? 0,
@@ -43,7 +42,6 @@ export const useAuthStore = defineStore('auth', () => {
   const avatar = computed(() => user.value?.avatar || '')
   const bgColor = computed(() => user.value?.bg_color || '')
   const bgPattern = computed(() => user.value?.bg_pattern || '')
-  const cornerRadius = computed(() => user.value?.corner_radius || '')
   const followCount = computed(() => user.value?.follow_count || 0)
   const articleCount = computed(() => user.value?.article_count || 0)
   const likedArticleCount = computed(() => user.value?.liked_article_count || 0)
@@ -137,7 +135,6 @@ export const useAuthStore = defineStore('auth', () => {
     avatar,
     bgColor,
     bgPattern,
-    cornerRadius,
     followCount,
     articleCount,
     likedArticleCount,

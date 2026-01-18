@@ -520,7 +520,6 @@ def get_user(request, user_id):
                     avatar,
                     bg_color,
                     bg_pattern,
-                    corner_radius,
                     follow_count,
                     article_count,
                     liked_article_count,
@@ -544,12 +543,11 @@ def get_user(request, user_id):
                 'avatar': row[3],
                 'bg_color': row[4],
                 'bg_pattern': row[5],
-                'corner_radius': row[6],
-                'follow_count': row[7],
-                'article_count': row[8],
-                'liked_article_count': row[9],
-                'follower_count': row[10],
-                'is_admin': bool(row[11]) if row[11] is not None else False
+                'follow_count': row[6],
+                'article_count': row[7],
+                'liked_article_count': row[8],
+                'follower_count': row[9],
+                'is_admin': bool(row[10]) if row[10] is not None else False
             }
             
             return JsonResponse({
@@ -592,10 +590,6 @@ def update_user(request, user_id):
         if 'bg_pattern' in data:
             update_fields.append("bg_pattern = %s")
             params.append(data['bg_pattern'])
-        
-        if 'corner_radius' in data:
-            update_fields.append("corner_radius = %s")
-            params.append(data['corner_radius'])
         
         if not update_fields:
             return JsonResponse({

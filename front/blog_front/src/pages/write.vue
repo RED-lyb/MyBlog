@@ -21,8 +21,7 @@ const {
   registeredTime,
   avatar,
   bgColor,
-  bgPattern,
-  cornerRadius
+  bgPattern
 } = storeToRefs(authStore)
 const { loading, fetchUserInfo } = useUserInfo()
 const router = useRouter()

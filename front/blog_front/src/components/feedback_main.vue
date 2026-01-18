@@ -325,7 +325,9 @@ defineExpose({
 .feedback-info {
   margin-top: 30px;
 }
-
+.el-card{
+  background: rgba(245, 245, 245, 0.1) !important; 
+}
 .card-header {
   font-size: 18px;
   font-weight: 600;

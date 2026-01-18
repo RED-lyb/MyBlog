@@ -72,7 +72,6 @@ const calculatePageSize = () => {
   
   const container = containerRef.value
   const containerHeight = container.offsetHeight || container.clientHeight
-  console.log(containerHeight)
   // 如果高度异常，跳过计算
   if (containerHeight < 100) return
   
@@ -549,7 +548,7 @@ onUnmounted(() => {
   border-radius: 8px;
   border: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(245, 245, 245, 0.1);
   cursor: pointer;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }

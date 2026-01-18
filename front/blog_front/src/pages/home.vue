@@ -1,12 +1,11 @@
 <script setup>
-import { onMounted, ref, computed, nextTick, provide } from 'vue'
+import { onMounted, ref, nextTick, provide } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
-import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Home_main from '../components/home_main.vue'
@@ -41,21 +40,11 @@ const {
   registeredTime,
   avatar,
   bgColor,
-  bgPattern,
-  cornerRadius
+  bgPattern
 } = storeToRefs(authStore)
-const { loading, fetchUserInfo } = useUserInfo()
+const { fetchUserInfo } = useUserInfo()
 const router = useRouter()
 const route = useRoute()
-const isLoading = ref(true)
-const layoutReady = ref(false)
-const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
-
-const markLayoutReady = async () => {
-  if (layoutReady.value) return
-  await nextTick()
-  layoutReady.value = true
-}
 const guest_info_show = () => {
   ElMessageBox.confirm(
     `您当前正在以游客身份访问，仅可进行博客文档内容阅读，<br/>
@@ -83,17 +72,13 @@ onMounted(async () => {
 
   if (tokenExpired.value) {
     // token已过期，等待路由守卫处理
-    isLoading.value = false
-    await markLayoutReady()
     return
   }
 
   const accessToken = localStorage.getItem('access_token')
 
   if (!accessToken) {
-    // 游客模式：没有 token，直接结束 loading
-    isLoading.value = false
-    await markLayoutReady()
+    // 游客模式：没有 token
     // 只有从登录页的游客登录进入时才显示弹窗
     const shouldShowDialog = sessionStorage.getItem('show_guest_dialog') === 'true'
     if (!isAuthenticated.value && shouldShowDialog) {
@@ -113,17 +98,13 @@ onMounted(async () => {
       // 其他错误可以在这里处理
     }
   } finally {
-    isLoading.value = false
     // 只有在不是过期状态且未认证时，且从登录页的游客登录进入时才显示游客提示
     const shouldShowDialog = sessionStorage.getItem('show_guest_dialog') === 'true'
     if (!isAuthenticated.value && !tokenExpired.value && shouldShowDialog) {
       // 清除标记，确保只弹出一次
       sessionStorage.removeItem('show_guest_dialog')
-      await markLayoutReady()
       await nextTick()
       guest_info_show()
-    } else {
-      await markLayoutReady()
     }
   }
 })
@@ -145,12 +126,7 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <FullScreenLoading :visible="showPageLoading" />
-  <div v-if="showPageLoading">
-  </div>
-  <div v-else>
-
-    <div class="common-layout">
+  <div class="common-layout">
       <el-container>
         <el-header style="padding: 0">
           <Head />
@@ -268,7 +244,6 @@ const resetFilters = () => {
         </el-footer>
       </el-container>
     </div>
-  </div>
 </template>
 <style scoped>
 .el-aside {
@@ -287,7 +262,7 @@ const resetFilters = () => {
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }
 
 

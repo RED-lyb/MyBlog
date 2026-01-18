@@ -25,7 +25,6 @@ class Users(models.Model):
     bg_color = models.CharField(max_length=20, blank=True, null=True, db_comment='个人中心背景色，CSS 合法值')
     bg_pattern = models.CharField(max_length=50, blank=True, null=True, db_comment='背景点缀样式')
     bio = models.TextField(blank=True, null=True, db_comment='个人介绍')
-    corner_radius = models.CharField(max_length=10, blank=True, null=True, db_comment='卡片圆角大小，单位 px 或百分比')
     follow_count = models.PositiveIntegerField(default=0, db_comment='关注数，默认0')
     article_count = models.PositiveIntegerField(default=0, db_comment='发布文章数，默认0')
     liked_article_count = models.PositiveIntegerField(default=0, db_comment='喜欢的文章数，默认0')

@@ -1026,7 +1026,7 @@ watch([filterOnlyMine, filterUsername], () => {
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
-  box-shadow: var(--el-box-shadow-light);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }
 
 .network-disk-container {

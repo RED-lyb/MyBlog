@@ -24,7 +24,7 @@ def home(request):
         try:
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern, corner_radius 
+                    SELECT id, username, protect, registered_time, avatar, bg_color, bg_pattern 
                     FROM users WHERE id = %s
                 """, [user_id])
                 row = cursor.fetchone()
@@ -37,8 +37,7 @@ def home(request):
                         'registered_time': row[3].isoformat() if row[3] else None,
                         'avatar': row[4],
                         'bg_color': row[5],
-                        'bg_pattern': row[6],
-                        'corner_radius': row[7]
+                        'bg_pattern': row[6]
                     }
                     
                     return JsonResponse({
