@@ -55,6 +55,12 @@ const storageInfo = ref({
 })
 const loadingStorageInfo = ref(false)
 
+// 网盘配置信息
+const networkDiskConfig = ref({
+  cleanup_days: 7
+})
+const loadingConfig = ref(false)
+
 const apiUrl = import.meta.env.VITE_API_URL
 
 const markLayoutReady = async () => {
@@ -103,6 +109,27 @@ const checkIfFile = async (path) => {
       return true // 可能是文件
     }
     return false
+  }
+}
+
+// 获取网盘配置信息
+const fetchNetworkDiskConfig = async () => {
+  loadingConfig.value = true
+  try {
+    const response = await apiClient.get(`${apiUrl}network_disk/config/`)
+    if (response.data?.success) {
+      networkDiskConfig.value = response.data.data
+    } else {
+      console.error('获取网盘配置失败:', response.data?.error)
+      // 使用默认值
+      networkDiskConfig.value.cleanup_days = 7
+    }
+  } catch (error) {
+    console.error('获取网盘配置失败:', error)
+    // 使用默认值
+    networkDiskConfig.value.cleanup_days = 7
+  } finally {
+    loadingConfig.value = false
   }
 }
 
@@ -741,6 +768,8 @@ const ensureUserDirectory = async () => {
       await apiClient.get(`${apiUrl}network_disk/list/`, {
         params: { path: String(userId.value) }
       })
+      // 提示用户网盘仅存储文件一定天数
+      ElMessage.warning(`该网盘仅存储文件${networkDiskConfig.value.cleanup_days}天`)
   } catch (error) {
       // 忽略错误，目录会在后端自动创建
       console.log('确保用户目录:', error)
@@ -786,11 +815,16 @@ onMounted(async () => {
   isLoading.value = false
   await markLayoutReady()
   
+  // 获取网盘配置信息
+    await fetchNetworkDiskConfig()
+
   // 如果用户已登录，确保用户文件夹存在
   await ensureUserDirectory()
   
   // 获取存储信息
   await fetchStorageInfo()
+
+  
   
   // 文件列表加载由路由监听器处理（watch with immediate: true）
 })

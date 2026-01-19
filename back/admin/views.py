@@ -696,6 +696,13 @@ def toggle_admin(request, user_id):
                 'error': '不能修改自己的管理员状态'
             }, status=400)
         
+        # 不能取消ID为1的用户的管理员权限
+        if user_id == 1:
+            return JsonResponse({
+                'success': False,
+                'error': '不能取消ID为1的用户的管理员权限'
+            }, status=400)
+        
         with connection.cursor() as cursor:
             cursor.execute("SELECT is_admin FROM users WHERE id = %s", [user_id])
             row = cursor.fetchone()
@@ -709,6 +716,13 @@ def toggle_admin(request, user_id):
             current_admin_status = bool(row[0]) if row[0] is not None else False
             new_admin_status = not current_admin_status
             
+            # 如果是取消管理员权限且用户ID为1，禁止操作
+            if not new_admin_status and user_id == 1:
+                return JsonResponse({
+                    'success': False,
+                    'error': '不能取消ID为1的用户的管理员权限'
+                }, status=400)
+
             cursor.execute("UPDATE users SET is_admin = %s WHERE id = %s", [new_admin_status, user_id])
             
             return JsonResponse({

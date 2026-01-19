@@ -17,6 +17,8 @@
       return {
         "--radiant-anim-duration": `${props.duration}s`,
         "--radiant-width": `${props.radiantWidth}px`,
+        "padding-left":`0px`,
+        "padding-bottom":`3px`
       };
     });
     </script>

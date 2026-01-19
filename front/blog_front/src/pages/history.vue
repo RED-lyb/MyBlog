@@ -138,7 +138,7 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside>
+          <el-aside style="padding: 10px;">
             <!-- 时间列表 -->
             <div class="history-list">
               <div 
@@ -180,8 +180,6 @@ onMounted(async () => {
   top: 60px;
   align-self: flex-start;
   height: calc(100vh - 165px);
-  overflow-y: auto;
-  padding: 10px;
 }
 
 .history-list {

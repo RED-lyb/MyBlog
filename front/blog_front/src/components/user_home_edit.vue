@@ -36,6 +36,7 @@ const formData = ref({
 })
 const saving = ref(false)
 const showLoading = ref(false)
+const showPageContent = ref(false) // 控制是否显示页面内容
 
 // 上传头像相关
 const avatarDialogVisible = ref(false)
@@ -631,23 +632,23 @@ onMounted(async () => {
     return
   }
   permissionChecked.value = true
-  
+
   // 权限检查：编辑页面只能访问自己的（只在这里检查一次，避免重复）
   const routeUserId = route.params.userId ? parseInt(route.params.userId) : null
-  
+
   // 检查是否为游客
   if (!isAuthenticated.value) {
     // 游客不能访问任何用户的编辑页面（只显示弹窗，不显示错误消息）
     showGuestDialog(router, '/home')
     return
   }
-  
+
   // 检查登录用户是否尝试访问其他用户的编辑页面（只跳转，不显示错误消息，避免重复）
   if (routeUserId && routeUserId !== userId.value) {
     router.push(`/user_home/${userId.value}`)
     return
   }
-  
+
   // 正常访问自己的编辑页面
   if (routeUserId) {
     targetUserId.value = routeUserId
@@ -660,7 +661,10 @@ onMounted(async () => {
       await fetchCurrentUserProtect()
     }
   }
-  
+
+  // 显示页面内容
+  showPageContent.value = true
+
   // 触发浏览器重新计算页面高度
   triggerResize()
 })
@@ -668,7 +672,7 @@ onMounted(async () => {
 
 <template>
   <FullScreenLoading :visible="showLoading" />
-  <div class="edit-profile-container">
+  <div v-if="showPageContent" class="edit-profile-container">
     <div v-if="userLoading" class="user-loading">加载中...</div>
     <div v-else-if="userError" class="user-error">{{ userError }}</div>
     <div v-else class="edit-profile-content">

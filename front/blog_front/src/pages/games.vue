@@ -9,8 +9,6 @@ import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Games_main from '../components/games_main.vue'
-import { showGuestDialog } from '../lib/guestDialog.js'
-
 const authStore = useAuthStore()
 const {
   user,
@@ -49,14 +47,9 @@ onMounted(async () => {
   const accessToken = localStorage.getItem('access_token')
 
   if (!accessToken) {
-    // 游客模式：没有 token，直接结束 loading，并显示游客提示
+    // 游客模式：没有 token，直接结束 loading
     isLoading.value = false
     await markLayoutReady()
-    if (!isAuthenticated.value) {
-      // 延迟显示弹窗，确保页面已渲染完成
-      await nextTick()
-      showGuestDialog(router, '/home')
-    }
     return
   }
 
@@ -69,14 +62,7 @@ onMounted(async () => {
     }
   } finally {
     isLoading.value = false
-    // 只有在不是过期状态且未认证时才显示游客提示
-    if (!isAuthenticated.value && !tokenExpired.value) {
-      await markLayoutReady()
-      await nextTick()
-      showGuestDialog(router, '/home')
-    } else {
-      await markLayoutReady()
-    }
+    await markLayoutReady()
   }
 })
 </script>

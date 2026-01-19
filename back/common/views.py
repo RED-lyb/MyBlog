@@ -346,9 +346,19 @@ def update_profile(request):
             }, status=401)
         
         data = json.loads(request.body.decode())
-        bg_color = data.get('bg_color', '').strip()
-        bg_pattern = data.get('bg_pattern', '').strip()
-        bio = data.get('bio', '').strip()
+        
+        if data.get('bg_color', '') is None:
+            bg_color = ''
+        else:
+            bg_color = data.get('bg_color', '').strip()
+        if data.get('bg_pattern', '') is None:
+            bg_pattern = ''
+        else:
+            bg_pattern = data.get('bg_pattern', '').strip()
+        if data.get('bio', '') is None:
+            bio = ''
+        else:
+            bio = data.get('bio', '').strip()
         
         # 构建更新SQL
         updates = []

@@ -28,6 +28,7 @@ const router = useRouter()
 const isLoading = ref(true)
 const layoutReady = ref(false)
 const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
+const showPageContent = ref(false) // 控制是否显示页面内容
 
 const markLayoutReady = async () => {
   if (layoutReady.value) return
@@ -56,6 +57,8 @@ onMounted(async () => {
       // 延迟显示弹窗，确保页面已渲染完成
       await nextTick()
       showGuestDialog(router, '/home')
+    } else {
+      showPageContent.value = true
     }
     return
   }
@@ -76,6 +79,7 @@ onMounted(async () => {
       showGuestDialog(router, '/home')
     } else {
       await markLayoutReady()
+      showPageContent.value = true
     }
   }
 })
@@ -85,7 +89,7 @@ onMounted(async () => {
   <FullScreenLoading :visible="showPageLoading" />
   <div v-if="showPageLoading">
   </div>
-  <div v-else>
+  <div v-else-if="showPageContent">
 
     <div class="common-layout">
       <el-container>

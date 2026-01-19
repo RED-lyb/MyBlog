@@ -16,12 +16,34 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from common.jwt_utils import jwt_required
+from common.config_utils import get_config_value
 from django.db import connection
 
 
 # 网盘文件根目录
 NETWORK_DISK_ROOT = Path(settings.BASE_DIR) / 'api' / 'static' / 'files'
 
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_network_disk_config(request):
+    """获取网盘配置信息"""
+    try:
+        # 获取网盘清理天数配置
+        cleanup_days = get_config_value('network_disk.cleanup_days', 7)
+        
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'cleanup_days': cleanup_days
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'获取网盘配置失败: {str(e)}'
+        }, status=500)
+    
 
 def get_username_by_id(user_id):
     """通过用户ID获取用户名"""

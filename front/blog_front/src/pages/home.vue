@@ -10,6 +10,7 @@ import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Home_main from '../components/home_main.vue'
 import CreateButton from '../components/CreateButton.vue'
+import { showGuestDialog } from '../lib/guestDialog.js'
 
 // 搜索筛选参数
 const searchFilters = ref({
@@ -45,6 +46,7 @@ const {
 const { fetchUserInfo } = useUserInfo()
 const router = useRouter()
 const route = useRoute()
+const showPageContent = ref(false) // 控制是否显示页面内容
 const guest_info_show = () => {
   ElMessageBox.confirm(
     `您当前正在以游客身份访问，仅可进行博客文档内容阅读，<br/>
@@ -63,6 +65,8 @@ const guest_info_show = () => {
       router.push({ path: '/login' })
     })
     .catch(() => {
+      // 用户点击"继续访问"，显示页面内容
+      showPageContent.value = true
     })
 }
 // 页面挂载时刷新用户信息（确保数据最新）
@@ -86,6 +90,9 @@ onMounted(async () => {
       sessionStorage.removeItem('show_guest_dialog')
       await nextTick()
       guest_info_show()
+    } else {
+      // 不需要显示弹窗，直接显示页面内容
+      showPageContent.value = true
     }
     return
   }
@@ -105,6 +112,9 @@ onMounted(async () => {
       sessionStorage.removeItem('show_guest_dialog')
       await nextTick()
       guest_info_show()
+    } else {
+      // 不需要显示弹窗，直接显示页面内容
+      showPageContent.value = true
     }
   }
 })
@@ -126,7 +136,7 @@ const resetFilters = () => {
 </script>
 
 <template>
-  <div class="common-layout">
+  <div v-if="showPageContent" class="common-layout">
       <el-container>
         <el-header style="padding: 0">
           <Head />
@@ -138,7 +148,7 @@ const resetFilters = () => {
                 <span>搜索筛选</span>
                 <el-icon><Search /></el-icon>
               </div>
-              
+
               <!-- 用户ID -->
               <div class="filter-item">
                 <label>用户ID</label>
@@ -149,7 +159,7 @@ const resetFilters = () => {
                   size="small"
                 />
               </div>
-              
+
               <!-- 用户名 -->
               <div class="filter-item">
                 <label>用户名</label>
@@ -160,7 +170,7 @@ const resetFilters = () => {
                   size="small"
                 />
               </div>
-              
+
               <!-- 文章名 -->
               <div class="filter-item">
                 <label>文章名</label>
@@ -171,7 +181,7 @@ const resetFilters = () => {
                   size="small"
                 />
               </div>
-              
+
               <!-- 发布时间区间 -->
               <div class="filter-item">
                 <label>发布时间</label>
@@ -194,7 +204,7 @@ const resetFilters = () => {
                   style="width: 100%;"
                 />
               </div>
-              
+
               <!-- 排序方式 -->
               <div class="filter-item">
                 <label>排序方式</label>
@@ -217,7 +227,7 @@ const resetFilters = () => {
                   <el-option label="升序" value="asc" />
                 </el-select>
               </div>
-              
+
               <!-- 重置按钮 -->
               <div class="filter-actions">
                 <el-button

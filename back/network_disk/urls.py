@@ -12,5 +12,6 @@ urlpatterns = [
     path('mkdir/', views.create_directory, name='create_directory'),  # 创建目录
     path('rename/', views.rename_item, name='rename_item'),  # 重命名文件或文件夹
     path('storage-info/', views.get_storage_info, name='get_storage_info'),  # 获取存储信息
+    path('config/', views.get_network_disk_config, name='get_network_disk_config'),  # 获取网盘配置
 ]
 

@@ -102,7 +102,7 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside>
+          <el-aside style="padding: 10px;">
             <!-- 选择面板 -->
             <div class="panel-list">
               <div class="panel-item" :class="{ active: selectedPanel === 'intro' }" @click="selectPanel('intro')">
@@ -141,8 +141,6 @@ onMounted(async () => {
   top: 60px;
   align-self: flex-start;
   height: calc(100vh - 165px);
-  overflow-y: auto;
-  padding: 10px;
 }
 
 .el-main {

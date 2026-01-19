@@ -3,8 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { storeToRefs } from 'pinia'
+import { useConfigStore } from '../stores/config.js'
 import RadiantText from '../pages/inspira/RadiantText.vue'
+import FullScreenLoading from '../pages/FullScreenLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,12 +18,15 @@ const error = ref(null)
 const targetUser = ref(null)
 const userLoading = ref(false)
 const userError = ref(null)
-
 // 列表数据
 const followingList = ref([])
 const followersList = ref([])
 const likedArticlesList = ref([])
 const articlesList = ref([])
+
+//配置
+const configStore = useConfigStore()
+const { config } = storeToRefs(configStore)
 
 // 当前显示的类型
 const currentType = computed(() => {
@@ -31,6 +36,33 @@ const currentType = computed(() => {
   if (path.includes('/liked-articles')) return 'liked-articles'
   if (path.includes('/articles')) return 'articles'
   return 'home'
+})
+
+const calculateDays = (dateString) => {
+  if (!dateString) return 0
+  
+  try {
+    const startDate = new Date(dateString)
+    const endDate = new Date() // 当前时间
+    
+    // 计算时间差（毫秒）
+    const timeDiff = endDate.getTime() - startDate.getTime()
+    
+    // 转换为天数（向上取整，确保至少1天）
+    const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24))
+    
+    // 确保最小值为1
+    return Math.max(1, daysDiff)
+  } catch (error) {
+    console.error('计算天数错误:', error)
+    return 0
+  }
+}
+
+// 计算注册天数（使用响应式计算属性）
+const registeredDays = computed(() => {
+  if (!targetUser.value?.registered_time) return 0
+  return calculateDays(targetUser.value.registered_time)
 })
 
 // 默认头像
@@ -264,7 +296,7 @@ onMounted(() => {
   <div class="user-home-main">
     <!-- 主页内容 -->
     <div v-if="currentType === 'home'">
-      <div v-if="userLoading" class="loading">加载中...</div>
+      <div v-if="userLoading" class="loading"></div>
       <div v-else-if="userError" class="error">{{ userError }}</div>
       <div v-else class="welcome-message">
 
@@ -276,6 +308,10 @@ onMounted(() => {
           </RadiantText>
           <p v-if="targetUser?.bio">{{ targetUser.bio }}</p>
           <p v-else class="empty-introduction">该用户还没有个人介绍</p>
+
+        </div>
+        <div style="margin-top: 10px;">
+          <i>该用户已来到{{ config.blog_name }} <u>{{ registeredDays }}</u> 天</i>
         </div>
       </div>
     </div>
@@ -283,10 +319,10 @@ onMounted(() => {
     <!-- 关注列表 -->
     <div v-else-if="currentType === 'following'" class="list-content">
       <h2 class="list-title">关注列表</h2>
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
-      <div v-else-if="followingList.length === 0" class="empty">暂无关注</div>
-      <div v-else class="user-list">
+      <FullScreenLoading :visible="loading" />
+      <div v-if="!loading && error" class="error">{{ error }}</div>
+      <div v-else-if="!loading && followingList.length === 0" class="empty">暂无关注</div>
+      <div v-else-if="!loading" class="user-list">
         <div v-for="user in followingList" :key="user.id" class="user-item" @click="goToUserHome(user.id)">
           <img :src="user.avatarUrl" :alt="user.username" class="user-avatar" />
           <div class="user-info">
@@ -304,10 +340,10 @@ onMounted(() => {
     <!-- 粉丝列表 -->
     <div v-else-if="currentType === 'followers'" class="list-content">
       <h2 class="list-title">粉丝列表</h2>
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
-      <div v-else-if="followersList.length === 0" class="empty">暂无粉丝</div>
-      <div v-else class="user-list">
+      <FullScreenLoading :visible="loading" />
+      <div v-if="!loading && error" class="error">{{ error }}</div>
+      <div v-else-if="!loading && followersList.length === 0" class="empty">暂无粉丝</div>
+      <div v-else-if="!loading" class="user-list">
         <div v-for="user in followersList" :key="user.id" class="user-item" @click="goToUserHome(user.id)">
           <img :src="user.avatarUrl" :alt="user.username" class="user-avatar" />
           <div class="user-info">
@@ -325,10 +361,10 @@ onMounted(() => {
     <!-- 喜欢的文章列表 -->
     <div v-else-if="currentType === 'liked-articles'" class="list-content">
       <h2 class="list-title">喜欢的文章</h2>
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
-      <div v-else-if="likedArticlesList.length === 0" class="empty">暂无喜欢的文章</div>
-      <div v-else class="article-list">
+      <FullScreenLoading :visible="loading" />
+      <div v-if="!loading && error" class="error">{{ error }}</div>
+      <div v-else-if="!loading && likedArticlesList.length === 0" class="empty">暂无喜欢的文章</div>
+      <div v-else-if="!loading" class="article-list">
         <div v-for="article in likedArticlesList" :key="article.id" class="article-item"
           @click="goToArticle(article.id)">
           <h3 class="article-title">{{ article.title }}</h3>
@@ -347,10 +383,10 @@ onMounted(() => {
     <!-- 发布的文章列表 -->
     <div v-else-if="currentType === 'articles'" class="list-content">
       <h2 class="list-title">发布的文章</h2>
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
-      <div v-else-if="articlesList.length === 0" class="empty">暂无发布的文章</div>
-      <div v-else class="article-list">
+      <FullScreenLoading :visible="loading" />
+      <div v-if="!loading && error" class="error">{{ error }}</div>
+      <div v-else-if="!loading && articlesList.length === 0" class="empty">暂无发布的文章</div>
+      <div v-else-if="!loading" class="article-list">
         <div v-for="article in articlesList" :key="article.id" class="article-item" @click="goToArticle(article.id)">
           <h3 class="article-title">{{ article.title }}</h3>
           <p class="article-content">{{ article.content }}</p>

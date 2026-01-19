@@ -37,8 +37,8 @@ REM Temporary SQL file
 set TEMP_FILE=%OUTPUT_FILE%.tmp
 
 REM Step 1: Export database structure with UTF-8 encoding (without DROP TABLE)
-echo [1/3] Exporting database structure...
-mysqldump -u %DB_USER% -p --no-data --skip-add-drop-table --default-character-set=utf8mb4 --set-charset --single-transaction %DB_NAME% > "%TEMP_FILE%"
+echo [1/4] Exporting database structure...
+mysqldump -u %DB_USER% -p --no-data --default-character-set=utf8mb4 --set-charset --single-transaction %DB_NAME% > "%TEMP_FILE%"
 
 if errorlevel 1 (
     echo Error: Database export failed!
@@ -47,12 +47,16 @@ if errorlevel 1 (
 )
 
 REM Step 2: Fix collation_connection to utf8mb4_unicode_ci
-echo [2/3] Fixing collation settings...
+echo [2/4] Fixing collation settings...
 powershell -NoProfile -Command "$content = Get-Content '%TEMP_FILE%' -Raw -Encoding UTF8; $content = $content -replace 'utf8mb4_0900_ai_ci', 'utf8mb4_unicode_ci'; [System.IO.File]::WriteAllText('%OUTPUT_FILE%', $content, [System.Text.Encoding]::UTF8)"
 
 REM Step 3: Fix DEFINER to admin@localhost
-echo [3/3] Fixing DEFINER settings...
+echo [3/4] Fixing DEFINER settings...
 powershell -NoProfile -Command "$content = Get-Content '%OUTPUT_FILE%' -Raw -Encoding UTF8; $content = $content -replace 'DEFINER=`root`@`localhost`', 'DEFINER=`admin`@`localhost`'; [System.IO.File]::WriteAllText('%OUTPUT_FILE%', $content, [System.Text.Encoding]::UTF8)"
+
+REM Step 4: Fix AUTO_INCREMENT values to 1
+echo [4/4] Fixing AUTO_INCREMENT values...
+powershell -NoProfile -Command "$content = Get-Content '%OUTPUT_FILE%' -Raw -Encoding UTF8; $content = $content -replace 'AUTO_INCREMENT=\d+', 'AUTO_INCREMENT=1'; [System.IO.File]::WriteAllText('%OUTPUT_FILE%', $content, [System.Text.Encoding]::UTF8)"
 
 REM Delete temporary file
 del "%TEMP_FILE%"
@@ -66,6 +70,7 @@ echo.
 echo Verify export file:
 echo - collation_connection should be utf8mb4_unicode_ci
 echo - DEFINER should be admin@localhost
+echo - All AUTO_INCREMENT values should be 1
 echo.
 
 pause
