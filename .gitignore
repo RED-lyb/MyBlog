@@ -36,11 +36,15 @@ front/blog_front/.env.development
 front/blog_front/.env.production
 
 # 日志和临时文件
+!log/back.log
 *.log
 *.tmp
 
 # 静态资源上传目录
-back/api/static/
+back/api/static/files/*
+!back/api/static/files/.gitkeep
+back/api/static/user_heads/*
+!back/api/static/user_heads/.gitkeep
 
 # 其他
 .DS_Store
