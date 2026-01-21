@@ -51,6 +51,14 @@ const showCodeLangDropdown = ref(false)
 const showColorPicker = ref(false)
 const selectedColor = ref('#000000')
 
+// 嵌入网页对话框状态
+const showEmbedDialog = ref(false)
+const embedType = ref('url') // 'url' 或 'html'
+const embedUrl = ref('')
+const embedHtml = ref('')
+const embedWidth = ref('100%')
+const embedHeight = ref('400px')
+
 // 插入文本到编辑器（支持撤销）
 const insertText = (beforeText, afterText = '', cursorPosition = 'end') => {
   const textarea = editorRef.value
@@ -136,6 +144,52 @@ const handleColor = () => {
   insertText(`<span style="color: ${color}">`, '</span>', 'middle')
   // 关闭颜色选择器弹窗
   showColorPicker.value = false
+}
+
+// 打开嵌入网页对话框
+const handleEmbedWeb = () => {
+  showEmbedDialog.value = true
+  embedType.value = 'url'
+  embedUrl.value = ''
+  embedHtml.value = ''
+  embedWidth.value = '100%'
+  embedHeight.value = '400px'
+}
+
+// 确认嵌入网页
+const confirmEmbed = () => {
+  if (embedType.value === 'url' && !embedUrl.value.trim()) {
+    ElMessage.warning('请输入网页URL')
+    return
+  }
+
+  if (embedType.value === 'html' && !embedHtml.value.trim()) {
+    ElMessage.warning('请输入HTML代码')
+    return
+  }
+
+  // 生成嵌入标记
+  let embedTag = ''
+  if (embedType.value === 'url') {
+    // URL嵌入
+    embedTag = `[embed:url:${embedUrl.value}|width:${embedWidth.value}|height:${embedHeight.value}]`
+  } else {
+    // HTML代码嵌入（使用Base64编码避免解析问题）
+    const encodedHtml = btoa(unescape(encodeURIComponent(embedHtml.value)))
+    embedTag = `[embed:html:${encodedHtml}|width:${embedWidth.value}|height:${embedHeight.value}]`
+  }
+
+  // 插入标记到编辑器
+  insertText(embedTag, '')
+
+  // 关闭对话框
+  showEmbedDialog.value = false
+  ElMessage.success('嵌入标记已添加')
+}
+
+// 取消嵌入
+const cancelEmbed = () => {
+  showEmbedDialog.value = false
 }
 
 // 标题选项
@@ -262,11 +316,11 @@ const parsedContent = computed(() => {
   }
 
   try {
-    const result = marked.parse(content.value)
+    let result = marked.parse(content.value)
 
     // 确保返回的是字符串
     if (typeof result === 'string') {
-      return result
+      result = result
     } else {
       // 如果不是字符串，强制转换为字符串
       const stringResult = String(result || '')
@@ -276,8 +330,48 @@ const parsedContent = computed(() => {
         return '<p style="color: red;">解析错误：返回了对象而非字符串</p>'
       }
 
-      return stringResult
+      result = stringResult
     }
+
+    // 解析嵌入标记 [embed:type:content|width:xxx|height:xxx]
+    const embedPattern = /\[embed:(url|html):([^\|\]]+)\|width:([^\|\]]+)\|height:([^\|\]]+)\]/gi
+    result = result.replace(embedPattern, (match, type, content, width, height) => {
+      if (type === 'url') {
+        // URL嵌入
+        return `<div class="embed-iframe-container">
+          <iframe
+            src="${content}"
+            width="${width}"
+            height="${height}"
+            frameborder="0"
+            scrolling="auto"
+            class="embed-iframe"
+            allowfullscreen
+          ></iframe>
+        </div>`
+      } else if (type === 'html') {
+        // HTML代码嵌入（使用srcdoc）
+        try {
+          const decodedHtml = decodeURIComponent(escape(atob(content)))
+          return `<div class="embed-iframe-container">
+            <iframe
+              width="${width}"
+              height="${height}"
+              frameborder="0"
+              scrolling="auto"
+              class="embed-iframe"
+              srcdoc="${decodedHtml.replace(/"/g, '&quot;')}"
+            ></iframe>
+          </div>`
+        } catch (e) {
+          console.error('HTML解码失败:', e)
+          return '<p style="color: red;">嵌入内容解析失败</p>'
+        }
+      }
+      return match
+    })
+
+    return result
   } catch (e) {
     return String(content.value || '')
   }
@@ -576,6 +670,18 @@ const onCaptchaCancel = () => {
             </div>
           </div>
         </el-popover>
+
+        <!-- 分隔线 -->
+        <div class="toolbar-divider">|</div>
+
+        <!-- 嵌入网页按钮 -->
+        <button class="toolbar-btn" title="嵌入网页" @click="handleEmbedWeb">
+          <el-icon><svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24">
+              <path fill="currentColor"
+                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z">
+              </path>
+            </svg></el-icon>
+        </button>
       </div>
     </div>
 
@@ -631,6 +737,65 @@ const onCaptchaCancel = () => {
   <!-- 验证码对话框 -->
   <CaptchaDialog v-model="showCaptchaDialog" :has-error="captchaError" @success="onCaptchaSuccess"
     @cancel="onCaptchaCancel" />
+
+  <!-- 嵌入网页对话框 -->
+  <el-dialog v-model="showEmbedDialog" title="嵌入网页" width="600px" :close-on-click-modal="false">
+    <el-tabs v-model="embedType">
+      <!-- URL嵌入 -->
+      <el-tab-pane label="URL嵌入" name="url">
+        <div class="embed-form">
+          <el-form label-width="80px">
+            <el-form-item label="网页URL">
+              <el-input v-model="embedUrl" placeholder="请输入网页URL，例如：https://example.com" />
+            </el-form-item>
+            <el-form-item label="宽度">
+              <el-input v-model="embedWidth" placeholder="例如：100% 或 800px" />
+            </el-form-item>
+            <el-form-item label="高度">
+              <el-input v-model="embedHeight" placeholder="例如：400px 或 600px" />
+            </el-form-item>
+          </el-form>
+          <el-alert type="info" :closable="false" style="margin-top: 10px;">
+            <template #title>
+              <div>提示：嵌入外部网页时，请确保目标网站允许被iframe嵌入（无X-Frame-Options限制）</div>
+            </template>
+          </el-alert>
+        </div>
+      </el-tab-pane>
+
+      <!-- HTML代码嵌入 -->
+      <el-tab-pane label="HTML代码" name="html">
+        <div class="embed-form">
+          <el-form label-width="80px">
+            <el-form-item label="HTML代码">
+              <el-input
+                v-model="embedHtml"
+                type="textarea"
+                :rows="10"
+                placeholder="请粘贴完整的HTML代码，例如游戏代码、可视化组件等"
+              />
+            </el-form-item>
+            <el-form-item label="宽度">
+              <el-input v-model="embedWidth" placeholder="例如：100% 或 800px" />
+            </el-form-item>
+            <el-form-item label="高度">
+              <el-input v-model="embedHeight" placeholder="例如：400px 或 600px" />
+            </el-form-item>
+          </el-form>
+          <el-alert type="info" :closable="false" style="margin-top: 10px;">
+            <template #title>
+              <div>提示：支持嵌入任意HTML代码，包括游戏、可视化组件、交互式内容等</div>
+            </template>
+          </el-alert>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
+
+    <template #footer>
+      <el-button @click="cancelEmbed">取消</el-button>
+      <el-button type="primary" @click="confirmEmbed">确认嵌入</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -989,6 +1154,49 @@ const onCaptchaCancel = () => {
 .content-preview :deep(img) {
   max-width: 100%;
   height: auto;
+}
+
+/* 游戏iframe容器样式 */
+.content-preview :deep(.game-iframe-container) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(245, 245, 245, 0.3);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+}
+
+.content-preview :deep(.game-iframe) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  height: auto;
+}
+
+/* 嵌入网页iframe容器样式 */
+.content-preview :deep(.embed-iframe-container) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(245, 245, 245, 0.3);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+}
+
+.content-preview :deep(.embed-iframe) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  height: auto;
+}
+
+/* 嵌入表单样式 */
+.embed-form {
+  padding: 10px 0;
 }
 
 .content-placeholder {

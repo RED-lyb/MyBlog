@@ -154,11 +154,51 @@ const parsedContent = computed(() => {
   if (!article.value?.content) {
     return ''
   }
-  
+
   try {
     // 使用marked解析Markdown
-    const result = marked.parse(article.value.content)
-    return typeof result === 'string' ? result : String(result || '')
+    let result = marked.parse(article.value.content)
+    result = typeof result === 'string' ? result : String(result || '')
+
+    // 解析嵌入标记 [embed:type:content|width:xxx|height:xxx]
+    const embedPattern = /\[embed:(url|html):([^\|\]]+)\|width:([^\|\]]+)\|height:([^\|\]]+)\]/gi
+    result = result.replace(embedPattern, (match, type, content, width, height) => {
+      if (type === 'url') {
+        // URL嵌入
+        return `<div class="embed-iframe-container">
+          <iframe
+            src="${content}"
+            width="${width}"
+            height="${height}"
+            frameborder="0"
+            scrolling="auto"
+            class="embed-iframe"
+            allowfullscreen
+          ></iframe>
+        </div>`
+      } else if (type === 'html') {
+        // HTML代码嵌入（使用srcdoc）
+        try {
+          const decodedHtml = decodeURIComponent(escape(atob(content)))
+          return `<div class="embed-iframe-container">
+            <iframe
+              width="${width}"
+              height="${height}"
+              frameborder="0"
+              scrolling="auto"
+              class="embed-iframe"
+              srcdoc="${decodedHtml.replace(/"/g, '&quot;')}"
+            ></iframe>
+          </div>`
+        } catch (e) {
+          console.error('HTML解码失败:', e)
+          return '<p style="color: red;">嵌入内容解析失败</p>'
+        }
+      }
+      return match
+    })
+
+    return result
   } catch (e) {
     console.error('Markdown解析错误:', e)
     return article.value.content
@@ -817,6 +857,45 @@ onUnmounted(() => {
   max-width: 100%;
   height: auto;
 }
+
+/* 游戏iframe容器样式 */
+.article-content :deep(.game-iframe-container) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(245, 245, 245, 0.3);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+}
+
+.article-content :deep(.game-iframe) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  height: auto;
+}
+
+/* 嵌入网页iframe容器样式 */
+.article-content :deep(.embed-iframe-container) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+  padding: 20px;
+  background: rgba(245, 245, 245, 0.3);
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-light);
+}
+
+.article-content :deep(.embed-iframe) {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-width: 100%;
+  height: auto;
+}
+
 :deep(.el-drawer__body){
   padding-top: 0 !important;
 }
