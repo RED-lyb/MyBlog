@@ -52,3 +52,6 @@ Thumbs.db
 
 # Cursor
 .cursor/
+
+# nginx进程
+project-master.pid
