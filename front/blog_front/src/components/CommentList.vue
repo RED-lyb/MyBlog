@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../stores/user_info.js'
 import apiClient from '../lib/api.js'
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps({
   articleId: {
@@ -15,6 +17,10 @@ const props = defineProps({
 const comments = ref([])
 const loading = ref(false)
 const error = ref(null)
+
+// 用户认证
+const authStore = useAuthStore()
+const { isAuthenticated, userId } = storeToRefs(authStore)
 
 // 默认头像
 const defaultAvatar = '/default_head.png'
@@ -110,6 +116,44 @@ onMounted(() => {
   fetchComments()
 })
 
+// 检查是否是自己的评论
+const isMyComment = (comment) => {
+  return isAuthenticated.value && userId.value && comment.user_id === userId.value
+}
+
+// 删除评论
+const handleDeleteComment = (comment) => {
+  ElMessageBox.confirm(
+    '确定要删除这条评论吗？',
+    '确认删除',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      const response = await apiClient.delete(
+        `${import.meta.env.VITE_API_URL}article/${props.articleId}/comments/${comment.id}/delete/`
+      )
+      
+      if (response.data?.success) {
+        ElMessage.success('评论删除成功')
+        // 刷新评论列表
+        await fetchComments()
+      } else {
+        ElMessage.error(response.data?.error || '删除失败')
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || '删除失败'
+      ElMessage.error(errorMsg)
+      console.error('删除评论错误:', err)
+    }
+  }).catch(() => {
+    // 用户取消删除
+  })
+}
+
 // 暴露刷新方法供父组件调用
 defineExpose({
   refresh: fetchComments
@@ -142,7 +186,12 @@ defineExpose({
             <div class="comment-time">{{ formatDate(comment.created_at) }}</div>
           </div>
         </div>
-        <div class="comment-content">{{ comment.content }}</div>
+        <div class="comment-content-wrapper">
+          <div class="comment-content">{{ comment.content }}</div>
+          <div v-if="isMyComment(comment)" class="comment-actions">
+            <span class="comment-delete" @click="handleDeleteComment(comment)">删除</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -206,12 +255,36 @@ defineExpose({
   color: #999;
 }
 
+.comment-content-wrapper {
+  position: relative;
+}
+
 .comment-content {
   font-size: 14px;
   line-height: 1.6;
   color: var(--el-text-color-regular);
   word-wrap: break-word;
   white-space: pre-wrap;
+  padding-right: 50px;
+}
+
+.comment-actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+
+.comment-delete {
+  font-size: 12px;
+  color: var(--el-color-danger);
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s;
+}
+
+.comment-delete:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 </style>
 

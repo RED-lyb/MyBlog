@@ -10,6 +10,7 @@ urlpatterns = [
     # 评论相关
     path('<int:article_id>/comments/', comment_views.get_comments, name='get_comments'),
     path('<int:article_id>/comments/create/', comment_views.create_comment, name='create_comment'),
+    path('<int:article_id>/comments/<int:comment_id>/delete/', comment_views.delete_comment, name='delete_comment'),
     # 喜欢相关
     path('<int:article_id>/like/', like_views.toggle_like, name='toggle_like'),
     path('<int:article_id>/like/status/', like_views.check_like_status, name='check_like_status'),

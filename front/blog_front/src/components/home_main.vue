@@ -86,7 +86,7 @@ const calculatePageSize = () => {
     const containerPadding = 10
     const availableHeight = containerHeight - paginationHeight - containerPadding
     let calculatedSize = Math.floor(availableHeight / defaultHeight)
-    calculatedSize = Math.max(4, Math.min(20, calculatedSize))
+    calculatedSize = Math.max(3, Math.min(20, calculatedSize))
     if (calculatedSize !== pageSize.value) {
       paginationStore.setPageSize(calculatedSize)
     }
@@ -105,8 +105,8 @@ const calculatePageSize = () => {
   // 计算能显示多少篇文章
   let calculatedSize = Math.floor(availableHeight / articleItemHeight)
   
-  // 设置最小值为 4，最大值为 20
-  calculatedSize = Math.max(4, Math.min(20, calculatedSize))
+  // 设置最小值为 3，最大值为 20
+  calculatedSize = Math.max(3, Math.min(20, calculatedSize))
   
   // 只有当计算出的值与当前值不同时才更新，避免不必要的重新请求
   if (calculatedSize !== pageSize.value) {

@@ -26,7 +26,7 @@ CREATE TABLE `article_comments` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
   `article_id` int unsigned NOT NULL COMMENT '文章ID，外键关联 blog_articles 表',
   `user_id` int unsigned NOT NULL COMMENT '评论用户ID，外键关联 users 表',
-  `content` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '评论内容，最多200字',
+  `content` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '评论内容，最多200字',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间，默认服务器系统时间',
   PRIMARY KEY (`id`),
   KEY `idx_article_id` (`article_id`),
@@ -45,14 +45,14 @@ CREATE TABLE `article_comments` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
-
-    UPDATE blog_articles 
-
-    SET comment_count = comment_count + 1 
-
-    WHERE id = NEW.article_id;
-
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = comment_count + 1 
+
+    WHERE id = NEW.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -68,14 +68,14 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
-
-    UPDATE blog_articles 
-
-    SET comment_count = GREATEST(comment_count - 1, 0)
-
-    WHERE id = OLD.article_id;
-
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = GREATEST(comment_count - 1, 0)
+
+    WHERE id = OLD.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -92,8 +92,8 @@ DROP TABLE IF EXISTS `blog_articles`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `blog_articles` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '文章ID，主键自增',
-  `title` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章标题',
-  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章正文，支持 Markdown/HTML',
+  `title` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章标题',
+  `content` longtext COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '文章正文，支持 Markdown/HTML',
   `author_id` int unsigned NOT NULL COMMENT '作者ID，外键关联 users 表',
   `view_count` int unsigned NOT NULL DEFAULT '0' COMMENT '浏览量，默认0',
   `love_count` int unsigned NOT NULL DEFAULT '0' COMMENT '喜欢数，默认0',
@@ -103,7 +103,7 @@ CREATE TABLE `blog_articles` (
   KEY `idx_author_id` (`author_id`),
   KEY `idx_published_at` (`published_at`),
   KEY `idx_view_count` (`view_count`),
-  CONSTRAINT `blog_articles_ibfk_1` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+  CONSTRAINT `blog_articles_ibfk_1` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='博客文章表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
@@ -162,9 +162,9 @@ DROP TABLE IF EXISTS `captcha_captchastore`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `captcha_captchastore` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `challenge` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `response` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `hashkey` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `challenge` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `response` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `hashkey` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
   `expiration` datetime(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `hashkey` (`hashkey`)
@@ -180,11 +180,11 @@ DROP TABLE IF EXISTS `django_content_type`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_content_type` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `app_label` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `model` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app_label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `model` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `django_content_type_app_label_model_76bd3d3b_uniq` (`app_label`,`model`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -196,11 +196,11 @@ DROP TABLE IF EXISTS `django_migrations`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_migrations` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `app` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `app` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `applied` datetime(6) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -211,8 +211,8 @@ DROP TABLE IF EXISTS `django_session`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `django_session` (
-  `session_key` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `session_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_key` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_data` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
   `expire_date` datetime(6) NOT NULL,
   PRIMARY KEY (`session_key`),
   KEY `django_session_expire_date_a5c62663` (`expire_date`)
@@ -229,11 +229,12 @@ DROP TABLE IF EXISTS `feedbacks`;
 CREATE TABLE `feedbacks` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
   `user_id` int unsigned DEFAULT NULL COMMENT '提出用户ID，外键关联 users 表，NULL表示匿名反馈',
-  `issue_type` enum('使用错误','功能建议') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题类型：使用错误、功能建议',
-  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题描述',
+  `issue_type` enum('使用错误','功能建议') COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题类型：使用错误、功能建议',
+  `description` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '问题描述',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '问题提出时间，默认服务器系统时间',
-  `is_resolved` enum('未解决','已解决','未采纳') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '未解决' COMMENT '解决状态：未解决、已解决、未采纳',
+  `is_resolved` enum('未解决','已解决','未采纳') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '未解决' COMMENT '解决状态：未解决、已解决、未采纳',
   `resolved_at` datetime DEFAULT NULL COMMENT '解决时间，未解决时为NULL',
+  `author_reply` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '作者回复内容',
   PRIMARY KEY (`id`),
   KEY `idx_feedback_user_id` (`user_id`),
   KEY `idx_issue_type` (`issue_type`),
@@ -253,7 +254,7 @@ DROP TABLE IF EXISTS `refresh_tokens`;
 CREATE TABLE `refresh_tokens` (
   `id` int NOT NULL AUTO_INCREMENT,
   `user_id` int NOT NULL COMMENT '用户ID',
-  `token_hash` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Refresh Token的哈希值',
+  `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Refresh Token的哈希值',
   `expires_at` datetime(6) NOT NULL COMMENT '过期时间',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
   `last_used_at` datetime(6) DEFAULT NULL COMMENT '最后使用时间',
@@ -274,7 +275,7 @@ DROP TABLE IF EXISTS `update_history`;
 CREATE TABLE `update_history` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
   `update_time` date NOT NULL DEFAULT (curdate()) COMMENT '更新日期，默认服务器系统日期',
-  `update_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '更新内容描述',
+  `update_content` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '更新内容描述',
   PRIMARY KEY (`id`),
   KEY `idx_update_time` (`update_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新历史表';
@@ -296,7 +297,7 @@ CREATE TABLE `user_follows` (
   UNIQUE KEY `unique_follow` (`follower_id`,`following_id`),
   KEY `idx_follower` (`follower_id`),
   KEY `idx_following` (`following_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注关系表';
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注关系表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -467,15 +468,15 @@ DROP TABLE IF EXISTS `users`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `users` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
-  `username` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '登录名，全局唯一',
-  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '加密后的登录密码',
-  `protect` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密保问题原文',
-  `answer` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密保答案',
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '登录名，全局唯一',
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '加密后的登录密码',
+  `protect` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密保问题原文',
+  `answer` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '密保答案',
   `registered_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '注册时间，默认当前时间',
-  `avatar` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像 URL，空表示未上传',
-  `bg_color` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '个人中心背景色，CSS 合法值',
-  `bg_pattern` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '背景点缀样式',
-  `bio` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '个人介绍',
+  `avatar` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '头像 URL，空表示未上传',
+  `bg_color` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '个人中心背景色，CSS 合法值',
+  `bg_pattern` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '背景点缀样式',
+  `bio` text COLLATE utf8mb4_unicode_ci COMMENT '个人介绍',
   `follow_count` int unsigned NOT NULL DEFAULT '0' COMMENT '关注数，默认0',
   `article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '发布文章数，默认0',
   `liked_article_count` int unsigned NOT NULL DEFAULT '0' COMMENT '喜欢的文章数，默认0',
@@ -495,4 +496,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-19 22:21:26
+-- Dump completed on 2026-01-22 23:29:47

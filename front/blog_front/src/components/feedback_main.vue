@@ -204,14 +204,14 @@ defineExpose({
             <li><strong>使用错误：</strong>在使用过程中遇到的问题、BUG等</li>
             <li><strong>功能建议：</strong>对新功能的需求或改进建议</li>
           </ul>
-          <p style="margin-top: 16px;"><strong>反馈流程：</strong></p>
+          <p style="margin-top: 10px;"><strong>反馈流程：</strong></p>
           <ol>
             <li>点击右侧"反馈"按钮</li>
             <li>选择问题类型</li>
             <li>详细描述问题或建议</li>
             <li>提交反馈</li>
           </ol>
-          <p style="margin-top: 16px; color: var(--el-text-color-secondary);">
+          <p style="margin-top: 10px; color: var(--el-text-color-secondary);">
             我会尽快处理您的反馈，感谢您的支持！
           </p>
         </div>
@@ -278,6 +278,9 @@ defineExpose({
         <div v-if="feedback.resolved_at" class="feedback-resolved">
           <span class="resolved-label">处理时间：</span>
           <span>{{ formatDateTime(feedback.resolved_at) }}</span>
+          <br />
+          <span class="resolved-label">作者回复：</span>
+          <span>{{ feedback.author_reply || '无' }}</span>
         </div>
       </el-card>
     </div>
@@ -347,7 +350,7 @@ defineExpose({
 }
 
 .info-content li {
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
 .loading-feedback,
@@ -439,6 +442,21 @@ defineExpose({
 .resolved-label {
   font-weight: 500;
   margin-right: 4px;
+}
+
+.feedback-author-reply {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--el-border-color-lighter);
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+  line-height: 1.6;
+}
+
+.author-reply-label {
+  font-weight: 500;
+  margin-right: 4px;
+  color: var(--el-text-color-primary);
 }
 
 .dsi-btn {

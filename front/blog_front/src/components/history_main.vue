@@ -84,7 +84,7 @@ onMounted(() => {
     </div>
 
     <div class="content-body">
-      <pre class="content-text">{{ selectedHistory.update_content }}</pre>
+      <div class="content-text" v-html="selectedHistory.update_content"></div>
     </div>
   </div>
   <div v-else class="empty-content">
@@ -118,13 +118,122 @@ onMounted(() => {
 }
 
 .content-text {
-  white-space: pre-wrap;
   word-wrap: break-word;
   font-size: 15px;
   line-height: 1.8;
   color: var(--el-text-color-primary);
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* HTML 标签样式 */
+.content-text :deep(h1),
+.content-text :deep(h2),
+.content-text :deep(h3),
+.content-text :deep(h4),
+.content-text :deep(h5),
+.content-text :deep(h6) {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
+}
+
+.content-text :deep(h1) {
+  font-size: 2em;
+}
+
+.content-text :deep(h2) {
+  font-size: 1.5em;
+}
+
+.content-text :deep(h3) {
+  font-size: 1.25em;
+}
+
+.content-text :deep(h4) {
+  font-size: 1.1em;
+}
+
+.content-text :deep(h5) {
+  font-size: 1em;
+}
+
+.content-text :deep(h6) {
+  font-size: 0.9em;
+}
+
+.content-text :deep(ul),
+.content-text :deep(ol) {
+  margin: 0.5em 0;
+  padding-left: 2em;
+}
+
+.content-text :deep(ul) {
+  list-style-type: disc;
+}
+
+.content-text :deep(ol) {
+  list-style-type: decimal;
+}
+
+.content-text :deep(li) {
+  margin: 0.25em 0;
+}
+
+.content-text :deep(p) {
+  margin: 0.5em 0;
+}
+
+.content-text :deep(strong),
+.content-text :deep(b) {
+  font-weight: bold;
+}
+
+.content-text :deep(em),
+.content-text :deep(i) {
+  font-style: italic;
+}
+
+.content-text :deep(code) {
+  background: var(--el-fill-color-light);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+.content-text :deep(pre) {
+  background: var(--el-fill-color-light);
+  padding: 1em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+.content-text :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.content-text :deep(a) {
+  color: var(--el-color-primary);
+  text-decoration: none;
+}
+
+.content-text :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.content-text :deep(blockquote) {
+  border-left: 4px solid var(--el-border-color);
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: var(--el-text-color-secondary);
+}
+
+.content-text :deep(img) {
+  max-width: 100%;
+  height: auto;
 }
 
 .empty-content {

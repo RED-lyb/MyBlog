@@ -62,7 +62,7 @@ def get_feedback_list(request):
             
             # 获取列表（按时间倒序）
             cursor.execute(f"""
-                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at
+                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at, author_reply
                 FROM feedbacks 
                 WHERE {where_clause}
                 ORDER BY created_at DESC
@@ -86,7 +86,8 @@ def get_feedback_list(request):
                     'description': row[3],
                     'created_at': row[4].isoformat() if row[4] else None,
                     'is_resolved': row[5],
-                    'resolved_at': row[6].isoformat() if row[6] else None
+                    'resolved_at': row[6].isoformat() if row[6] else None,
+                    'author_reply': row[7] if len(row) > 7 else None
                 })
             
             return JsonResponse({
@@ -212,7 +213,7 @@ def admin_get_feedback_list(request):
             # 获取列表
             params_with_limit = params + [page_size, offset]
             cursor.execute(f"""
-                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at
+                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at, author_reply
                 FROM feedbacks 
                 WHERE {where_clause}
                 ORDER BY created_at DESC
@@ -237,7 +238,8 @@ def admin_get_feedback_list(request):
                     'description': row[3],
                     'created_at': row[4].isoformat() if row[4] else None,
                     'is_resolved': row[5],
-                    'resolved_at': row[6].isoformat() if row[6] else None
+                    'resolved_at': row[6].isoformat() if row[6] else None,
+                    'author_reply': row[7] if len(row) > 7 else None
                 })
             
             return JsonResponse({
@@ -266,7 +268,7 @@ def admin_get_feedback(request, feedback_id):
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at
+                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at, author_reply
                 FROM feedbacks 
                 WHERE id = %s
             """, [feedback_id])
@@ -295,7 +297,8 @@ def admin_get_feedback(request, feedback_id):
                     'description': row[3],
                     'created_at': row[4].isoformat() if row[4] else None,
                     'is_resolved': row[5],
-                    'resolved_at': row[6].isoformat() if row[6] else None
+                    'resolved_at': row[6].isoformat() if row[6] else None,
+                    'author_reply': row[7] if len(row) > 7 else None
                 }
             })
     except Exception as e:
@@ -336,32 +339,41 @@ def admin_update_feedback_status(request, feedback_id):
             
             old_status = row[1]
             
+            # 获取 author_reply，支持设置为空
+            author_reply = data.get('author_reply')
+            if author_reply is None:
+                author_reply = None
+            elif isinstance(author_reply, str):
+                author_reply = author_reply.strip() or None
+            else:
+                author_reply = None
+            
             # 如果状态改变且新状态不是"未解决"，更新 resolved_at
             if old_status != is_resolved and is_resolved != '未解决':
                 cursor.execute("""
                     UPDATE feedbacks 
-                    SET is_resolved = %s, resolved_at = NOW()
+                    SET is_resolved = %s, resolved_at = NOW(), author_reply = %s
                     WHERE id = %s
-                """, [is_resolved, feedback_id])
+                """, [is_resolved, author_reply, feedback_id])
             else:
                 # 如果状态改为"未解决"，清空 resolved_at
                 if is_resolved == '未解决':
                     cursor.execute("""
                         UPDATE feedbacks 
-                        SET is_resolved = %s, resolved_at = NULL
+                        SET is_resolved = %s, resolved_at = NULL, author_reply = %s
                         WHERE id = %s
-                    """, [is_resolved, feedback_id])
+                    """, [is_resolved, author_reply, feedback_id])
                 else:
-                    # 状态不变，只更新状态
+                    # 状态不变，只更新状态和作者回复
                     cursor.execute("""
                         UPDATE feedbacks 
-                        SET is_resolved = %s
+                        SET is_resolved = %s, author_reply = %s
                         WHERE id = %s
-                    """, [is_resolved, feedback_id])
+                    """, [is_resolved, author_reply, feedback_id])
             
             # 获取更新后的记录
             cursor.execute("""
-                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at
+                SELECT id, user_id, issue_type, description, created_at, is_resolved, resolved_at, author_reply
                 FROM feedbacks 
                 WHERE id = %s
             """, [feedback_id])
@@ -384,7 +396,8 @@ def admin_update_feedback_status(request, feedback_id):
                     'description': row[3],
                     'created_at': row[4].isoformat() if row[4] else None,
                     'is_resolved': row[5],
-                    'resolved_at': row[6].isoformat() if row[6] else None
+                    'resolved_at': row[6].isoformat() if row[6] else None,
+                    'author_reply': row[7] if len(row) > 7 else None
                 },
                 'message': '反馈状态更新成功'
             })

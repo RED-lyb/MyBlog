@@ -20,13 +20,13 @@ def get_all_articles(request):
     try:
         # 获取分页参数
         page = int(request.GET.get('page', 1))  # 当前页码，默认第1页
-        page_size = int(request.GET.get('page_size', 4))  # 每页数量，默认4条
+        page_size = int(request.GET.get('page_size', 3))  # 每页数量，默认3条
         
         # 确保页码和每页数量有效
         if page < 1:
             page = 1
         if page_size < 1:
-            page_size = 4
+            page_size = 3
         
         # 获取筛选参数
         author_id = request.GET.get('author_id', '').strip()

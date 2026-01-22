@@ -168,8 +168,7 @@ const parsedContent = computed(() => {
         return `<div class="embed-iframe-container">
           <iframe
             src="${content}"
-            width="${width}"
-            height="${height}"
+            style="width: ${width}; height: ${height};"
             frameborder="0"
             scrolling="auto"
             class="embed-iframe"
@@ -182,8 +181,7 @@ const parsedContent = computed(() => {
           const decodedHtml = decodeURIComponent(escape(atob(content)))
           return `<div class="embed-iframe-container">
             <iframe
-              width="${width}"
-              height="${height}"
+              style="width: ${width}; height: ${height};"
               frameborder="0"
               scrolling="auto"
               class="embed-iframe"
@@ -893,7 +891,7 @@ onUnmounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   max-width: 100%;
-  height: auto;
+  /* height 通过内联样式设置，不在这里覆盖 */
 }
 
 :deep(.el-drawer__body){

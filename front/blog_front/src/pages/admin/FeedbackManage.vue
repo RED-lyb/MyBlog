@@ -125,6 +125,17 @@
             <el-option label="未采纳" value="未采纳" />
           </el-select>
         </el-form-item>
+        <el-form-item label="作者回复">
+          <el-input 
+            v-model="statusFormData.author_reply" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="可输入反馈回复"
+            maxlength="1000"
+            show-word-limit
+            style="width: 100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button plain @click="statusDialogVisible = false">取消</el-button>
@@ -160,7 +171,8 @@ const statusDialogVisible = ref(false)
 const submitting = ref(false)
 const statusFormData = ref({
   id: null,
-  is_resolved: ''
+  is_resolved: '',
+  author_reply: ''
 })
 
 const descriptionDialogVisible = ref(false)
@@ -238,7 +250,8 @@ const handlePageChange = () => {
 const handleEditStatus = (row) => {
   statusFormData.value = {
     id: row.id,
-    is_resolved: row.is_resolved
+    is_resolved: row.is_resolved,
+    author_reply: row.author_reply || ''
   }
   statusDialogVisible.value = true
 }
@@ -251,9 +264,23 @@ const handleSubmitStatus = async () => {
 
   submitting.value = true
   try {
+    // 处理 author_reply：空字符串或只有空格时设置为 null
+    let authorReply = statusFormData.value.author_reply
+    if (authorReply && typeof authorReply === 'string') {
+      authorReply = authorReply.trim()
+      if (!authorReply) {
+        authorReply = null
+      }
+    } else if (!authorReply) {
+      authorReply = null
+    }
+    
     const response = await apiClient.put(
       `${apiUrl}feedback/admin/${statusFormData.value.id}/update-status/`,
-      { is_resolved: statusFormData.value.is_resolved }
+      { 
+        is_resolved: statusFormData.value.is_resolved,
+        author_reply: authorReply
+      }
     )
 
     if (response.data.success) {

@@ -1,7 +1,7 @@
 import json
 from django.http import JsonResponse
 from django.db import connection
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from common.jwt_utils import jwt_required
@@ -213,5 +213,58 @@ def create_comment(request, article_id):
         return JsonResponse({
             'success': False,
             'error': f'发布评论失败: {str(e)}'
+        }, status=500)
+
+
+@csrf_exempt
+@jwt_required
+@require_http_methods(["DELETE"])
+def delete_comment(request, article_id, comment_id):
+    """
+    删除评论
+    只能删除自己的评论
+    """
+    try:
+        # 获取用户ID（由JWT中间件设置）
+        user_id = getattr(request, 'user_id', None)
+        if not user_id:
+            return JsonResponse({
+                'success': False,
+                'error': '用户未登录'
+            }, status=401)
+        
+        with connection.cursor() as cursor:
+            # 检查评论是否存在且属于当前用户
+            cursor.execute("""
+                SELECT id, user_id, article_id 
+                FROM article_comments 
+                WHERE id = %s AND article_id = %s
+            """, [comment_id, article_id])
+            row = cursor.fetchone()
+            
+            if not row:
+                return JsonResponse({
+                    'success': False,
+                    'error': '评论不存在'
+                }, status=404)
+            
+            if row[1] != user_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': '只能删除自己的评论'
+                }, status=403)
+            
+            # 删除评论（触发器会自动更新文章的评论数）
+            cursor.execute("DELETE FROM article_comments WHERE id = %s", [comment_id])
+            
+            return JsonResponse({
+                'success': True,
+                'message': '评论删除成功'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'删除评论失败: {str(e)}'
         }, status=500)
 

@@ -53,8 +53,6 @@ const selectedColor = ref('#000000')
 
 // 嵌入网页对话框状态
 const showEmbedDialog = ref(false)
-const embedType = ref('url') // 'url' 或 'html'
-const embedUrl = ref('')
 const embedHtml = ref('')
 const embedWidth = ref('100%')
 const embedHeight = ref('400px')
@@ -149,42 +147,28 @@ const handleColor = () => {
 // 打开嵌入网页对话框
 const handleEmbedWeb = () => {
   showEmbedDialog.value = true
-  embedType.value = 'url'
-  embedUrl.value = ''
   embedHtml.value = ''
   embedWidth.value = '100%'
-  embedHeight.value = '400px'
+  embedHeight.value = '500px'
 }
 
 // 确认嵌入网页
 const confirmEmbed = () => {
-  if (embedType.value === 'url' && !embedUrl.value.trim()) {
-    ElMessage.warning('请输入网页URL')
-    return
-  }
-
-  if (embedType.value === 'html' && !embedHtml.value.trim()) {
+  if (!embedHtml.value.trim()) {
     ElMessage.warning('请输入HTML代码')
     return
   }
 
-  // 生成嵌入标记
-  let embedTag = ''
-  if (embedType.value === 'url') {
-    // URL嵌入
-    embedTag = `[embed:url:${embedUrl.value}|width:${embedWidth.value}|height:${embedHeight.value}]`
-  } else {
-    // HTML代码嵌入（使用Base64编码避免解析问题）
-    const encodedHtml = btoa(unescape(encodeURIComponent(embedHtml.value)))
-    embedTag = `[embed:html:${encodedHtml}|width:${embedWidth.value}|height:${embedHeight.value}]`
-  }
+  // HTML代码嵌入（使用Base64编码避免解析问题）
+  const encodedHtml = btoa(unescape(encodeURIComponent(embedHtml.value)))
+  const embedTag = `[embed:html:${encodedHtml}|width:${embedWidth.value}|height:${embedHeight.value}]`
 
   // 插入标记到编辑器
   insertText(embedTag, '')
 
   // 关闭对话框
   showEmbedDialog.value = false
-  ElMessage.success('嵌入标记已添加')
+  ElMessage.success('添加成功')
 }
 
 // 取消嵌入
@@ -341,8 +325,7 @@ const parsedContent = computed(() => {
         return `<div class="embed-iframe-container">
           <iframe
             src="${content}"
-            width="${width}"
-            height="${height}"
+            style="width: ${width}; height: ${height};"
             frameborder="0"
             scrolling="auto"
             class="embed-iframe"
@@ -355,8 +338,7 @@ const parsedContent = computed(() => {
           const decodedHtml = decodeURIComponent(escape(atob(content)))
           return `<div class="embed-iframe-container">
             <iframe
-              width="${width}"
-              height="${height}"
+              style="width: ${width}; height: ${height};"
               frameborder="0"
               scrolling="auto"
               class="embed-iframe"
@@ -676,11 +658,7 @@ const onCaptchaCancel = () => {
 
         <!-- 嵌入网页按钮 -->
         <button class="toolbar-btn" title="嵌入网页" @click="handleEmbedWeb">
-          <el-icon><svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24">
-              <path fill="currentColor"
-                d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5-7l-3 3.72L9 13l-3 4h12l-4-5z">
-              </path>
-            </svg></el-icon>
+          <el-icon><svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 48 48"><g fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" data-swindex="0" d="M25 40H7a3 3 0 0 1-3-3V11a3 3 0 0 1 3-3h34a3 3 0 0 1 3 3v13.941"></path><path stroke="currentColor" stroke-width="4" data-swindex="0" d="M4 11a3 3 0 0 1 3-3h34a3 3 0 0 1 3 3v9H4z"></path><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" data-swindex="0" d="M32 35h12m-6-6v12"></path><circle r="2" fill="currentColor" transform="matrix(0 -1 -1 0 10 14)"></circle><circle r="2" fill="currentColor" transform="matrix(0 -1 -1 0 16 14)"></circle></g></svg></el-icon>
         </button>
       </div>
     </div>
@@ -740,56 +718,29 @@ const onCaptchaCancel = () => {
 
   <!-- 嵌入网页对话框 -->
   <el-dialog v-model="showEmbedDialog" title="嵌入网页" width="600px" :close-on-click-modal="false">
-    <el-tabs v-model="embedType">
-      <!-- URL嵌入 -->
-      <el-tab-pane label="URL嵌入" name="url">
-        <div class="embed-form">
-          <el-form label-width="80px">
-            <el-form-item label="网页URL">
-              <el-input v-model="embedUrl" placeholder="请输入网页URL，例如：https://example.com" />
-            </el-form-item>
-            <el-form-item label="宽度">
-              <el-input v-model="embedWidth" placeholder="例如：100% 或 800px" />
-            </el-form-item>
-            <el-form-item label="高度">
-              <el-input v-model="embedHeight" placeholder="例如：400px 或 600px" />
-            </el-form-item>
-          </el-form>
-          <el-alert type="info" :closable="false" style="margin-top: 10px;">
-            <template #title>
-              <div>提示：嵌入外部网页时，请确保目标网站允许被iframe嵌入（无X-Frame-Options限制）</div>
-            </template>
-          </el-alert>
-        </div>
-      </el-tab-pane>
-
-      <!-- HTML代码嵌入 -->
-      <el-tab-pane label="HTML代码" name="html">
-        <div class="embed-form">
-          <el-form label-width="80px">
-            <el-form-item label="HTML代码">
-              <el-input
-                v-model="embedHtml"
-                type="textarea"
-                :rows="10"
-                placeholder="请粘贴完整的HTML代码，例如游戏代码、可视化组件等"
-              />
-            </el-form-item>
-            <el-form-item label="宽度">
-              <el-input v-model="embedWidth" placeholder="例如：100% 或 800px" />
-            </el-form-item>
-            <el-form-item label="高度">
-              <el-input v-model="embedHeight" placeholder="例如：400px 或 600px" />
-            </el-form-item>
-          </el-form>
-          <el-alert type="info" :closable="false" style="margin-top: 10px;">
-            <template #title>
-              <div>提示：支持嵌入任意HTML代码，包括游戏、可视化组件、交互式内容等</div>
-            </template>
-          </el-alert>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+    <div class="embed-form">
+      <el-form label-width="80px">
+        <el-form-item label="HTML代码">
+          <el-input
+            v-model="embedHtml"
+            type="textarea"
+            :rows="10"
+            placeholder="请粘贴完整的HTML代码，例如游戏代码、可视化组件等"
+          />
+        </el-form-item>
+        <el-form-item label="宽度">
+          <el-input v-model="embedWidth" placeholder="例如：100% 或 800px" />
+        </el-form-item>
+        <el-form-item label="高度">
+          <el-input v-model="embedHeight" placeholder="例如：400px 或 600px" />
+        </el-form-item>
+      </el-form>
+      <el-alert type="info" :closable="false" style="margin-top: 10px;">
+        <template #title>
+          <div>提示：支持嵌入任意HTML代码，包括游戏、可视化组件、交互式内容等</div>
+        </template>
+      </el-alert>
+    </div>
 
     <template #footer>
       <el-button @click="cancelEmbed">取消</el-button>
@@ -1191,7 +1142,7 @@ const onCaptchaCancel = () => {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   max-width: 100%;
-  height: auto;
+  /* height 通过内联样式设置，不在这里覆盖 */
 }
 
 /* 嵌入表单样式 */
