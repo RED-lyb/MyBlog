@@ -39,6 +39,7 @@ hljs.registerLanguage('sql', sql)
 hljs.registerLanguage('php', php)
 hljs.registerLanguage('c++', c)
 hljs.registerLanguage('c', c)
+hljs.registerLanguage('cpp', c)
 
 // 标题和内容
 const title = ref('')

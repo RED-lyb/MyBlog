@@ -34,6 +34,7 @@ hljs.registerLanguage('sql', sql)
 hljs.registerLanguage('php', php)
 hljs.registerLanguage('c++', c)
 hljs.registerLanguage('c', c)
+hljs.registerLanguage('cpp', c)
 
 // 配置marked使用highlight.js进行代码高亮
 marked.use({
