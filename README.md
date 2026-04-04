@@ -11,18 +11,9 @@
 ## 安装教程
 * 强烈建议按照对应系统版本开始部署，并下载对应版本软件，未尝试跨平台部署，可能存在兼容性问题
 ### 开发环境安装（Windows10 x64）
-* 点击安装node.js
-```url
-https://nodejs.org/dist/v20.19.4/node-v20.19.4-x64.msi
-```
-* 点击链接安装Python3.12.9
-```url
-https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe
-```
-* 点击链接安装Mysql
-```url
-https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.43.0.msi
-```
+* 点击链接安装[node.js20.19.4](https://nodejs.org/dist/v20.19.4/node-v20.19.4-x64.msi)
+* 点击链接安装[Python3.12.9](https://www.python.org/ftp/python/3.12.9/python-3.12.9-amd64.exe)
+* 点击链接安装[Mysql-community-8.0.43.0](https://dev.mysql.com/get/Downloads/MySQLInstaller/mysql-installer-community-8.0.43.0.msi)
 * 安装后端依赖
 ```bash
 cd my-blog/back/depend_manage
@@ -283,7 +274,9 @@ systemctl start nginx
 ```
 * 执行上述步骤后即可完成部署，可通过访问服务器IP或域名进行访问。
 
-## 网盘容量自动管理脚本配置
+## 拓展功能（非必须组件，步骤过程中可能出现的问题不再详细描述解决方案，仅做快速搭建最小步骤。）
+
+### 网盘容量自动管理脚本配置
 * 编辑 crontab：
 ```bash
 crontab -e
@@ -295,6 +288,66 @@ crontab -e
 * `--days [(int)天数]`: 指定删除多少天前修改的文件（不带该参数则默认7天）
 * `--dry-run`: 预览模式，仅显示将要删除的文件，不实际删除
 * `--no-log`: 不写入日志文件，仅输出到控制台（默认情况下会同时输出到控制台和日志文件）
+
+### 同频影院
+基于[ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit)项目实现该功能
+* 安装ffmpeg
+```bash
+dnf install ffmpeg
+```
+* 导入官方镜像并做端口映射（可根据个人服务器端口占用情况更改相关映射）
+```bash
+docker run -id \
+-p 11935:1935 \
+-p 18080:80 \
+-p 18443:443 \
+-p 18554:554 \
+-p 11000:10000 -p 11000:10000/udp \
+-p 18000:8000/udp \
+-p 19000:9000/udp \
+zlmediakit/zlmediakit:master
+```
+* 如果无法访问docker hub，可通过"TODO:url"本地下载docker镜像
+```bash
+docker load -i ./zlmediakit_zlmediakit.tar.gz  #导入下载的镜像
+
+docker run -id \
+-p 11935:1935 \
+-p 18080:80 \
+-p 18443:443 \
+-p 18554:554 \
+-p 11000:10000 -p 11000:10000/udp \
+-p 18000:8000/udp \
+-p 19000:9000/udp \
+zlmediakit/zlmediakit:master
+```
+* 进入docker并修改相关配置文件
+```bash
+docker ps -a  #查看所有容器
+docker exec -it [容器id] /bin/bash  #根据上一个命令关于zlmediakit的容器id进入容器
+cd ../conf/
+vim ./config.ini
+[general]
+#绑定的本地网卡ip
+listen_ip=::0.0.0.0  #改为0.0.0.0，因为是docker所以监听全部而不是公网ip
+[http]
+#允许访问http api和http文件索引的ip地址范围白名单，置空情况下不做限制
+allow_ip_range=::  #置空开放访问
+
+#修改完成后退出容器并重启
+exit
+docker restart [容器id]
+```
+* 在docker容器中使用vim配置文件，有可能会出现乱码，以下为相关解决方案
+```bash
+vim ~/.vimrc
+#复制下述配置内容
+" 解决Vim中文乱码核心配置
+set encoding=utf-8          " Vim内部运行的编码（核心，统一为UTF-8）
+set fileencodings=utf-8,gbk,gb2312,cp936,iso-8859-1  " 自动识别文件的编码（按顺序检测）
+set fileencoding=utf-8      " 保存文件时默认用UTF-8编码（避免新增中文乱码）
+set termencoding=utf-8      " 终端和Vim之间的编码交互（和终端编码一致）
+```
 
 ## 参与贡献
 1. 李远博
