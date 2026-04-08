@@ -6,7 +6,7 @@ from django.db import connection, IntegrityError
 from django.contrib.auth.hashers import make_password
 from common.captcha_utils import CaptchaUtils, captcha_required
 
-# 与前端完全一致的校验规则（copy 自 logincard.vue）
+# 与前端完全一致的校验规则
 DB_KEYWORDS = [
     'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE',
     'USER', 'USERS', 'ORDER', 'GROUP', 'KEY', 'INDEX', 'TABLE', 'PASSWORD', 'ADMIN', 'ROOT'
