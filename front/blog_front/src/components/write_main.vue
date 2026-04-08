@@ -20,8 +20,10 @@ import sql from 'highlight.js/lib/languages/sql'
 import php from 'highlight.js/lib/languages/php'
 import c from 'highlight.js/lib/languages/c'
 import cpp from 'highlight.js/lib/languages/cpp'
+import go from 'highlight.js/lib/languages/go'
 // 导入自定义的代码高亮样式
 import '@/assets/highlight.css'
+import label from 'daisyui/components/label/index.js'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -41,6 +43,7 @@ hljs.registerLanguage('php', php)
 hljs.registerLanguage('c', c)
 hljs.registerLanguage('c++', cpp)
 hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('go', go)
 
 // 标题和内容
 const title = ref('')
@@ -201,7 +204,8 @@ const codeLangOptions = [
   { label: 'JSON', value: 'json' },
   { label: 'Bash', value: 'bash' },
   { label: 'SQL', value: 'sql' },
-  { label: 'PHP', value: 'php' }
+  { label: 'PHP', value: 'php' },
+  { label: 'Go', value: 'go' }
 
 ]
 

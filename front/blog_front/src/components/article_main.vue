@@ -20,6 +20,7 @@ import sql from 'highlight.js/lib/languages/sql'
 import php from 'highlight.js/lib/languages/php'
 import c from 'highlight.js/lib/languages/c'
 import cpp from 'highlight.js/lib/languages/cpp'
+import go from 'highlight.js/lib/languages/go'
 
 // 注册常用语言
 hljs.registerLanguage('javascript', javascript)
@@ -36,6 +37,7 @@ hljs.registerLanguage('php', php)
 hljs.registerLanguage('c', c)
 hljs.registerLanguage('c++', cpp)
 hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('go', go)
 
 // 配置marked使用highlight.js进行代码高亮
 marked.use({
