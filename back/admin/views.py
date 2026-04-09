@@ -13,6 +13,7 @@ from django.db import connection
 from django.conf import settings
 from functools import wraps
 from common.jwt_utils import jwt_required, JWTUtils
+from common.article_content_sanitize import sanitize_article_content_embeds
 
 
 def admin_required(view_func):
@@ -317,6 +318,8 @@ def create_article(request):
         if not author_id:
             author_id = request.user_id
         
+        content = sanitize_article_content_embeds(content)
+        
         with connection.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO blog_articles (title, content, author_id, published_at)
@@ -355,6 +358,8 @@ def update_article(request, article_id):
                 'success': False,
                 'error': '标题和内容不能为空'
             }, status=400)
+        
+        content = sanitize_article_content_embeds(content)
         
         with connection.cursor() as cursor:
             # 检查文章是否存在
