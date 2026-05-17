@@ -111,6 +111,7 @@ import {
   Expand,
   SwitchButton,
   HomeFilled,
+  Trophy,
   Clock,
   ChatDotRound
 } from '@element-plus/icons-vue'
@@ -178,6 +179,11 @@ const menuItems = computed(() => [
     path: '/admin/network-disk',
     label: '网盘管理',
     icon: Folder
+  },
+  {
+    path: '/admin/games',
+    label: '游戏管理',
+    icon: Trophy
   },
   {
     path: '/admin/history',

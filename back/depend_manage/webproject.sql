@@ -45,14 +45,14 @@ CREATE TABLE `article_comments` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
-
-    UPDATE blog_articles 
-
-    SET comment_count = comment_count + 1 
-
-    WHERE id = NEW.article_id;
-
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_insert` AFTER INSERT ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = comment_count + 1 
+
+    WHERE id = NEW.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -68,14 +68,14 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
-
-    UPDATE blog_articles 
-
-    SET comment_count = GREATEST(comment_count - 1, 0)
-
-    WHERE id = OLD.article_id;
-
+/*!50003 CREATE*/ /*!50017 DEFINER=`admin`@`localhost`*/ /*!50003 TRIGGER `update_comment_count_on_delete` AFTER DELETE ON `article_comments` FOR EACH ROW BEGIN
+
+    UPDATE blog_articles 
+
+    SET comment_count = GREATEST(comment_count - 1, 0)
+
+    WHERE id = OLD.article_id;
+
 END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -279,6 +279,28 @@ CREATE TABLE `update_history` (
   PRIMARY KEY (`id`),
   KEY `idx_update_time` (`update_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='更新历史表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `games`
+--
+
+DROP TABLE IF EXISTS `games`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `games` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT '主键，自增',
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '卡片标题',
+  `content` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '封面图文件名，对应 api/static/games/game_images',
+  `introduction` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '卡片底部简介',
+  `detail` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '详情描述',
+  `web_entry` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Web入口 html，基本与title一致',
+  `windows` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Windows 包文件名 game_files/{id}/ 下',
+  `linux` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Linux 包文件名',
+  `android` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Android 包文件名',
+  PRIMARY KEY (`id`),
+  KEY `idx_game_title` (`title`(191))
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='趣味游戏表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

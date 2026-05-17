@@ -8,7 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
-import Tools_main from '../components/movie_main.vue/index.js'
+import Movie_main from '../components/movie_main.vue'
 
 const authStore = useAuthStore()
 const {
@@ -83,7 +83,7 @@ onMounted(async () => {
           <el-aside>
           </el-aside>
           <el-main>
-            <Tools_main />
+            <Movie_main />
           </el-main>
           <el-aside></el-aside>
         </el-container>

@@ -243,3 +243,48 @@ class UpdateHistory(models.Model):
     
     def __str__(self):
         return f"Update {self.id} at {self.update_time}"
+
+
+class Game(models.Model):
+    """
+    趣味游戏表
+    title：卡片标题；content：封面图文件名（位于 api/static/games/game_images）；
+    introduction：卡片底部简介；detail：详情正文；
+    web_entry：`game_files/{id}/web/` 下入口 HTML 相对路径；
+    windows/linux/android：各平台安装包在 game_files/{id}/ 下的文件名（如 windows.zip）
+    """
+    id = models.AutoField(primary_key=True, db_comment='主键，自增')
+    title = models.CharField(max_length=255, db_comment='卡片标题，非空')
+    content = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True,
+        db_comment='封面图文件名，空则前端显示占位图',
+    )
+    introduction = models.CharField(max_length=500, db_comment='卡片底部简介，非空')
+    detail = models.TextField(db_comment='详情描述，非空')
+    web_entry = models.CharField(
+        max_length=512,
+        blank=True,
+        null=True,
+        db_comment='Web 入口 html 相对路径（位于 api/static/games/game_files/{id}/web/）',
+    )
+    windows = models.CharField(
+        max_length=512, blank=True, null=True, db_comment='Windows 包文件名'
+    )
+    linux = models.CharField(
+        max_length=512, blank=True, null=True, db_comment='Linux 包文件名'
+    )
+    android = models.CharField(
+        max_length=512, blank=True, null=True, db_comment='Android 包文件名'
+    )
+
+    class Meta:
+        managed = False
+        db_table = 'games'
+        indexes = [
+            models.Index(fields=['title'], name='idx_game_title'),
+        ]
+
+    def __str__(self):
+        return f"Game {self.id}: {self.title[:50]}"

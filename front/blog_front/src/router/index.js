@@ -76,6 +76,14 @@ const routes=[
     }
   },
   {
+    path: '/games/play/:gameId(\\d+)',
+    name: 'game_play',
+    component: () => import('../pages/game_play.vue'),
+    meta: {
+      title: '在线游戏|L-BLOG'
+    }
+  },
+  {
     path: '/games',
     name: 'games',
     component: () => import('../pages/games.vue'),

@@ -20,7 +20,7 @@ const activeIndex = computed(() => {
   // 使用startsWith匹配二级URL，保持active状态
   if (path === '/home' || path.startsWith('/home/')) return '1'
   if (path === '/network_disk' || path.startsWith('/network_disk/')) return '2'
-  if (path === '/tools' || path.startsWith('/tools/')) return '3'
+  if (path === '/movie' || path.startsWith('/movie/')) return '3'
   if (path === '/games' || path.startsWith('/games/')) return '4'
   if (path === '/feedback' || path.startsWith('/feedback/')) return '5'
   if (path === '/history' || path.startsWith('/history/')) return '6'
@@ -95,6 +95,13 @@ const goToLogin = () => {
 const defaultAvatar = '/default_head.png'
 const user_avatar = ref(defaultAvatar)
 const avatarLoading = ref(true)
+
+/** 远程头像 404 等加载失败时与无头像一致，使用默认图 */
+const onAvatarLoadError = () => {
+  if (user_avatar.value !== defaultAvatar) {
+    user_avatar.value = defaultAvatar
+  }
+}
 
 const buildAvatarUrl = (fileName) => {
   const baseUrl = import.meta.env?.VITE_API_FILE_URL || import.meta.env?.VITE_API_URL || ''
@@ -185,7 +192,7 @@ watch(
                 <el-skeleton-item variant="circle" style="width: 35px;height: 35px;" />
               </template>
               <template #default>
-                <el-avatar :size="35" :src="user_avatar" />
+                <el-avatar :size="35" :src="user_avatar" @error="onAvatarLoadError" />
               </template>
             </el-skeleton>
           </div>

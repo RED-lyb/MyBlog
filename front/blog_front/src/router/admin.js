@@ -39,6 +39,14 @@ const adminRoutes = [
     }
   },
   {
+    path: 'games',
+    name: 'admin_games',
+    component: () => import('../pages/admin/GameManage.vue'),
+    meta: {
+      title: '游戏管理|L-BLOG管理后台'
+    }
+  },
+  {
     path: 'history',
     name: 'admin_history',
     component: () => import('../pages/admin/HistoryManage.vue'),
