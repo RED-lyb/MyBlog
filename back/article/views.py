@@ -1,6 +1,4 @@
 import json
-import re
-import html
 import time
 from django.http import JsonResponse
 from django.db import connection
@@ -9,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from common.jwt_utils import jwt_required
 from common.captcha_utils import CaptchaUtils, LoginLimitUtils
+from common.article_content_sanitize import sanitize_article_content_embeds
 
 
 @require_GET
@@ -236,84 +235,6 @@ def get_article_detail(request, article_id):
         }, status=500)
 
 
-def sanitize_html(content):
-    """
-    清理HTML内容，防止XSS攻击
-    允许安全的HTML标签和属性，过滤危险的标签和属性
-    """
-    # 允许的HTML标签（白名单）
-    allowed_tags = {
-        'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img',
-        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span'
-    }
-    
-    # 允许的属性
-    allowed_attrs = {
-        'a': ['href', 'title'],
-        'img': ['src', 'alt', 'title', 'width', 'height'],
-        'code': ['class'],
-        'pre': ['class'],
-        'div': ['class'],
-        'span': ['class'],
-        'table': ['class'],
-        'th': ['class'],
-        'td': ['class']
-    }
-    
-    # 转义所有HTML标签
-    content = html.escape(content)
-    
-    # 恢复允许的标签（使用正则表达式）
-    # 注意：这是一个简化的实现，实际生产环境建议使用 bleach 库
-    
-    # 恢复换行符
-    content = content.replace('&lt;br&gt;', '<br>')
-    content = content.replace('&lt;br/&gt;', '<br>')
-    content = content.replace('&lt;br /&gt;', '<br>')
-    
-    # 恢复允许的标签（使用正则表达式匹配）
-    tag_pattern = r'&lt;(\/?)(\w+)([^&]*?)&gt;'
-    
-    def replace_tag(match):
-        closing = match.group(1)  # / 或空
-        tag_name = match.group(2).lower()
-        attrs = match.group(3)
-        
-        if tag_name not in allowed_tags:
-            return match.group(0)  # 保持转义状态
-        
-        # 处理属性
-        if attrs and tag_name in allowed_attrs:
-            # 提取允许的属性
-            allowed_attrs_list = allowed_attrs[tag_name]
-            attr_pattern = r'(\w+)=["\']([^"\']*)["\']'
-            valid_attrs = []
-            
-            for attr_match in re.finditer(attr_pattern, attrs):
-                attr_name = attr_match.group(1).lower()
-                attr_value = attr_match.group(2)
-                
-                if attr_name in allowed_attrs_list:
-                    # 对于 href 和 src，需要额外验证
-                    if attr_name in ['href', 'src']:
-                        # 只允许 http/https 和相对路径
-                        if attr_value.startswith(('http://', 'https://', '/', '#')) or not attr_value.startswith('javascript:'):
-                            valid_attrs.append(f'{attr_name}="{html.escape(attr_value)}"')
-                    else:
-                        valid_attrs.append(f'{attr_name}="{html.escape(attr_value)}"')
-            
-            attrs_str = ' ' + ' '.join(valid_attrs) if valid_attrs else ''
-        else:
-            attrs_str = ''
-        
-        return f'<{closing}{tag_name}{attrs_str}>'
-    
-    content = re.sub(tag_pattern, replace_tag, content)
-    
-    return content
-
-
 @csrf_exempt
 @jwt_required
 @require_POST
@@ -432,9 +353,8 @@ def create_article(request):
         fail_key = f"publish_fail_{identifier}"
         cache.delete(fail_key)
         
-        # 直接存储原始内容，不做HTML转义
-        # 因为内容是Markdown格式，会被marked安全解析
-        # 转义会导致代码块中的引号等字符变成HTML实体（如 &quot;），影响显示
+        # Markdown 正文原样存储；对 [embed:html:...] 内联 HTML 用 bleach 做结构清洗（去 on*、危险协议、嵌套 iframe 等）
+        content = sanitize_article_content_embeds(content)
         
         # 写入数据库（触发器会自动更新用户的文章数）
         with connection.cursor() as cursor:

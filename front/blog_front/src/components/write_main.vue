@@ -4,6 +4,7 @@ import { marked } from 'marked'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '../stores/user_info.js'
+import { buildEmbedMarkup } from '@/lib/embedIframe.js'
 import apiClient from '../lib/api.js'
 import CaptchaDialog from '../components/CaptchaDialog.vue'
 // 按需导入highlight.js核心和语言包（减小打包体积）
@@ -325,39 +326,9 @@ const parsedContent = computed(() => {
 
     // 解析嵌入标记 [embed:type:content|width:xxx|height:xxx]
     const embedPattern = /\[embed:(url|html):([^\|\]]+)\|width:([^\|\]]+)\|height:([^\|\]]+)\]/gi
-    result = result.replace(embedPattern, (match, type, content, width, height) => {
-      if (type === 'url') {
-        // URL嵌入
-        return `<div class="embed-iframe-container">
-          <iframe
-            src="${content}"
-            style="width: ${width}; height: ${height};"
-            frameborder="0"
-            scrolling="auto"
-            class="embed-iframe"
-            allowfullscreen
-          ></iframe>
-        </div>`
-      } else if (type === 'html') {
-        // HTML代码嵌入（使用srcdoc）
-        try {
-          const decodedHtml = decodeURIComponent(escape(atob(content)))
-          return `<div class="embed-iframe-container">
-            <iframe
-              style="width: ${width}; height: ${height};"
-              frameborder="0"
-              scrolling="auto"
-              class="embed-iframe"
-              srcdoc="${decodedHtml.replace(/"/g, '&quot;')}"
-            ></iframe>
-          </div>`
-        } catch (e) {
-          console.error('HTML解码失败:', e)
-          return '<p style="color: red;">嵌入内容解析失败</p>'
-        }
-      }
-      return match
-    })
+    result = result.replace(embedPattern, (match, type, payload, width, height) =>
+      buildEmbedMarkup(type, payload, width, height) || match
+    )
 
     return result
   } catch (e) {
@@ -1135,13 +1106,28 @@ const onCaptchaCancel = () => {
 /* 嵌入网页iframe容器样式 */
 .content-preview :deep(.embed-iframe-container) {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 10px;
   margin: 20px 0;
   padding: 20px;
   background: rgba(245, 245, 245, 0.3);
   border-radius: 8px;
   border: 1px solid var(--el-border-color-light);
+}
+
+.content-preview :deep(.embed-iframe-hint) {
+  width: 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--el-text-color-secondary);
+}
+
+.content-preview :deep(.embed-parse-error) {
+  margin: 12px 0;
+  color: var(--el-color-danger);
 }
 
 .content-preview :deep(.embed-iframe) {
