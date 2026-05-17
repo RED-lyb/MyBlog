@@ -68,11 +68,11 @@ const routes=[
     }
   },
   {
-    path: '/tools',
-    name: 'tools',
-    component: () => import('../pages/tools.vue'),
+    path: '/movie',
+    name: 'movie',
+    component: () => import('../pages/movie.vue'),
     meta: {
-      title: '实用工具|L-BLOG'
+      title: '同频影院|L-BLOG'
     }
   },
   {

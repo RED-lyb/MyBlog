@@ -66,7 +66,7 @@ const handleSelect = (key, keyPath) => {
     '0': '/', // Logo点击回到首页
     '1': '/home', // 博客主页
     '2': '/network_disk', // 流动网盘
-    '3': '/tools', // 实用工具
+    '3': '/movie', // 同频影院
     '4': '/games', // 趣味游戏
     '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史
@@ -167,7 +167,7 @@ watch(
       </el-menu-item>
       <el-menu-item index="1">博客主页</el-menu-item>
       <el-menu-item index="2">流动网盘</el-menu-item>
-      <el-menu-item index="3">实用工具</el-menu-item>
+      <el-menu-item index="3">同频影院</el-menu-item>
       <el-menu-item index="4">趣味游戏</el-menu-item>
       <el-menu-item index="5">意见反馈</el-menu-item>
       <el-menu-item index="6">更新历史</el-menu-item>

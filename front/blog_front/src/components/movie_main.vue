@@ -2,7 +2,7 @@
 </script>
 <template>
       <div class="content-header">
-        <h1>实用工具</h1>
+        <h1>同频影院</h1>
       </div>
       <p>暂未实现，敬请期待</p>
 </template>

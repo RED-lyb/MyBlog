@@ -8,7 +8,7 @@ import Logout from '../components/Logout.vue'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
-import Tools_main from '../components/tools_main.vue'
+import Tools_main from '../components/movie_main.vue/index.js'
 
 const authStore = useAuthStore()
 const {
