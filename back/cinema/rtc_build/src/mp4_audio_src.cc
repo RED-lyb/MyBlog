@@ -6,7 +6,11 @@
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/version.h>
 #include <libswresample/swresample.h>
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+#include <libavutil/channel_layout.h>
+#endif
 }
 
 Mp4AudioSrc::Mp4AudioSrc(const char *filePath) {
@@ -84,6 +88,40 @@ Mp4AudioSrc::Mp4AudioSrc(const char *filePath) {
 		return;
 	}
 
+#if LIBAVCODEC_VERSION_MAJOR >= 59
+	AVChannelLayout outLayout = AV_CHANNEL_LAYOUT_STEREO;
+	AVChannelLayout inLayout = {};
+	if (codecContext->ch_layout.nb_channels > 0) {
+		if (av_channel_layout_copy(&inLayout, &codecContext->ch_layout) < 0) {
+			LOG_WARN("Mp4AudioSrc: 无法复制输入声道布局");
+			cleanup();
+			return;
+		}
+	} else if (codecpar->ch_layout.nb_channels > 0) {
+		if (av_channel_layout_copy(&inLayout, &codecpar->ch_layout) < 0) {
+			LOG_WARN("Mp4AudioSrc: 无法复制流声道布局");
+			cleanup();
+			return;
+		}
+	} else {
+		if (av_channel_layout_default(&inLayout, 2) < 0) {
+			LOG_WARN("Mp4AudioSrc: 无法设置默认声道布局");
+			cleanup();
+			return;
+		}
+	}
+	if (swr_alloc_set_opts2(
+			&swrContext,
+			&outLayout, AV_SAMPLE_FMT_S16, kSampleRate,
+			&inLayout, codecContext->sample_fmt, codecContext->sample_rate,
+			0, nullptr) < 0) {
+		av_channel_layout_uninit(&inLayout);
+		LOG_WARN("Mp4AudioSrc: 重采样器分配失败");
+		cleanup();
+		return;
+	}
+	av_channel_layout_uninit(&inLayout);
+#else
 	int64_t inLayout = codecContext->channel_layout;
 	if (!inLayout) {
 		inLayout = av_get_default_channel_layout(codecContext->channels);
@@ -98,6 +136,7 @@ Mp4AudioSrc::Mp4AudioSrc(const char *filePath) {
 		codecContext->sample_rate,
 		0,
 		nullptr);
+#endif
 	if (!swrContext || swr_init(swrContext) < 0) {
 		LOG_WARN("Mp4AudioSrc: 重采样初始化失败");
 		cleanup();
