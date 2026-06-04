@@ -145,10 +145,7 @@ int RTCVideoEngineWrapper::joinRoom()
 	m_pRtcRoomEx->publishStream(bytertc::kStreamIndexMain, publishType);
 
 	m_roomJoined = true;
-	// 视频等 onStart 再推；音频进房后即可推（勿在 onRoomStateChanged 里改 m_roomJoined）
-	if (m_hasAudio && appDataIns->enable_audio) {
-		startAudioPush();
-	}
+	// 音视频均在 onStart 同时开推，避免 joinRoom→onStart 间隔导致音频先跑 ~1s
 
 	return nRet;
 }
@@ -327,7 +324,32 @@ int RTCVideoEngineWrapper::initAudioConfig()
 	}
 	m_audioTimestampUs = 0;
 	LOG_INFO("音频 PCM 已加载，共 " << m_audioTotalChunks << " 个 10ms 帧，进房后开始推送");
+	alignAudioDurationToVideo();
 	return 0;
+}
+
+void RTCVideoEngineWrapper::alignAudioDurationToVideo()
+{
+	if (!m_hasAudio || !m_externalVideoFrameInfo || m_audioPcm.empty()) {
+		return;
+	}
+	const auto &info = m_externalVideoFrameInfo;
+	const int fps = info->fps > 0 ? info->fps : 30;
+	if (info->total_frames <= 0 || fps <= 0) {
+		return;
+	}
+	const int videoMs = (info->total_frames * 1000) / fps;
+	const int targetChunks = (videoMs + 9) / 10;
+	const int prevChunks = m_audioTotalChunks;
+	if (targetChunks <= prevChunks) {
+		LOG_INFO("音画时长: 音频 " << (prevChunks * 10) << "ms, 视频约 " << videoMs << "ms");
+		return;
+	}
+	const size_t needBytes = static_cast<size_t>(targetChunks) * static_cast<size_t>(Mp4AudioSrc::kBytesPer10Ms);
+	m_audioPcm.resize(needBytes, 0);
+	m_audioTotalChunks = targetChunks;
+	LOG_INFO("音频末尾补静音对齐视频: " << prevChunks << " -> " << targetChunks
+		<< " 块 (约 " << videoMs << "ms)");
 }
 
 void RTCVideoEngineWrapper::startAudioPush()
@@ -444,15 +466,22 @@ void RTCVideoEngineWrapper::pushExternalAudioFrame()
 		|| m_audioTotalChunks <= 0 || m_pVideoEngineEx == nullptr) {
 		return;
 	}
-	if (m_audioCurrentChunk >= m_audioTotalChunks) {
+	const bool videoStillPlaying = m_externalVideoFrameInfo
+		&& m_externalVideoFrameInfo->current_frame_index < m_externalVideoFrameInfo->total_frames;
+	const bool audioExhausted = m_audioCurrentChunk >= m_audioTotalChunks;
+	if (audioExhausted && !videoStillPlaying) {
 		return;
 	}
-	const int idx = m_audioCurrentChunk % m_audioTotalChunks;
-	const size_t offset = static_cast<size_t>(idx) * static_cast<size_t>(Mp4AudioSrc::kBytesPer10Ms);
-	if (offset + static_cast<size_t>(Mp4AudioSrc::kBytesPer10Ms) > m_audioPcm.size()) {
-		return;
+
+	static const uint8_t kSilencePcm[Mp4AudioSrc::kBytesPer10Ms] = {};
+	const uint8_t *pcm = kSilencePcm;
+	if (!audioExhausted) {
+		const size_t offset = static_cast<size_t>(m_audioCurrentChunk) * static_cast<size_t>(Mp4AudioSrc::kBytesPer10Ms);
+		if (offset + static_cast<size_t>(Mp4AudioSrc::kBytesPer10Ms) > m_audioPcm.size()) {
+			return;
+		}
+		pcm = m_audioPcm.data() + offset;
 	}
-	const uint8_t *pcm = m_audioPcm.data() + offset;
 
 	bytertc::AudioFrameBuilder builder;
 	builder.data = const_cast<uint8_t *>(pcm);
@@ -528,8 +557,14 @@ void RTCVideoEngineWrapper::pushExternalEncodedVideoFrame()
 	builder.size = size;
 	builder.width = info->width;
 	builder.height = info->height;
-	builder.timestamp_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-	builder.timestamp_dts_us = builder.timestamp_us;
+	const int fps = info->fps > 0 ? info->fps : 30;
+	int relFrame = info->current_frame_index - info->first_key_frame_index;
+	if (relFrame < 0) {
+		relFrame = 0;
+	}
+	const int64_t frameTsUs = static_cast<int64_t>(relFrame) * 1000000LL / fps;
+	builder.timestamp_us = frameTsUs;
+	builder.timestamp_dts_us = frameTsUs;
 	builder.memory_deleter = [](uint8_t* data, int size, void* user_opaque) -> int{ return 0; };
 
 	// LOG_INFO("frameType:" << (is_idr?"I":"P") << " index:" << m_videoFileSrc->index() << " size:" << size);
@@ -814,12 +849,14 @@ void RTCVideoEngineWrapper::onStart(bytertc::StreamIndex streamIndex)
 		return;
 	}
 	m_roomJoined = true;
+	m_audioCurrentChunk = 0;
+	m_audioTimestampUs = 0;
 	ensureVideoPushStarted();
 	auto appDataIns = AppDataManager::instance()->getAppData();
 	if (m_hasAudio && appDataIns->enable_audio) {
 		startAudioPush();
 	}
-	LOG_INFO("[callback] onStart");
+	LOG_INFO("[callback] onStart 音画同步起点");
 }
 
 void RTCVideoEngineWrapper::onStop(bytertc::StreamIndex streamIndex)

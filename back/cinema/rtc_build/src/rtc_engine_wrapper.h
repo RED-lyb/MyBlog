@@ -82,6 +82,7 @@ public:
 protected:
 	int initVideoConfig();
 	int initAudioConfig();
+	void alignAudioDurationToVideo();
 	void resetPlaybackState();
 	void startAudioPush();
 	void stopAudioPush();

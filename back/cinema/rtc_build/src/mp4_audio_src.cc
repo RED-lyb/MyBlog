@@ -181,6 +181,29 @@ Mp4AudioSrc::Mp4AudioSrc(const char *filePath) {
 		appendFrame(frame);
 	}
 
+	if (swrContext) {
+		while (true) {
+			const int outCap = swr_get_out_samples(swrContext, 0);
+			if (outCap <= 0) {
+				break;
+			}
+			const int bufSize = av_samples_get_buffer_size(
+				nullptr, kChannels, outCap, AV_SAMPLE_FMT_S16, 1);
+			if (bufSize <= 0) {
+				break;
+			}
+			std::vector<uint8_t> buf(static_cast<size_t>(bufSize));
+			uint8_t *outData[1] = { buf.data() };
+			const int converted = swr_convert(
+				swrContext, outData, outCap, nullptr, 0);
+			if (converted <= 0) {
+				break;
+			}
+			const int bytes = converted * kChannels * static_cast<int>(sizeof(int16_t));
+			pcm_.insert(pcm_.end(), buf.begin(), buf.begin() + bytes);
+		}
+	}
+
 	cleanup();
 
 	if (pcm_.empty()) {
