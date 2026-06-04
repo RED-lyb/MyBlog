@@ -61,4 +61,5 @@ urlpatterns = [
     path('api/history/', include('history.urls')),  # 更新历史相关路由
     path('api/feedback/', include('feedback.urls')),  # 反馈相关路由
     path('api/games/', include('games.urls')),  # 游戏相关路由
+    path('api/cinema/', include('cinema.urls')),  # 同频影院
 ]

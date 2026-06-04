@@ -113,7 +113,8 @@ import {
   HomeFilled,
   Trophy,
   Clock,
-  ChatDotRound
+  ChatDotRound,
+  Film
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -184,6 +185,11 @@ const menuItems = computed(() => [
     path: '/admin/games',
     label: '游戏管理',
     icon: Trophy
+  },
+  {
+    path: '/admin/cinema',
+    label: '同频影院',
+    icon: Film
   },
   {
     path: '/admin/history',

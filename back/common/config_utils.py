@@ -6,6 +6,14 @@ import json
 from pathlib import Path
 from django.conf import settings
 
+# 同频影院推流规格（与 config_back.json / rtccli 一致）
+CINEMA_VIDEO_ENCODER_DEFAULT = {
+    'width': 1920,
+    'height': 1080,
+    'fps': 30,
+    'max_bitrate': 4000,  # kbps，即 4 Mbps
+}
+
 
 def get_config_path():
     """
@@ -42,7 +50,21 @@ def load_config():
         'jwt': {
             'access_token_expire_minutes': 60,  # Access Token 60分钟
             'refresh_token_expire_days': 30  # Refresh Token 30天
-        }
+        },
+        'rtc': {
+            'app_id': '',
+            'app_key': '',
+            'expire_ts': 168,
+            'default_room_id': 'cinema_room',
+            'default_user_id': 'cinema_publisher',
+            'token_server_host': '127.0.0.1',
+            'token_server_port': 8000,
+            'token_server_path': '/api/cinema/get/token',
+            'rtc_env': 0,
+            'enable_video': True,
+            'enable_audio': True,
+            'video_encoder_config': dict(CINEMA_VIDEO_ENCODER_DEFAULT),
+        },
     }
     
     if not config_path.exists():

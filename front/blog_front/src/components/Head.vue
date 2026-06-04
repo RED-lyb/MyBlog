@@ -20,7 +20,7 @@ const activeIndex = computed(() => {
   // 使用startsWith匹配二级URL，保持active状态
   if (path === '/home' || path.startsWith('/home/')) return '1'
   if (path === '/network_disk' || path.startsWith('/network_disk/')) return '2'
-  if (path === '/movie' || path.startsWith('/movie/')) return '3'
+  if (path === '/cinema' || path.startsWith('/cinema/')) return '3'
   if (path === '/games' || path.startsWith('/games/')) return '4'
   if (path === '/feedback' || path.startsWith('/feedback/')) return '5'
   if (path === '/history' || path.startsWith('/history/')) return '6'
@@ -66,7 +66,7 @@ const handleSelect = (key, keyPath) => {
     '0': '/', // Logo点击回到首页
     '1': '/home', // 博客主页
     '2': '/network_disk', // 流动网盘
-    '3': '/movie', // 同频影院
+    '3': '/cinema', // 同频影院
     '4': '/games', // 趣味游戏
     '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史

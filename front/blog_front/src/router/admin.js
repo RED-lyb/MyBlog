@@ -47,6 +47,14 @@ const adminRoutes = [
     }
   },
   {
+    path: 'cinema',
+    name: 'admin_cinema',
+    component: () => import('../pages/admin/CinemaManage.vue'),
+    meta: {
+      title: '同频影院|L-BLOG管理后台'
+    }
+  },
+  {
     path: 'history',
     name: 'admin_history',
     component: () => import('../pages/admin/HistoryManage.vue'),

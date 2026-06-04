@@ -10,6 +10,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     Article_main: typeof import('./src/components/article_main.vue')['default']
     CaptchaDialog: typeof import('./src/components/CaptchaDialog.vue')['default']
+    Cinema_main: typeof import('./src/components/cinema_main.vue')['default']
     CommentList: typeof import('./src/components/CommentList.vue')['default']
     CreateButton: typeof import('./src/components/CreateButton.vue')['default']
     Feedback_main: typeof import('./src/components/feedback_main.vue')['default']
@@ -21,7 +22,6 @@ declare module 'vue' {
     History_main: typeof import('./src/components/history_main.vue')['default']
     Home_main: typeof import('./src/components/home_main.vue')['default']
     Logout: typeof import('./src/components/Logout.vue')['default']
-    Movie_main: typeof import('./src/components/movie_main.vue')['default']
     Network_disk_main: typeof import('./src/components/network_disk_main.vue')['default']
     Page_number: typeof import('./src/components/page_number.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

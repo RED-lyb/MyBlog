@@ -45,6 +45,13 @@ back/api/static/files/*
 !back/api/static/files/.gitkeep
 back/api/static/user_heads/*
 !back/api/static/user_heads/.gitkeep
+!back/api/static/cinema/.gitkeep
+
+# 同频影院：编译产物可提交，运行时状态不提交
+back/cinema/rtc_runtime/stream.pid
+back/cinema/rtc_runtime/stream_state.json
+back/cinema/rtc_runtime/stream.lock
+back/cinema/rtc_build/build/
 
 # 其他
 .DS_Store

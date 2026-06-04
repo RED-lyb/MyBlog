@@ -68,9 +68,9 @@ const routes=[
     }
   },
   {
-    path: '/movie',
-    name: 'movie',
-    component: () => import('../pages/movie.vue'),
+    path: '/cinema',
+    name: 'cinema',
+    component: () => import('../pages/cinema.vue'),
     meta: {
       title: '同频影院|L-BLOG'
     }
