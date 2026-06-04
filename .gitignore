@@ -47,10 +47,10 @@ back/api/static/user_heads/*
 !back/api/static/user_heads/.gitkeep
 !back/api/static/cinema/.gitkeep
 
-# 同频影院：编译产物可提交，运行时状态不提交
-back/cinema/rtc_runtime/stream.pid
-back/cinema/rtc_runtime/stream_state.json
-back/cinema/rtc_runtime/stream.lock
+# 同频影院
+back/cinema/rtc_runtime/*
+!back/cinema/rtc_runtime/.gitkeep
+# CMake 中间文件与对象在 rtc_build/build/
 back/cinema/rtc_build/build/
 
 # 其他
