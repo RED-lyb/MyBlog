@@ -42,10 +42,18 @@ target_link_options(${PROJECT_NAME} PUBLIC -Wl,-rpath-link=${BYTERTC_LIB_DIR}/li
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ggdb -std=c++14 -fPIC -pthread")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath='$ORIGIN'")
 
+if(POLICY CMP0072)
+    cmake_policy(SET CMP0072 NEW)
+endif()
 find_package(OpenGL REQUIRED)
 target_link_libraries(${PROJECT_NAME} PUBLIC OpenGL::GL)
 
 find_package(FFmpeg COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE SWRESAMPLE REQUIRED)
+message(STATUS "FFMPEG_INCLUDE_DIRS: ${FFMPEG_INCLUDE_DIRS}")
+target_include_directories(${PROJECT_NAME} PUBLIC ${FFMPEG_INCLUDE_DIRS})
+if(FFMPEG_DEFINITIONS)
+    target_compile_options(${PROJECT_NAME} PUBLIC ${FFMPEG_DEFINITIONS})
+endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${FFMPEG_LIBRARIES})
 if(SWSCALE_LIBRARIES)
     target_link_libraries(${PROJECT_NAME} PUBLIC ${SWSCALE_LIBRARIES})

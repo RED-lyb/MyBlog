@@ -295,5 +295,12 @@ crontab -e
 * 配置`config_back.json`，填写火山引擎 `rtc.app_id` / `rtc.app_key`
 * 推流规格（`rtc.video_encoder_config`）：**1920×1080、30fps、max_bitrate 4000（4 Mbps）**
 
+* 安装构建工具及编译依赖
+```bash
+dnf install -y cmake gcc-c++ make pkgconfig
+dnf install -y ffmpeg libavcodec-devel libavformat-devel libavutil-devel libswscale-devel libswresample-devel
+dnf install -y mesa-libGL-devel libX11-devel
+```
+
 ## 参与贡献
 1. 李远博
