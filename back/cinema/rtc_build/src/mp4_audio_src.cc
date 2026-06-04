@@ -104,11 +104,8 @@ Mp4AudioSrc::Mp4AudioSrc(const char *filePath) {
 			return;
 		}
 	} else {
-		if (av_channel_layout_default(&inLayout, 2) < 0) {
-			LOG_WARN("Mp4AudioSrc: 无法设置默认声道布局");
-			cleanup();
-			return;
-		}
+		// FFmpeg 7+ 中 av_channel_layout_default 返回 void
+		av_channel_layout_default(&inLayout, 2);
 	}
 	if (swr_alloc_set_opts2(
 			&swrContext,
