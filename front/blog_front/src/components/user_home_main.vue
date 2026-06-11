@@ -306,7 +306,7 @@ onMounted(() => {
             :duration="5">
             <span class="text-3xl font-bold">个人介绍</span>
           </RadiantText>
-          <p v-if="targetUser?.bio">{{ targetUser.bio }}</p>
+          <p v-if="targetUser?.bio" class="bio-content">{{ targetUser.bio }}</p>
           <p v-else class="empty-introduction">该用户还没有个人介绍</p>
 
         </div>
@@ -438,6 +438,10 @@ onMounted(() => {
   .intro-title {
     font-size: 28px;
   }
+}
+
+.bio-content {
+  white-space: pre-line;
 }
 
 .empty-introduction {
