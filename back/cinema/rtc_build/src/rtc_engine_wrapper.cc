@@ -886,10 +886,14 @@ void RTCVideoEngineWrapper::onRequestKeyFrame(bytertc::StreamIndex index, int32_
 		return;
 	}
 	auto info = m_externalVideoFrameInfo;
+	// 新观众进房会触发关键帧请求；回退到历史 I 帧会改变推流时间线，导致已在观看的用户画面跳变。
+	// 保持当前播放进度：仅当当前帧已是关键帧时补发，否则等待定时器自然推到下一个 GOP（与音频一致）。
 	if (!info->h264_frame_is_key[info->current_frame_index]) {
-		info->current_frame_index = info->keyFrameIndexAtOrBefore(info->current_frame_index);
+		LOG_INFO("[callback] onRequestKeyFrame ignored, wait natural GOP at index "
+			<< info->current_frame_index);
+		return;
 	}
-	LOG_INFO("[callback] onRequestKeyFrame, push key frame index:" << info->current_frame_index);
+	LOG_INFO("[callback] onRequestKeyFrame, push current key frame index:" << info->current_frame_index);
 	pushExternalEncodedVideoFrame();
 }
 

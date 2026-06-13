@@ -177,11 +177,13 @@ export class CinemaRtcViewer {
 export async function fetchCinemaToken(roomId, userId) {
   const axios = (await import('./api.js')).default
   const { cinemaApiUrl } = await import('./cinemaApi.js')
-  const payload = { room_id: roomId }
-  if (userId) {
-    payload.user_id = userId
+  if (!userId) {
+    throw new Error('请先登录后再观看')
   }
-  const res = await axios.post(cinemaApiUrl('get/token'), payload)
+  const res = await axios.post(cinemaApiUrl('get/token'), {
+    room_id: roomId,
+    user_id: userId,
+  })
   const body = res.data || {}
   if (res.status !== 200 || !body.data) {
     throw new Error(body.message || body.error || '获取 RTC Token 失败')
@@ -190,6 +192,5 @@ export async function fetchCinemaToken(roomId, userId) {
     token: body.data,
     user_id: body.user_id,
     room_id: body.room_id,
-    display_name: body.display_name || null,
   }
 }

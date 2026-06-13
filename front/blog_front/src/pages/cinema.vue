@@ -1,18 +1,22 @@
 <script setup>
 import { onMounted, ref, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
+import { showCinemaLoginDialog } from '../lib/guestDialog.js'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
 import Cinema_main from '../components/cinema_main.vue'
 
 const authStore = useAuthStore()
-const { tokenExpired } = storeToRefs(authStore)
+const router = useRouter()
+const { tokenExpired, isAuthenticated } = storeToRefs(authStore)
 const { loading, fetchUserInfo } = useUserInfo()
 const isLoading = ref(true)
 const layoutReady = ref(false)
+const showPageContent = ref(false)
 const showPageLoading = computed(() => loading.value || isLoading.value || !layoutReady.value)
 
 const markLayoutReady = async () => {
@@ -21,12 +25,18 @@ const markLayoutReady = async () => {
   layoutReady.value = true
 }
 
+const promptLogin = async () => {
+  await markLayoutReady()
+  await nextTick()
+  showCinemaLoginDialog(router, '/home')
+}
+
 onMounted(async () => {
   authStore.syncFromLocalStorage()
 
   if (tokenExpired.value) {
     isLoading.value = false
-    await markLayoutReady()
+    await promptLogin()
     return
   }
 
@@ -34,7 +44,7 @@ onMounted(async () => {
 
   if (!accessToken) {
     isLoading.value = false
-    await markLayoutReady()
+    await promptLogin()
     return
   }
 
@@ -46,7 +56,12 @@ onMounted(async () => {
     }
   } finally {
     isLoading.value = false
-    await markLayoutReady()
+    if (!isAuthenticated.value || tokenExpired.value) {
+      await promptLogin()
+    } else {
+      await markLayoutReady()
+      showPageContent.value = true
+    }
   }
 })
 </script>
@@ -54,7 +69,7 @@ onMounted(async () => {
 <template>
   <FullScreenLoading :visible="showPageLoading" />
   <div v-if="showPageLoading"></div>
-  <div v-else>
+  <div v-else-if="showPageContent">
     <div class="common-layout">
       <el-container>
         <el-header style="padding: 0">

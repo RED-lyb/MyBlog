@@ -1,50 +1,35 @@
-const IDENTITY_KEY = 'cinema_guest_identity'
+const SESSION_RTC_SUFFIX_KEY = 'cinema_rtc_session_suffix'
 
-/** VolcEngine userId 仅允许 [0-9a-zA-Z_\\-@.]，中文用户名需映射 */
+/** VolcEngine userId 仅允许 [0-9a-zA-Z_\\-@.] */
 function isValidRtcUserId(id) {
   return /^[0-9a-zA-Z_\-@.]{1,128}$/.test(id)
 }
 
-/** 从 RTC user_id 推导展示名（与后端 guest 规则一致） */
-export function displayNameFromRtcUserId(rtcUserId) {
-  const s = String(rtcUserId || '')
-  if (s.startsWith('guest_')) {
-    return `游客${s.slice(6)}`
+function getSessionRtcSuffix() {
+  let suffix = sessionStorage.getItem(SESSION_RTC_SUFFIX_KEY)
+  if (!suffix) {
+    suffix = Math.random().toString(36).slice(2, 8)
+    sessionStorage.setItem(SESSION_RTC_SUFFIX_KEY, suffix)
   }
-  return s
+  return suffix
 }
 
-export function readCachedGuestIdentity() {
-  try {
-    const raw = sessionStorage.getItem(IDENTITY_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed?.rtcUserId && parsed?.displayName) return parsed
-  } catch {
-    // ignore
-  }
-  return null
-}
-
-export function cacheGuestIdentity(identity) {
-  sessionStorage.setItem(IDENTITY_KEY, JSON.stringify(identity))
-}
-
-/** 清除本标签页缓存的游客身份（下次进房向后端申请新序号） */
-export function resetCinemaGuestIdentity() {
-  sessionStorage.removeItem(IDENTITY_KEY)
-}
-
-/** 已登录观众的 RTC 身份（游客请走 get/token 由后端分配） */
+/**
+ * 已登录观众 RTC 身份：展示用用户名，进房 id 带标签页后缀避免刷新/多开重复进房
+ */
 export function resolveLoggedInViewerIdentity(authStore) {
-  if (!authStore?.isAuthenticated || !authStore.username) {
+  if (!authStore?.isAuthenticated) {
     return null
   }
-  const name = String(authStore.username).trim().slice(0, 64)
-  if (isValidRtcUserId(name)) {
-    return { rtcUserId: name, displayName: name }
-  }
+
+  const displayName = String(authStore.username || `用户${authStore.userId || ''}`).trim().slice(0, 64)
   const uid = authStore.userId != null ? String(authStore.userId) : '0'
-  const rtcUserId = `u${uid}`
-  return { rtcUserId, displayName: name }
+  const suffix = getSessionRtcSuffix()
+  let rtcUserId = `u${uid}_${suffix}`
+
+  if (!isValidRtcUserId(rtcUserId)) {
+    rtcUserId = `u${uid}_${suffix}`.replace(/[^0-9a-zA-Z_\-@.]/g, '_').slice(0, 128)
+  }
+
+  return { rtcUserId, displayName: displayName || rtcUserId }
 }

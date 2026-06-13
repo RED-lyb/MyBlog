@@ -6,16 +6,11 @@ import { ElMessage } from 'element-plus'
 import { FullScreen, VideoPlay } from '@element-plus/icons-vue'
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
 import { fetchCinemaList } from '../lib/cinemaApi.js'
-import {
-  readCachedGuestIdentity,
-  cacheGuestIdentity,
-  resolveLoggedInViewerIdentity,
-  displayNameFromRtcUserId,
-} from '../lib/cinemaGuestId.js'
+import { resolveLoggedInViewerIdentity } from '../lib/cinemaGuestId.js'
 import { CinemaRtcViewer, fetchCinemaToken } from '../lib/cinemaRtcViewer.js'
 
 const authStore = useAuthStore()
-const { username, isAuthenticated } = storeToRefs(authStore)
+const { username } = storeToRefs(authStore)
 
 const loading = ref(true)
 const joining = ref(false)
@@ -45,21 +40,18 @@ const viewer = new CinemaRtcViewer({
   onPublisherStream: () => {
     hasRemoteStream.value = true
     rtcPhase.value = 'watching'
-    logCinema('收到推流端发布流')
   },
   onPublisherUnpublish: () => {
     hasRemoteStream.value = false
     if (rtcPhase.value !== 'error') {
       rtcPhase.value = 'in_room'
     }
-    logCinema('推流端停止发布')
   },
   onPublisherLeave: () => {
     hasRemoteStream.value = false
     if (rtcPhase.value !== 'error') {
       rtcPhase.value = 'in_room'
     }
-    logCinema('推流端离开房间')
   },
   onAutoplayFailed: () => {
     needUserGesture.value = true
@@ -72,8 +64,8 @@ const viewer = new CinemaRtcViewer({
     rtcPhase.value = 'error'
     leaveRtc()
   },
-  onError: (e) => {
-    console.error('[cinema] RTC error', e)
+  onError: () => {
+    // RTC 错误由 overlay 提示，避免在控制台输出敏感信息
   },
 })
 
@@ -85,15 +77,11 @@ const displayTitle = computed(() => {
   return '同频影院'
 })
 
-const viewerLabel = computed(() => viewerIdentity.value.displayName)
+const viewerLabel = computed(() => viewerIdentity.value.displayName || username.value || '')
 
 const showNoStreamHint = computed(() => {
   return rtcPhase.value === 'in_room' && !hasRemoteStream.value
 })
-
-const logCinema = (...args) => {
-  console.log('[cinema]', ...args)
-}
 
 const loadRtcConfig = async () => {
   const { response } = await fetchCinemaList()
@@ -107,7 +95,6 @@ const loadRtcConfig = async () => {
     publisher_user_id: stream.user_id || '',
     cinema_filename: stream.cinema_filename || null,
   }
-  logCinema('config', rtcConfig.value)
 }
 
 const waitPlayerDom = async () => {
@@ -134,14 +121,21 @@ const joinRtc = async () => {
   const gen = ++joinGeneration
   const cfg = rtcConfig.value
   if (!cfg.app_id || !cfg.room_id || !cfg.publisher_user_id) {
-    rtcError.value = 'RTC 未配置（app_id / room_id / 推流端 user_id）'
+    rtcError.value = '放映厅未就绪，请稍后再试'
+    rtcPhase.value = 'error'
+    return
+  }
+
+  const loggedIn = resolveLoggedInViewerIdentity(authStore)
+  if (!loggedIn?.rtcUserId) {
+    rtcError.value = '请先登录后再观看'
     rtcPhase.value = 'error'
     return
   }
 
   const domReady = await waitPlayerDom()
   if (!domReady) {
-    rtcError.value = '播放器容器未就绪'
+    rtcError.value = '播放器未就绪'
     rtcPhase.value = 'error'
     return
   }
@@ -150,44 +144,23 @@ const joinRtc = async () => {
   rtcError.value = ''
   rtcPhase.value = 'joining'
   hasRemoteStream.value = false
+  viewerIdentity.value = loggedIn
 
   try {
-    let requestUserId = viewerIdentity.value.rtcUserId || null
-    if (isAuthenticated.value) {
-      const loggedIn = resolveLoggedInViewerIdentity(authStore)
-      if (loggedIn) {
-        requestUserId = loggedIn.rtcUserId
-      }
-    } else if (!requestUserId) {
-      const cached = readCachedGuestIdentity()
-      requestUserId = cached?.rtcUserId || null
-    }
-
-    logCinema('进房', { room: cfg.room_id, viewer: requestUserId || '(新游客)', publisher: cfg.publisher_user_id })
-    const tokenResult = await fetchCinemaToken(cfg.room_id, requestUserId)
+    const tokenResult = await fetchCinemaToken(cfg.room_id, loggedIn.rtcUserId)
     if (gen !== joinGeneration) return
-
-    const rtcUserId = tokenResult.user_id
-    viewerIdentity.value = {
-      rtcUserId,
-      displayName: tokenResult.display_name || displayNameFromRtcUserId(rtcUserId),
-    }
-    if (!isAuthenticated.value) {
-      cacheGuestIdentity(viewerIdentity.value)
-    }
 
     await viewer.join({
       appId: cfg.app_id,
       roomId: cfg.room_id,
-      userId: rtcUserId,
+      userId: tokenResult.user_id,
       token: tokenResult.token,
       publisherUserId: cfg.publisher_user_id,
       renderDom: playerDomRef.value,
     })
     if (gen !== joinGeneration) return
   } catch (e) {
-    console.error(e)
-    rtcError.value = e.message || '进房失败'
+    rtcError.value = e.message || '连接放映厅失败'
     rtcPhase.value = 'error'
     await viewer.leave()
     ElMessage.error(rtcError.value)
@@ -216,33 +189,27 @@ const toggleFullscreen = async () => {
   }
 }
 
+const handlePageHide = () => {
+  viewer.leave()
+}
+
 onMounted(async () => {
   loading.value = true
   authStore.syncFromLocalStorage()
-  if (isAuthenticated.value) {
-    const loggedIn = resolveLoggedInViewerIdentity(authStore)
-    if (loggedIn) {
-      viewerIdentity.value = loggedIn
-    }
-  } else {
-    const cached = readCachedGuestIdentity()
-    if (cached) {
-      viewerIdentity.value = cached
-    }
-  }
+  window.addEventListener('pagehide', handlePageHide)
   try {
     await loadRtcConfig()
     await joinRtc()
   } catch (e) {
     rtcError.value = e.message || '初始化失败'
     rtcPhase.value = 'error'
-    logCinema('init error', e)
   } finally {
     loading.value = false
   }
 })
 
 onUnmounted(async () => {
+  window.removeEventListener('pagehide', handlePageHide)
   await leaveRtc()
 })
 </script>
@@ -255,8 +222,7 @@ onUnmounted(async () => {
       <div class="header-left">
         <h1 class="title">{{ displayTitle }}</h1>
         <p class="meta">
-          <span v-if="isAuthenticated">用户：{{ username || viewerLabel }}</span>
-          <span v-else>观众：{{ viewerLabel }}</span>
+          <span>用户：{{ viewerLabel }}</span>
         </p>
       </div>
       <div class="header-actions">
@@ -346,7 +312,6 @@ onUnmounted(async () => {
   font-weight: 600;
 }
 
-/* 100% 宽度 + 16:9，高度设上限，避免带鱼屏过高 */
 .player-stage {
   width: 100%;
   display: flex;
@@ -421,5 +386,4 @@ onUnmounted(async () => {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.85);
 }
-
 </style>
