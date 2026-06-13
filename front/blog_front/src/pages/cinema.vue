@@ -3,7 +3,6 @@ import { onMounted, ref, computed, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserInfo } from '../lib/authState.js'
 import { useAuthStore } from '../stores/user_info.js'
-import { useRouter } from 'vue-router'
 import FullScreenLoading from './FullScreenLoading.vue'
 import Head from '../components/Head.vue'
 import Footer from '../components/Footer.vue'
@@ -62,11 +61,9 @@ onMounted(async () => {
           <Head />
         </el-header>
         <el-container>
-          <el-aside></el-aside>
-          <el-main>
+          <el-main class="cinema-main">
             <Cinema_main />
           </el-main>
-          <el-aside></el-aside>
         </el-container>
         <el-footer style="padding: 0">
           <Footer />
@@ -77,22 +74,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.el-aside {
-  background-color: #00000000;
-  width: 230px;
-  position: sticky;
-  top: 60px;
-  align-self: flex-start;
-  height: calc(100vh - 165px);
-}
-
-.el-main {
+.cinema-main {
+  width: 100%;
+  flex: 1;
   background-color: #00000000;
   min-height: max(570px, calc(100vh - 165px));
-  padding: 20px 20px 20px 20px;
+  padding: 20px;
   border: 1px solid var(--el-border-color-light);
   margin-top: 10px;
   border-radius: 8px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 </style>

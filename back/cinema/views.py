@@ -4,6 +4,7 @@
 import json
 import os
 import re
+import secrets
 import signal
 import subprocess
 import time
@@ -43,17 +44,40 @@ def _error(message, code=400, extra=None):
     return JsonResponse(body, status=code)
 
 
-def _token_response(code=200, message='请求成功', user_id=None, room_id=None, data=None):
+def _token_response(code=200, message='请求成功', user_id=None, room_id=None, data=None, display_name=None):
     """与 bytedance_server Flask 响应格式一致，供 rtccli 解析"""
-    return JsonResponse(
-        {
-            'user_id': user_id,
-            'room_id': room_id,
-            'data': data,
-            'message': message,
-        },
-        status=code,
-    )
+    body = {
+        'user_id': user_id,
+        'room_id': room_id,
+        'data': data,
+        'message': message,
+    }
+    if display_name:
+        body['display_name'] = display_name
+    return JsonResponse(body, status=code)
+
+
+_RTC_USER_ID_RE = re.compile(r'^[0-9a-zA-Z_\-@.]{1,128}$')
+_GUEST_USER_ID_RE = re.compile(r'^guest_([0-9a-zA-Z]{4,32})$')
+_GUEST_TAG_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+
+def _random_guest_tag(length=6):
+    return ''.join(secrets.choice(_GUEST_TAG_ALPHABET) for _ in range(length))
+
+
+def _guest_display_name(user_id):
+    m = _GUEST_USER_ID_RE.match(str(user_id))
+    if m:
+        return f'游客{m.group(1)}'
+    return str(user_id)
+
+
+def _allocate_guest_user_id():
+    """随机分配游客 RTC user_id（含字母数字），展示名与随机段一致。"""
+    tag = _random_guest_tag(6)
+    user_id = f'guest_{tag}'
+    return user_id, f'游客{tag}'
 
 
 def _safe_cinema_filename(name):
@@ -275,10 +299,19 @@ def get_token(request):
     except (json.JSONDecodeError, UnicodeDecodeError):
         return _token_response(400, '未携带json数据或格式错误')
 
-    user_id = body.get('user_id')
+    user_id = (body.get('user_id') or '').strip() or None
     room_id = body.get('room_id')
-    if not user_id or not room_id:
+    if not room_id:
         return _token_response(400, '未携带json数据或格式错误')
+
+    display_name = None
+    if user_id:
+        if not _RTC_USER_ID_RE.fullmatch(user_id):
+            return _token_response(400, 'user_id 格式无效')
+        if _GUEST_USER_ID_RE.match(user_id):
+            display_name = _guest_display_name(user_id)
+    else:
+        user_id, display_name = _allocate_guest_user_id()
 
     rtc = get_rtc_settings()
     if not rtc['app_id'] or not rtc['app_key']:
@@ -291,7 +324,7 @@ def get_token(request):
         str(user_id),
         rtc['expire_ts'],
     )
-    return _token_response(200, '请求成功', user_id, room_id, token_str)
+    return _token_response(200, '请求成功', user_id, room_id, token_str, display_name)
 
 
 @require_GET
