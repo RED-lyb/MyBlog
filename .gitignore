@@ -45,7 +45,14 @@ back/api/static/files/*
 !back/api/static/files/.gitkeep
 back/api/static/user_heads/*
 !back/api/static/user_heads/.gitkeep
+back/api/static/cinema/*
 !back/api/static/cinema/.gitkeep
+
+# 忽略 games 目录下的上传文件
+back/api/static/games/game_files/*
+back/api/static/games/game_files/.gitkeep
+back/api/static/games/game_images/*
+back/api/static/games/game_images/.gitkeep
 
 # 同频影院
 back/cinema/rtc_runtime/*
