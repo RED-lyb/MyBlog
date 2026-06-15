@@ -65,7 +65,6 @@ export function buildEmbedMarkup(type, payload, width, height) {
       allowfullscreen
     ></iframe></div>`
     } catch (e) {
-      console.error('HTML解码失败:', e)
       return '<p class="embed-parse-error">嵌入内容解析失败</p>'
     }
   }

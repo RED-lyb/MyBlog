@@ -53,7 +53,6 @@ const getUserAvatarUrl = async (userId, avatar) => {
       return buildAvatarUrl(userId, avatar)
     }
   } catch (error) {
-    console.error('获取头像失败', error)
     return buildAvatarUrl(userId, avatar)
   }
 }
@@ -100,7 +99,6 @@ const fetchComments = async () => {
     }
   } catch (err) {
     error.value = err.message || '请求失败'
-    console.error('获取评论列表错误:', err)
   } finally {
     loading.value = false
   }
@@ -147,7 +145,6 @@ const handleDeleteComment = (comment) => {
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message || '删除失败'
       ElMessage.error(errorMsg)
-      console.error('删除评论错误:', err)
     }
   }).catch(() => {
     // 用户取消删除

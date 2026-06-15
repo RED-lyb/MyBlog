@@ -188,7 +188,6 @@ const fetchHistory = async () => {
     historyList.value = filteredHistory.slice(start, end)
     total.value = filteredHistory.length
   } catch (error) {
-    console.error('获取更新历史列表错误:', error)
     ElMessage.error('获取更新历史列表失败')
   } finally {
     loading.value = false
@@ -279,7 +278,6 @@ const handleSubmit = async () => {
       }
     }
   } catch (error) {
-    console.error('提交更新历史错误:', error)
     ElMessage.error('操作失败')
   } finally {
     submitting.value = false
@@ -308,7 +306,6 @@ const handleDelete = (row) => {
         ElMessage.error(response.data.error || '删除失败')
       }
     } catch (error) {
-      console.error('删除更新历史错误:', error)
       ElMessage.error('删除失败')
     }
   }).catch(() => {})
@@ -357,7 +354,6 @@ const handleBatchDelete = () => {
       allHistoryCache.value = []
       await fetchHistory()
     } catch (error) {
-      console.error('批量删除更新历史错误:', error)
       ElMessage.error('批量删除失败')
     }
   }).catch(() => {})

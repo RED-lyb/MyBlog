@@ -1,6 +1,13 @@
 /**
  * 全站主布局：手机端限制宽度、Head 可横向滑动、主内容与侧栏纵向堆叠
  */
+:root {
+  --layout-header-h: 60px;
+  --layout-footer-reserve: 145px;
+  --layout-main-mt: 8px;
+  --layout-body-offset: calc(var(--layout-header-h) + var(--layout-footer-reserve) + var(--layout-main-mt));
+}
+
 .common-layout {
   width: 100%;
   max-width: 100vw;
@@ -25,6 +32,10 @@
   width: 100%;
   max-width: 100vw;
   box-sizing: border-box;
+  height: auto !important;
+  --el-footer-height: auto !important;
+  overflow: visible;
+  flex-shrink: 0;
 }
 
 .common-layout .el-main {
@@ -33,6 +44,21 @@
   min-width: 0;
   box-sizing: border-box;
   flex: 1 1 auto;
+}
+
+/* 侧栏 sticky 高度与主内容 min-height 统一由变量控制 */
+.common-layout > .el-container > .el-container > .el-aside {
+  position: sticky;
+  top: var(--layout-header-h);
+  align-self: flex-start;
+  height: calc(100dvh - var(--layout-body-offset));
+  max-height: calc(100dvh - var(--layout-body-offset));
+}
+
+.common-layout > .el-container > .el-container > .el-main,
+.common-layout > .el-container > .el-container > .el-main.cinema-main {
+  min-height: max(480px, calc(100dvh - var(--layout-body-offset)));
+  padding-bottom: 8px;
 }
 
 @media (max-width: 768px) {
@@ -45,6 +71,7 @@
     max-width: 100% !important;
     position: static !important;
     height: auto !important;
+    max-height: none !important;
     align-self: stretch !important;
     flex-shrink: 0;
   }
@@ -57,5 +84,22 @@
     padding-left: 8px;
     padding-right: 8px;
     margin-top: 6px;
+    min-height: unset !important;
+  }
+
+  .common-layout > .el-container > .el-container > .el-main.cinema-main {
+    min-height: unset !important;
+  }
+
+  /* 避免嵌套滚动容器抢占触摸滚动，导致首次滑动中断 */
+  .common-layout .article-main-container,
+  .common-layout .history-content {
+    height: auto !important;
+    overflow-y: visible !important;
+  }
+
+  .common-layout .el-header {
+    overflow-x: visible;
+    -webkit-overflow-scrolling: auto;
   }
 }

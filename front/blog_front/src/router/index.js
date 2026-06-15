@@ -256,7 +256,7 @@ router.beforeEach(async (to, from, next) => {
         authStore.tokenExpired = true
         authStore.isAuthenticated = false
         authStore.wasLoggedIn = true
-      } catch (_) {}
+      } catch {}
     }
   }
   
@@ -295,7 +295,7 @@ router.beforeEach(async (to, from, next) => {
             localStorage.setItem('token_expired', 'true')
             // 使用store的方法设置过期状态
             authStore.setTokenExpired()
-          } catch (_) {}
+          } catch {}
         }
       }
     }
@@ -350,7 +350,7 @@ router.beforeEach(async (to, from, next) => {
           type: 'warning',
           closeOnClickModal: false
         })
-      } catch (_) {}
+      } catch {}
       // 无论用户点击确认还是关闭，都跳转到登录页
       next('/login')
       return
@@ -358,14 +358,13 @@ router.beforeEach(async (to, from, next) => {
     
     // 再次检查isAdmin，确保从localStorage同步后正确
     if (!authStore.isAdmin) {
-      console.log('路由守卫 - 用户不是管理员，跳转到首页')
       try {
         await ElMessageBox.alert('您没有管理员权限', '权限不足', {
           confirmButtonText: '确定',
           type: 'error',
           closeOnClickModal: false
         })
-      } catch (_) {}
+      } catch {}
       // 无论用户点击确认还是关闭，都跳转到首页
       next('/home')
       return

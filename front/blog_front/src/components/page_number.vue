@@ -70,12 +70,9 @@ const updatePageFromJumper = () => {
   paginationStore.setCurrentPage(page)
 }
 
-const handleSizeChange = (val: number) => {
-  console.log(`${val} items per page`)
-}
+const handleSizeChange = () => {}
 
 const handleCurrentChange = (val: number) => {
-  console.log(`current page: ${val}`)
   paginationStore.setCurrentPage(val)
 }
 </script>

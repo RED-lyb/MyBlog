@@ -173,7 +173,6 @@ const parsedContent = computed(() => {
 
     return result
   } catch (e) {
-    console.error('Markdown解析错误:', e)
     return article.value.content
   }
 })
@@ -214,7 +213,6 @@ const fetchUserAvatar = async () => {
       article.value.display_avatar = buildAvatarUrl(article.value.author_id, article.value.author_avatar)
     }
   } catch (error) {
-    console.error('获取头像失败', error)
     article.value.display_avatar = buildAvatarUrl(article.value.author_id, article.value.author_avatar)
   } finally {
     article.value.avatar_loading = false
@@ -265,7 +263,6 @@ const fetchArticleDetail = async () => {
             isLiked.value = likeResponse.data.data.is_liked
           }
         } catch (err) {
-          console.error('获取喜欢状态失败:', err)
         }
       }
     } else {
@@ -273,7 +270,6 @@ const fetchArticleDetail = async () => {
     }
   } catch (err) {
     error.value = err.message || '请求失败'
-    console.error('获取文章详情错误:', err)
   } finally {
     loading.value = false
   }
@@ -301,7 +297,6 @@ const handleLikeClick = async () => {
       ElMessage.error(response.data?.error || '操作失败')
     }
   } catch (err) {
-    console.error('喜欢操作失败:', err)
     ElMessage.error(err.response?.data?.error || '操作失败')
   }
 }
@@ -363,7 +358,6 @@ const handleCaptchaSuccess = async (captchaInfo) => {
       ElMessage.error(response.data?.error || '发布评论失败')
     }
   } catch (err) {
-    console.error('发布评论失败:', err)
     ElMessage.error(err.response?.data?.error || '发布评论失败')
   } finally {
     commentLoading.value = false
@@ -517,6 +511,13 @@ onUnmounted(() => {
   height: 100%;
   padding: 20px;
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .article-main-container {
+    height: auto;
+    overflow-y: visible;
+  }
 }
 
 .loading,

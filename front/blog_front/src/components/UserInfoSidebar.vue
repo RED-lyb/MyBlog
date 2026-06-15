@@ -69,7 +69,6 @@ const getUserAvatarUrl = async (userId, avatar) => {
       return buildAvatarUrl(userId, avatar)
     }
   } catch (error) {
-    console.error('获取头像失败', error)
     return buildAvatarUrl(userId, avatar)
   }
 }
@@ -107,7 +106,6 @@ const fetchUser = async (userId) => {
     } else {
       userError.value = err.message || '请求失败'
     }
-    console.error('获取用户信息错误:', err)
   } finally {
     userLoading.value = false
   }
@@ -126,7 +124,6 @@ const checkFollowStatus = async () => {
       isFollowing.value = response.data.data.is_following
     }
   } catch (error) {
-    console.error('检查关注状态失败:', error)
     isFollowing.value = false
   }
 }
@@ -149,7 +146,6 @@ const handleToggleFollow = async () => {
       ElMessage.error(response.data?.error || '操作失败')
     }
   } catch (error) {
-    console.error('关注操作失败:', error)
     ElMessage.error(error.response?.data?.error || '操作失败')
   } finally {
     followLoading.value = false

@@ -54,7 +54,6 @@ const calculateDays = (dateString) => {
     // 确保最小值为1
     return Math.max(1, daysDiff)
   } catch (error) {
-    console.error('计算天数错误:', error)
     return 0
   }
 }
@@ -96,7 +95,6 @@ const getUserAvatarUrl = async (userId, avatar) => {
       return buildAvatarUrl(userId, avatar)
     }
   } catch (error) {
-    console.error('获取头像失败', error)
     return buildAvatarUrl(userId, avatar)
   }
 }
@@ -124,7 +122,6 @@ const fetchFollowingList = async () => {
       error.value = response.data?.error || '获取关注列表失败'
     }
   } catch (err) {
-    console.error('获取关注列表错误:', err)
     error.value = err.response?.data?.error || '获取关注列表失败'
   } finally {
     loading.value = false
@@ -154,7 +151,6 @@ const fetchFollowersList = async () => {
       error.value = response.data?.error || '获取粉丝列表失败'
     }
   } catch (err) {
-    console.error('获取粉丝列表错误:', err)
     error.value = err.response?.data?.error || '获取粉丝列表失败'
   } finally {
     loading.value = false
@@ -176,7 +172,6 @@ const fetchLikedArticlesList = async () => {
       error.value = response.data?.error || '获取喜欢的文章列表失败'
     }
   } catch (err) {
-    console.error('获取喜欢的文章列表错误:', err)
     error.value = err.response?.data?.error || '获取喜欢的文章列表失败'
   } finally {
     loading.value = false
@@ -198,7 +193,6 @@ const fetchArticlesList = async () => {
       error.value = response.data?.error || '获取文章列表失败'
     }
   } catch (err) {
-    console.error('获取文章列表错误:', err)
     error.value = err.response?.data?.error || '获取文章列表失败'
   } finally {
     loading.value = false
@@ -243,7 +237,6 @@ const fetchUserInfo = async () => {
     } else {
       userError.value = err.message || '请求失败'
     }
-    console.error('获取用户信息错误:', err)
   } finally {
     userLoading.value = false
   }

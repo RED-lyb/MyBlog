@@ -107,7 +107,6 @@ const fetchStatistics = async () => {
       ElMessage.error(response.data.error || '获取统计数据失败')
     }
   } catch (error) {
-    console.error('获取统计数据错误:', error)
     ElMessage.error('获取统计数据失败')
   }
 }

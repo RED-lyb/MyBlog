@@ -217,7 +217,6 @@ const fetchFeedbacks = async () => {
       ElMessage.error(response.data.error || '获取反馈列表失败')
     }
   } catch (error) {
-    console.error('获取反馈列表错误:', error)
     ElMessage.error('获取反馈列表失败')
   } finally {
     loading.value = false
@@ -291,7 +290,6 @@ const handleSubmitStatus = async () => {
       ElMessage.error(response.data.error || '更新失败')
     }
   } catch (error) {
-    console.error('更新状态错误:', error)
     ElMessage.error('更新失败')
   } finally {
     submitting.value = false
@@ -327,7 +325,6 @@ const handleDelete = (row) => {
         ElMessage.error(response.data.error || '删除失败')
       }
     } catch (error) {
-      console.error('删除反馈错误:', error)
       ElMessage.error('删除失败')
     }
   }).catch(() => { })
@@ -374,7 +371,6 @@ const handleBatchDelete = () => {
       selectedFeedbacks.value = []
       await fetchFeedbacks()
     } catch (error) {
-      console.error('批量删除反馈错误:', error)
       ElMessage.error('批量删除失败')
     }
   }).catch(() => { })

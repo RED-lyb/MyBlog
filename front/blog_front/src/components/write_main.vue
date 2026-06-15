@@ -729,7 +729,7 @@ const onCaptchaCancel = () => {
 <style scoped>
 .write-container {
   width: 100%;
-  height: max(500px, calc(100vh - 240px));
+  height: max(500px, calc(100dvh - var(--layout-body-offset) - 50px));
   border-radius: 8px;
   overflow: visible;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

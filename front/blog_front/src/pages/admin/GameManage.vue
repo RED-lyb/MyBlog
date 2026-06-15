@@ -334,7 +334,6 @@ const fetchGames = async () => {
       ElMessage.error(response.data.error || '获取游戏列表失败')
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('获取游戏列表失败')
   } finally {
     loading.value = false
@@ -615,7 +614,6 @@ const handleSubmit = async () => {
       await fetchGames()
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('操作失败')
   } finally {
     submitting.value = false
@@ -639,7 +637,6 @@ const handleDelete = (row) => {
           ElMessage.error(response.data.error || '删除失败')
         }
       } catch (e) {
-        console.error(e)
         ElMessage.error('删除失败')
       }
     })

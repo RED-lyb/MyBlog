@@ -37,7 +37,7 @@ function clearAuthInfo() {
   try {
     const auth = useAuthStore()
     auth.clear()
-  } catch (_) {}
+  } catch {}
 }
 
 /**
@@ -50,7 +50,7 @@ function setTokenExpired() {
   try {
     const auth = useAuthStore()
     auth.setTokenExpired()
-  } catch (_) {}
+  } catch {}
 }
 
 // 请求拦截器 - 自动添加Authorization头
@@ -88,7 +88,7 @@ apiClient.interceptors.request.use(
             try {
               const auth = useAuthStore()
               auth.setUser(refreshResponse.data.data.user)
-            } catch (_) {}
+            } catch {}
             
             // 使用新 token 添加到请求头
             config.headers.Authorization = `Bearer ${newAccessToken}`
@@ -141,7 +141,7 @@ apiClient.interceptors.response.use(
           try {
             const auth = useAuthStore()
             auth.setUser(refreshResponse.data.data.user)
-          } catch (_) {}
+          } catch {}
           
           // 重新发送原始请求
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`

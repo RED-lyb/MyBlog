@@ -359,7 +359,6 @@ const fetchConfig = async () => {
       ElMessage.error(response.data.error || '获取配置失败')
     }
   } catch (error) {
-    console.error('获取配置错误:', error)
     ElMessage.error('获取配置失败')
   }
 }
@@ -399,7 +398,6 @@ const handleSave = async () => {
       ElMessage.error(response.data.error || '保存配置失败')
     }
   } catch (error) {
-    console.error('保存配置错误:', error)
     ElMessage.error('保存配置失败')
   } finally {
     saving.value = false

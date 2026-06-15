@@ -61,7 +61,6 @@ const fetchGames = async () => {
       games.value = []
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('获取游戏列表失败')
     games.value = []
   } finally {

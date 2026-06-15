@@ -42,8 +42,8 @@ export const useConfigStore = defineStore('config', () => {
         }
         loaded.value = true
       }
-    } catch (error) {
-      console.error('恢复配置失败:', error)
+    } catch {
+      // ignore
     }
   }
 
@@ -51,8 +51,8 @@ export const useConfigStore = defineStore('config', () => {
   function persistConfig() {
     try {
       localStorage.setItem('app_config', JSON.stringify(config.value))
-    } catch (error) {
-      console.error('保存配置失败:', error)
+    } catch {
+      // ignore
     }
   }
 
@@ -85,11 +85,9 @@ export const useConfigStore = defineStore('config', () => {
         persistConfig() // 保存到localStorage
         loaded.value = true
       } else {
-        console.warn('配置文件加载失败，使用默认配置')
         loaded.value = true
       }
-    } catch (error) {
-      console.error('加载配置失败:', error)
+    } catch {
       loaded.value = true // 即使失败也标记为已加载，避免重复请求
     } finally {
       loading.value = false

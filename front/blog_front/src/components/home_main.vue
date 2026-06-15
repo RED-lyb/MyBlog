@@ -235,7 +235,6 @@ const fetchArticles = async (showLoading = true) => {
               article.is_liked = response.data.data.is_liked
             }
           } catch (err) {
-            console.error('获取喜欢状态失败:', err)
           }
         })
       }
@@ -295,7 +294,6 @@ const fetchArticles = async (showLoading = true) => {
               }
             } catch (err) {
               error.value = err.message || '请求失败'
-              console.error('获取文章列表错误:', err)
             }
           }
           
@@ -314,7 +312,6 @@ const fetchArticles = async (showLoading = true) => {
     }
   } catch (err) {
     error.value = err.message || '请求失败'
-    console.error('获取文章列表错误:', err)
   } finally {
     // 只有在不是初始化阶段时才结束 loading
     // 如果是初始化阶段，loading 会在使用实际高度重新计算并完成最终请求后结束
@@ -387,7 +384,6 @@ const handleLikeClick = async (event, article) => {
       ElMessage.error(response.data?.error || '操作失败')
     }
   } catch (err) {
-    console.error('喜欢操作失败:', err)
     ElMessage.error(err.response?.data?.error || '操作失败')
   }
 }

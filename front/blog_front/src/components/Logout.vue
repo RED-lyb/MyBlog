@@ -6,8 +6,7 @@ const router = useRouter()
 const logout = async () => {
     try {
         await apiClient.post(`${import.meta.env.VITE_API_URL}auth/logout/`, {}, { withCredentials: true })
-    } catch (_) {
-    } finally {
+    } catch {} finally {
         localStorage.removeItem('access_token')
         localStorage.removeItem('user_info')
         const authStore = useAuthStore()

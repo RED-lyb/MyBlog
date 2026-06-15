@@ -70,8 +70,8 @@ export class CinemaRtcViewer {
     for (const uid of this.autoPlayFailUsers) {
       try {
         await this.engine.play(uid)
-      } catch (e) {
-        console.warn('RTC play retry failed', uid, e)
+      } catch {
+        // ignore retry failure
       }
     }
     this.autoPlayFailUsers.clear()
@@ -83,15 +83,15 @@ export class CinemaRtcViewer {
     this._unbindEvents()
     try {
       await this.engine.leaveRoom()
-    } catch (e) {
-      console.warn('leaveRoom', e)
+    } catch {
+      // ignore
     }
     try {
       if (this.VERTC) {
         this.VERTC.destroyEngine(this.engine)
       }
-    } catch (e) {
-      console.warn('destroyEngine', e)
+    } catch {
+      // ignore
     }
     this.engine = null
     this.autoPlayFailUsers.clear()
@@ -139,7 +139,7 @@ export class CinemaRtcViewer {
     if (!userId) return
     this.handlers.onUserJoined?.(userId)
     if (this.publisherUserId && userId === this.publisherUserId) {
-      this.subscribePublisher(userId).catch((e) => console.warn('[cinema] subscribe on join', e))
+      this.subscribePublisher(userId).catch(() => {})
     }
   }
 

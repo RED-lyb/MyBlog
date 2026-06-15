@@ -73,10 +73,8 @@ const fetchHistory = async () => {
         }
       }
     } else {
-      console.error('获取更新历史失败:', response.data.error)
     }
   } catch (error) {
-    console.error('获取更新历史失败:', error)
   } finally {
     loadingHistory.value = false
   }
@@ -176,10 +174,6 @@ onMounted(async () => {
 .el-aside {
   background-color: #00000000;
   width: 230px;
-  position: sticky;
-  top: 60px;
-  align-self: flex-start;
-  height: calc(100vh - 165px);
 }
 
 .history-list {
@@ -225,10 +219,9 @@ onMounted(async () => {
 
 .el-main {
   background-color: #00000000;
-  min-height: max(570px, calc(100vh - 165px));
-  padding: 20px 20px 20px 20px;
+  padding: 20px 20px 8px 20px;
   border: 1px solid var(--el-border-color-light);
-  margin-top: 10px;
+  margin-top: 8px;
   border-radius: 8px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }

@@ -129,7 +129,6 @@ const getCaptcha = async () => {
       ElMessage.error(response.data.error || '获取验证码失败')
     }
   } catch (error) {
-    console.error('获取验证码失败:', error)
     ElMessage.error('获取验证码失败，请稍后重试')
   }
 }

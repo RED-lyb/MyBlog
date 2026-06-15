@@ -223,7 +223,6 @@ const handleDeleteSelected = async () => {
     selectedItems.value = []
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除错误:', error)
     }
   }
 }

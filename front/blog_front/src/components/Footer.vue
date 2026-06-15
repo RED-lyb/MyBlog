@@ -69,20 +69,19 @@ const backgroundColor = computed(() => {
   align-items: center;
   text-align: center;
   width: 100%;
-  height: 60px; /* 降低高度从 100px 到 60px */
 }
 
 .icons {
   display: flex;
   justify-content: center;
   align-items: center;
-
   gap: 0.7rem;
 }
 
 .copyright {
   margin-top: 0.5rem;
 }
+
 :deep(.el-divider__text) {
   background-color: v-bind(backgroundColor) !important;
 }
@@ -92,7 +91,6 @@ const backgroundColor = computed(() => {
   margin-bottom: 15px !important;
 }
 
-/* 覆盖 el-divider--horizontal 的 margin，使分割线也向下移动 */
 .line :deep(.el-divider--horizontal) {
   margin-top: 50px !important;
   margin-bottom: 10px !important;

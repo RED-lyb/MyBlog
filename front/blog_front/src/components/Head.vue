@@ -32,6 +32,11 @@ const activeIndex = computed(() => {
 
 // 添加遮罩状态
 const showMask = ref(false)
+const isMobileLayout = ref(false)
+
+const syncMobileLayout = () => {
+  isMobileLayout.value = window.matchMedia('(max-width: 768px)').matches
+}
 
 // 滚动监听
 const handleScroll = () => {
@@ -129,8 +134,7 @@ const fetchUserAvatar = async () => {
     } else {
       user_avatar.value = buildAvatarUrl(avatarFileName)
     }
-  } catch (error) {
-    console.error('获取头像失败', error)
+  } catch {
     user_avatar.value = buildAvatarUrl(avatarFileName)
   } finally {
     avatarLoading.value = false
@@ -141,6 +145,8 @@ onBeforeMount(() => {
   fetchUserAvatar()
 })
 onMounted(() => {
+  syncMobileLayout()
+  window.addEventListener('resize', syncMobileLayout)
   window.addEventListener('scroll', handleScroll)
   
   // 确保同步用户信息
@@ -148,6 +154,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncMobileLayout)
   window.removeEventListener('scroll', handleScroll)
 })
 watch(
@@ -164,7 +171,7 @@ watch(
 </script>
 
 <template>
-  <el-affix :offset="0">
+  <el-affix :offset="0" :disabled="isMobileLayout">
     <div class="header-mask" :class="{ 'mask-active': showMask }">
     <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
       @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">

@@ -192,7 +192,6 @@ const fetchTargetUser = async (userId) => {
     } else {
       userError.value = err.message || '请求失败'
     }
-    console.error('获取用户信息错误:', err)
   } finally {
     userLoading.value = false
   }
@@ -227,7 +226,6 @@ const fetchCurrentUserProtect = async () => {
       currentProtectQuestion.value = response.data.data.user.protect
     }
   } catch (error) {
-    console.error('获取密保问题失败:', error)
   }
 }
 
@@ -253,7 +251,6 @@ const saveProfile = async () => {
       showLoading.value = false
     }
   } catch (error) {
-    console.error('保存资料失败:', error)
     ElMessage.error(error.response?.data?.error || '保存失败')
     showLoading.value = false
   } finally {
@@ -303,7 +300,6 @@ const resetStyle = async () => {
         showLoading.value = false
       }
     } catch (error) {
-      console.error('恢复默认样式失败:', error)
       ElMessage.error(error.response?.data?.error || '恢复失败')
       showLoading.value = false
     } finally {
@@ -350,7 +346,6 @@ const handleAvatarUpload = async () => {
       ElMessage.error(response.data?.error || '上传失败')
     }
   } catch (error) {
-    console.error('上传头像失败:', error)
     ElMessage.error(error.response?.data?.error || '上传失败')
   } finally {
     uploadingAvatar.value = false
@@ -413,7 +408,6 @@ const handleResetPasswordWithCaptcha = async (captchaInfo) => {
       }
     }
   } catch (error) {
-    console.error('修改密码失败:', error)
     let errorMessage = '修改失败'
     showLoading.value = false
     
@@ -534,7 +528,6 @@ const handleResetSecurityQuestionWithCaptcha = async (captchaInfo) => {
       }
     }
   } catch (error) {
-    console.error('修改密保失败:', error)
     let errorMessage = '修改失败'
     showLoading.value = false
     

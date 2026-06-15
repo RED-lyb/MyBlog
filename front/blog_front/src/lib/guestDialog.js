@@ -38,9 +38,8 @@ export function showGuestDialog(router, fallbackPath = '/', options = {}) {
         }
       }
     }
-  } catch (e) {
+  } catch {
     // 解析失败，使用 fallbackPath
-    console.warn('获取来源路径失败:', e)
   }
 
   ElMessageBox.alert(

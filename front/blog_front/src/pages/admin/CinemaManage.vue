@@ -38,7 +38,6 @@ const fetchAll = async () => {
       runtime.value = runtimeRes.data.data || {}
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('加载影院数据失败')
   } finally {
     loading.value = false
@@ -63,7 +62,6 @@ const handleUpload = async ({ file }) => {
       ElMessage.error(res.data.error || '上传失败')
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
@@ -87,7 +85,6 @@ const handleDelete = async (row) => {
     }
   } catch (e) {
     if (e !== 'cancel') {
-      console.error(e)
       ElMessage.error('删除失败')
     }
   }
@@ -116,7 +113,6 @@ const startStream = async () => {
       ElMessage.error(res.data.error || '启动失败')
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error(e.response?.data?.error || '启动推流失败')
   } finally {
     streamLoading.value = false
@@ -134,7 +130,6 @@ const stopStream = async () => {
       ElMessage.error(res.data.error || '停止失败')
     }
   } catch (e) {
-    console.error(e)
     ElMessage.error('停止推流失败')
   } finally {
     streamLoading.value = false

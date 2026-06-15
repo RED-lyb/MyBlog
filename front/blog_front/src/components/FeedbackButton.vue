@@ -71,10 +71,7 @@ const handleSubmit = async () => {
     } else {
       ElMessage.error(response.data.error || '提交失败')
     }
-  } catch (error) {
-    console.error('提交反馈错误:', error)
-    ElMessage.error('提交失败，请稍后重试')
-  } finally {
+  } catch {} finally {
     submitting.value = false
   }
 }

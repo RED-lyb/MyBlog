@@ -181,7 +181,6 @@ const fetchUsers = async () => {
       ElMessage.error(response.data.error || '获取用户列表失败')
     }
   } catch (error) {
-    console.error('获取用户列表错误:', error)
     ElMessage.error('获取用户列表失败')
   } finally {
     loading.value = false
@@ -218,7 +217,6 @@ const handleEdit = async (row) => {
       ElMessage.error(response.data.error || '获取用户信息失败')
     }
   } catch (error) {
-    console.error('获取用户信息错误:', error)
     ElMessage.error('获取用户信息失败')
   }
 }
@@ -244,7 +242,6 @@ const handleSubmit = async () => {
       ElMessage.error(response.data.error || '更新用户信息失败')
     }
   } catch (error) {
-    console.error('更新用户信息错误:', error)
     ElMessage.error('更新用户信息失败')
   } finally {
     submitting.value = false
@@ -275,7 +272,6 @@ const handleToggleAdmin = (row) => {
         ElMessage.error(response.data.error || '操作失败')
       }
     } catch (error) {
-      console.error('切换管理员状态错误:', error)
       ElMessage.error('操作失败')
     }
   }).catch(() => {})
@@ -305,7 +301,6 @@ const handleDelete = (row) => {
         ElMessage.error(response.data.error || '删除用户失败')
       }
     } catch (error) {
-      console.error('删除用户错误:', error)
       ElMessage.error('删除用户失败')
     }
   }).catch(() => {})
@@ -352,7 +347,6 @@ const handleBatchDelete = () => {
       selectedUsers.value = []
       fetchUsers()
     } catch (error) {
-      console.error('批量删除用户错误:', error)
       ElMessage.error('批量删除失败')
     }
   }).catch(() => {})

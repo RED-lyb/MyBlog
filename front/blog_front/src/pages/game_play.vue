@@ -38,8 +38,7 @@ onMounted(async () => {
       return
     }
     window.location.replace(buildGameAbsoluteUrl(g))
-  } catch (e) {
-    console.error(e)
+  } catch {
     err.value = '加载失败'
     showLoading.value = false
   }

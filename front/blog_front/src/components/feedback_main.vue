@@ -82,10 +82,8 @@ const fetchFeedbackList = async (issueType = '') => {
     if (response.data.success) {
       feedbackList.value = response.data.data.feedbacks || []
     } else {
-      console.error('获取反馈列表失败:', response.data.error)
     }
   } catch (error) {
-    console.error('获取反馈列表失败:', error)
   } finally {
     loadingFeedback.value = false
   }
@@ -136,7 +134,6 @@ const handleEditSubmit = async () => {
       ElMessage.error(response.data.error || '更新失败')
     }
   } catch (error) {
-    console.error('更新反馈错误:', error)
     ElMessage.error('更新失败')
   } finally {
     editSubmitting.value = false
@@ -169,7 +166,6 @@ const handleDelete = (feedback) => {
         ElMessage.error(response.data.error || '删除失败')
       }
     } catch (error) {
-      console.error('删除反馈错误:', error)
       ElMessage.error('删除失败')
     }
   }).catch(() => { })

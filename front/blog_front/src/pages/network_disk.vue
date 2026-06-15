@@ -120,12 +120,10 @@ const fetchNetworkDiskConfig = async () => {
     if (response.data?.success) {
       networkDiskConfig.value = response.data.data
     } else {
-      console.error('获取网盘配置失败:', response.data?.error)
       // 使用默认值
       networkDiskConfig.value.cleanup_days = 7
     }
   } catch (error) {
-    console.error('获取网盘配置失败:', error)
     // 使用默认值
     networkDiskConfig.value.cleanup_days = 7
   } finally {
@@ -171,7 +169,6 @@ const fetchFileList = async (path = null) => {
       router.push({ name: 'network_disk' })
     }
   } catch (error) {
-    console.error('获取文件列表错误:', error)
     // 如果是404，可能是文件，抛出错误让路由监听处理
     if (error.response?.status === 404 && targetPath) {
       throw error // 重新抛出，让路由监听处理下载
@@ -280,7 +277,6 @@ const deleteItem = async (item) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除错误:', error)
       ElMessage.error('删除失败')
     }
   }
@@ -339,11 +335,9 @@ const handleUpload = async () => {
           successCount++
         } else {
           failCount++
-          console.error('上传失败:', response.data?.error)
         }
       } catch (error) {
         failCount++
-        console.error('上传错误:', error)
       }
     }
     
@@ -357,7 +351,6 @@ const handleUpload = async () => {
       ElMessage.error('所有文件上传失败')
     }
   } catch (error) {
-    console.error('上传错误:', error)
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
@@ -391,7 +384,6 @@ const createDirectory = async () => {
       ElMessage.error(response.data?.error || '创建目录失败')
     }
   } catch (error) {
-    console.error('创建目录错误:', error)
     ElMessage.error('创建目录失败')
   }
 }
@@ -419,7 +411,6 @@ const deleteItems = async (items) => {
         }
       } catch (error) {
         failCount++
-        console.error(`删除 ${item.name} 失败:`, error)
       }
     }
     
@@ -434,7 +425,6 @@ const deleteItems = async (items) => {
     fetchFileList() // 从 URL 读取路径
     fetchStorageInfo() // 更新存储信息
   } catch (error) {
-    console.error('删除错误:', error)
     ElMessage.error('删除失败')
   }
 }
@@ -484,7 +474,6 @@ const editFile = async (item) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('重命名错误:', error)
       ElMessage.error('重命名失败')
     }
   }
@@ -514,7 +503,6 @@ const getAllFilesInDirectory = async (dirPath) => {
       }
     }
   } catch (error) {
-    console.error(`获取目录 ${dirPath} 的文件列表失败:`, error)
   }
   return files
 }
@@ -568,13 +556,11 @@ const downloadArchive = async (items) => {
           await new Promise(resolve => setTimeout(resolve, 300))
         }
       } catch (error) {
-        console.error(`下载文件 ${file.name} 失败:`, error)
       }
     }
     
     ElMessage.success(`开始下载 ${filesToDownload.length} 个文件`)
   } catch (error) {
-    console.error('下载错误:', error)
     ElMessage.error('下载失败')
   } finally {
     downloadingFiles.value = false
@@ -750,7 +736,6 @@ watch(() => route.params.path, async () => {
         return
       }
       // 其他错误，显示错误信息
-      console.error('获取文件列表错误:', error)
       ElMessage.error('文件路径不存在')
       router.push({ name: 'network_disk' })
     }
@@ -772,7 +757,6 @@ const ensureUserDirectory = async () => {
       ElMessage.warning(`该网盘仅存储文件${networkDiskConfig.value.cleanup_days}天`)
   } catch (error) {
       // 忽略错误，目录会在后端自动创建
-      console.log('确保用户目录:', error)
     }
   }
 }
@@ -786,7 +770,6 @@ const fetchStorageInfo = async () => {
       storageInfo.value = response.data.data
     }
   } catch (error) {
-    console.error('获取存储信息失败:', error)
   } finally {
     loadingStorageInfo.value = false
   }
@@ -1015,10 +998,6 @@ watch([filterOnlyMine, filterUsername], () => {
 .el-aside {
   background-color: #00000000;
   width: 230px;
-  position: sticky;
-  top: 60px;
-  align-self: flex-start;
-  height: calc(100vh - 165px);
 }
 
 .search-filter-container {
@@ -1055,10 +1034,9 @@ watch([filterOnlyMine, filterUsername], () => {
 
 .el-main {
   background-color: #00000000;
-  min-height: max(570px, calc(100vh - 165px));
-  padding: 20px 20px 20px 20px;
+  padding: 20px 20px 8px 20px;
   border: 1px solid var(--el-border-color-light);
-  margin-top: 10px;
+  margin-top: 8px;
   border-radius: 8px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
 }

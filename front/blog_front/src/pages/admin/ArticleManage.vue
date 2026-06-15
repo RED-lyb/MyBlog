@@ -178,7 +178,6 @@ const fetchArticles = async () => {
       ElMessage.error(response.data.error || '获取文章列表失败')
     }
   } catch (error) {
-    console.error('获取文章列表错误:', error)
     ElMessage.error('获取文章列表失败')
   } finally {
     loading.value = false
@@ -261,7 +260,6 @@ const handleSubmit = async () => {
       }
     }
   } catch (error) {
-    console.error('提交文章错误:', error)
     ElMessage.error('操作失败')
   } finally {
     submitting.value = false
@@ -288,7 +286,6 @@ const handleDelete = (row) => {
         ElMessage.error(response.data.error || '删除文章失败')
       }
     } catch (error) {
-      console.error('删除文章错误:', error)
       ElMessage.error('删除文章失败')
     }
   }).catch(() => {})
@@ -335,7 +332,6 @@ const handleBatchDelete = () => {
       selectedArticles.value = []
       fetchArticles()
     } catch (error) {
-      console.error('批量删除文章错误:', error)
       ElMessage.error('批量删除失败')
     }
   }).catch(() => {})

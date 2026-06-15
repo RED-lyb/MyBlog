@@ -49,10 +49,10 @@ const fetchHistory = async () => {
         selectedHistory.value = historyList.value[0]
       }
     } else {
-      console.error('获取更新历史失败:', response.data.error)
+      // ignore
     }
-  } catch (error) {
-    console.error('获取更新历史失败:', error)
+  } catch {
+    // ignore
   } finally {
     loadingHistory.value = false
   }
@@ -115,6 +115,16 @@ onMounted(() => {
 .content-body {
   flex: 1;
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .history-content {
+    height: auto;
+  }
+
+  .content-body {
+    overflow-y: visible;
+  }
 }
 
 .content-text {

@@ -148,7 +148,6 @@ const fetchFiles = async () => {
     total.value = filteredFiles.length
     
   } catch (error) {
-    console.error('获取文件列表错误:', error)
     ElMessage.error('获取文件列表失败')
   } finally {
     loading.value = false
@@ -198,7 +197,6 @@ const handleDelete = (row) => {
         ElMessage.error(response.data.error || '删除文件失败')
       }
     } catch (error) {
-      console.error('删除文件错误:', error)
       ElMessage.error('删除文件失败')
     }
   }).catch(() => {})
@@ -244,7 +242,6 @@ const handleBatchDelete = () => {
       allFilesCache.value = []
       fetchFiles()
     } catch (error) {
-      console.error('批量删除文件错误:', error)
       ElMessage.error('批量删除文件失败')
     }
   }).catch(() => {})
