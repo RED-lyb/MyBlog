@@ -36,7 +36,8 @@ front/blog_front/.env.development
 front/blog_front/.env.production
 
 # 日志和临时文件
-!log/back.log
+log/*.log
+!log/.gitkeep
 *.log
 *.tmp
 
