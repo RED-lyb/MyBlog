@@ -30,6 +30,27 @@ const rtcConfig = ref({
 const playerShellRef = ref(null)
 const playerDomRef = ref(null)
 const viewerIdentity = ref({ rtcUserId: '', displayName: '' })
+const isMobileLayout = ref(false)
+const isMobileFsLandscape = ref(false)
+
+const MOBILE_MEDIA = '(max-width: 768px)'
+
+const syncMobileLayout = () => {
+  isMobileLayout.value = window.matchMedia(MOBILE_MEDIA).matches
+}
+
+const onFullscreenChange = () => {
+  const el = playerShellRef.value
+  const active = !!el && document.fullscreenElement === el
+  isMobileFsLandscape.value = active && isMobileLayout.value
+  if (!active) {
+    try {
+      screen.orientation?.unlock?.()
+    } catch {
+      // ignore
+    }
+  }
+}
 
 const viewer = new CinemaRtcViewer({
   onRoomJoined: () => {
@@ -181,6 +202,13 @@ const toggleFullscreen = async () => {
   try {
     if (!document.fullscreenElement) {
       await el.requestFullscreen()
+      if (isMobileLayout.value) {
+        try {
+          await screen.orientation?.lock?.('landscape-primary')
+        } catch {
+          // iOS 等可能不支持，由 CSS 旋转兜底
+        }
+      }
     } else {
       await document.exitFullscreen()
     }
@@ -196,6 +224,9 @@ const handlePageHide = () => {
 onMounted(async () => {
   loading.value = true
   authStore.syncFromLocalStorage()
+  syncMobileLayout()
+  window.addEventListener('resize', syncMobileLayout)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener('pagehide', handlePageHide)
   try {
     await loadRtcConfig()
@@ -209,6 +240,8 @@ onMounted(async () => {
 })
 
 onUnmounted(async () => {
+  window.removeEventListener('resize', syncMobileLayout)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener('pagehide', handlePageHide)
   await leaveRtc()
 })
@@ -232,7 +265,11 @@ onUnmounted(async () => {
     </header>
 
     <div class="player-stage">
-      <div ref="playerShellRef" class="player-shell">
+      <div
+        ref="playerShellRef"
+        class="player-shell"
+        :class="{ 'mobile-fs-landscape': isMobileFsLandscape }"
+      >
         <div ref="playerDomRef" class="rtc-player" />
 
         <div v-if="showNoStreamHint" class="overlay-mask overlay-waiting">
@@ -266,7 +303,9 @@ onUnmounted(async () => {
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 100%;
   gap: 8px;
+  box-sizing: border-box;
 }
 
 .theater-header {
@@ -314,8 +353,10 @@ onUnmounted(async () => {
 
 .player-stage {
   width: 100%;
+  max-width: 100%;
   display: flex;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .player-shell {
@@ -338,7 +379,24 @@ onUnmounted(async () => {
   border-radius: 0;
 }
 
-.player-shell:fullscreen .rtc-player {
+/* 手机竖屏全屏：旋转 90° 横屏铺满，避免上下大黑边 */
+.player-shell.mobile-fs-landscape:fullscreen,
+.player-shell.mobile-fs-landscape:-webkit-full-screen {
+  width: 100vh !important;
+  height: 100vw !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: auto;
+  border-radius: 0;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+}
+
+.player-shell.mobile-fs-landscape:fullscreen .rtc-player,
+.player-shell.mobile-fs-landscape:-webkit-full-screen .rtc-player {
   width: 100%;
   height: 100%;
 }
@@ -385,5 +443,38 @@ onUnmounted(async () => {
   margin: 0;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 768px) {
+  .theater-header {
+    gap: 8px;
+  }
+
+  .title {
+    font-size: 1rem;
+  }
+
+  .meta {
+    font-size: 11px;
+  }
+
+  .player-shell {
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    aspect-ratio: 16 / 9;
+  }
+
+  .overlay-title {
+    font-size: 16px;
+  }
+
+  .overlay-desc {
+    font-size: 13px;
+  }
+
+  .overlay-mask {
+    padding: 16px;
+  }
 }
 </style>
