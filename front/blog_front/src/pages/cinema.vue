@@ -69,8 +69,7 @@ onMounted(async () => {
 <template>
   <FullScreenLoading :visible="showPageLoading" />
   <div v-if="showPageLoading"></div>
-  <div v-else-if="showPageContent" class="cinema-page">
-    <div class="common-layout">
+  <div v-else-if="showPageContent" class="common-layout">
       <el-container>
         <el-header style="padding: 0">
           <Head />
@@ -84,35 +83,10 @@ onMounted(async () => {
           <Footer />
         </el-footer>
       </el-container>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.cinema-page {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-.cinema-page :deep(.el-container) {
-  width: 100%;
-  max-width: 100vw;
-}
-
-.cinema-page :deep(.el-header) {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.cinema-page :deep(.header-mask) {
-  width: 100%;
-  max-width: 100vw;
-}
-
 .cinema-main {
   width: 100%;
   max-width: 100%;
@@ -128,15 +102,9 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .cinema-page :deep(.el-footer) {
-    max-width: 100vw;
-  }
-
   .cinema-main {
     min-height: auto;
     padding: 8px;
-    margin-top: 6px;
-    border-radius: 6px;
   }
 }
 </style>

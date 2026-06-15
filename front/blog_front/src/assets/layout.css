@@ -1,0 +1,61 @@
+/**
+ * 全站主布局：手机端限制宽度、Head 可横向滑动、主内容与侧栏纵向堆叠
+ */
+.common-layout {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.common-layout > .el-container {
+  width: 100%;
+  max-width: 100vw;
+}
+
+.common-layout .el-header {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+}
+
+.common-layout .el-footer {
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+.common-layout .el-main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+}
+
+@media (max-width: 768px) {
+  .common-layout > .el-container > .el-container {
+    flex-direction: column !important;
+  }
+
+  .common-layout .el-aside {
+    width: 100% !important;
+    max-width: 100% !important;
+    position: static !important;
+    height: auto !important;
+    align-self: stretch !important;
+    flex-shrink: 0;
+  }
+
+  .common-layout .el-aside:empty {
+    display: none !important;
+  }
+
+  .common-layout .el-main {
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-top: 6px;
+  }
+}

@@ -235,6 +235,26 @@ watch(
   background: var(--el-bg-color); /* 使用Element Plus主题色 */
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
+
+@media (max-width: 768px) {
+  .header-mask {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .el-menu-demo {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .el-menu-item {
+    font-size: 15px;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
 .el-menu--horizontal>.el-menu-item:nth-child(1) {
   margin-right: auto;
 }
