@@ -646,7 +646,7 @@ const onCaptchaCancel = () => {
         <div class="panel-content">
           <!-- 标题输入区域 -->
           <div class="title-section">
-            <input v-model="title" type="text" placeholder="请输入文章标题..." class="title-input" />
+            <input v-model="title" type="text" placeholder="请输入文章标题" class="title-input" />
           </div>
 
           <!-- 分割线 -->
@@ -654,7 +654,7 @@ const onCaptchaCancel = () => {
 
           <!-- 编辑器区域 -->
           <div class="editor-section">
-            <textarea ref="editorRef" v-model="content" placeholder="请输入文章内容（支持Markdown和HTML）..." class="content-editor"
+            <textarea ref="editorRef" v-model="content" placeholder="请输入文章内容（支持Markdown和HTML）" class="content-editor"
               @keydown="handleTabKey" />
           </div>
         </div>
@@ -664,7 +664,7 @@ const onCaptchaCancel = () => {
         <div class="panel-content">
           <!-- 标题预览区域 -->
           <div class="title-section">
-            <h1 class="title-preview">{{ title || '请输入文章标题...' }}</h1>
+            <h1 class="title-preview">{{ title || '请输入文章标题' }}</h1>
           </div>
 
           <!-- 分割线 -->
@@ -745,6 +745,10 @@ const onCaptchaCancel = () => {
   display: flex;
   align-items: center;
   padding: 0 15px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .toolbar {
@@ -752,6 +756,7 @@ const onCaptchaCancel = () => {
   align-items: center;
   gap: 5px;
   height: 100%;
+  flex-shrink: 0;
 }
 
 .toolbar-btn {
@@ -779,6 +784,18 @@ const onCaptchaCancel = () => {
 
 .toolbar-btn .el-icon {
   font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-btn .el-icon :deep(svg) {
+  width: 1em;
+  height: 1em;
+  display: block;
 }
 
 .toolbar-btn .dropdown-arrow {
@@ -1145,11 +1162,9 @@ const onCaptchaCancel = () => {
 .content-placeholder {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   color: var(--el-text-color-placeholder);
   font-size: 14px;
+  line-height: 1.6;
 }
 
 /* 组2: 拖拽器基础样式（双下划线 __dragger） */
