@@ -87,12 +87,12 @@ const backgroundColor = computed(() => {
 }
 
 .line {
-  margin-top: 50px !important;
+  margin-top: var(--layout-footer-divider-mt) !important;
   margin-bottom: 15px !important;
 }
 
 .line :deep(.el-divider--horizontal) {
-  margin-top: 50px !important;
+  margin-top: 0 !important;
   margin-bottom: 10px !important;
 }
 </style>

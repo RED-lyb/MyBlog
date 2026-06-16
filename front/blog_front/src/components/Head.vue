@@ -32,15 +32,19 @@ const activeIndex = computed(() => {
 
 // 添加遮罩状态
 const showMask = ref(false)
-const isMobileLayout = ref(false)
 
-const syncMobileLayout = () => {
-  isMobileLayout.value = window.matchMedia('(max-width: 768px)').matches
+const getMaskActive = () => {
+  if (window.scrollY > 10) return true
+
+  for (const el of document.querySelectorAll('.article-main-container, .history-content .content-body')) {
+    if (el.scrollTop > 10) return true
+  }
+
+  return false
 }
 
-// 滚动监听
 const handleScroll = () => {
-  showMask.value = window.scrollY > 10
+  showMask.value = getMaskActive()
 }
 
 const handleSelect = (key, keyPath) => {
@@ -145,17 +149,15 @@ onBeforeMount(() => {
   fetchUserAvatar()
 })
 onMounted(() => {
-  syncMobileLayout()
-  window.addEventListener('resize', syncMobileLayout)
-  window.addEventListener('scroll', handleScroll)
-  
+  window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+  handleScroll()
+
   // 确保同步用户信息
   authStore.syncFromLocalStorage()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', syncMobileLayout)
-  window.removeEventListener('scroll', handleScroll)
+  window.removeEventListener('scroll', handleScroll, { capture: true })
 })
 watch(
   [userId, avatar],
@@ -171,8 +173,10 @@ watch(
 </script>
 
 <template>
-  <el-affix :offset="0" :disabled="isMobileLayout">
-    <div class="header-mask" :class="{ 'mask-active': showMask }">
+  <div
+    class="header-mask"
+    :class="{ 'mask-active': showMask }"
+  >
     <el-menu :default-active="activeIndex" class="el-menu-demo" mode="horizontal" :ellipsis="false" :router="false"
       @select="handleSelect" text-color="#EF5710" active-text-color="#C8161D">
       <el-menu-item index="0" style="padding-left: 10px;padding-right: 20px">
@@ -228,7 +232,6 @@ watch(
       </el-sub-menu>
     </el-menu>
   </div>
-  </el-affix>
 </template>
 <style scoped>
 /* 添加遮罩层 */

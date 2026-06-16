@@ -5,13 +5,16 @@
   --layout-header-h: 60px;
   --layout-footer-reserve: 145px;
   --layout-main-mt: 8px;
+  --layout-footer-divider-mt: 30px;
+  /* 从 footer 分隔线上方 margin 转移到主内容可视高度（非 padding） */
+  --layout-main-content-extra: 28px;
   --layout-body-offset: calc(var(--layout-header-h) + var(--layout-footer-reserve) + var(--layout-main-mt));
 }
 
 .common-layout {
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
   box-sizing: border-box;
 }
 
@@ -21,16 +24,19 @@
 }
 
 .common-layout .el-header {
+  position: sticky;
+  top: 0;
+  z-index: 2000;
   width: 100%;
   max-width: 100vw;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
   box-sizing: border-box;
 }
 
 .common-layout .el-footer {
   width: 100%;
   max-width: 100vw;
+  padding: 0;
   box-sizing: border-box;
   height: auto !important;
   --el-footer-height: auto !important;
@@ -38,6 +44,7 @@
   flex-shrink: 0;
 }
 
+/* 主内容区底部留白：从 footer 分隔线上方的 margin 转移而来 */
 .common-layout .el-main {
   width: 100%;
   max-width: 100%;
@@ -51,13 +58,13 @@
   position: sticky;
   top: var(--layout-header-h);
   align-self: flex-start;
-  height: calc(100dvh - var(--layout-body-offset));
-  max-height: calc(100dvh - var(--layout-body-offset));
+  height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
+  max-height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
 }
 
 .common-layout > .el-container > .el-container > .el-main,
 .common-layout > .el-container > .el-container > .el-main.cinema-main {
-  min-height: max(480px, calc(100dvh - var(--layout-body-offset)));
+  min-height: max(480px, calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra)));
   padding-bottom: 8px;
 }
 
@@ -99,7 +106,6 @@
   }
 
   .common-layout .el-header {
-    overflow-x: visible;
-    -webkit-overflow-scrolling: auto;
+    overflow: visible;
   }
 }

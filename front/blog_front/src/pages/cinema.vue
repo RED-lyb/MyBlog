@@ -91,6 +91,9 @@ onMounted(async () => {
   width: 100%;
   max-width: 100%;
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   background-color: #00000000;
   padding: 20px 20px 8px;
   border: 1px solid var(--el-border-color-light);
@@ -98,6 +101,25 @@ onMounted(async () => {
   border-radius: 8px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
+}
+
+.common-layout :deep(> .el-container > .el-container) {
+  flex: 1;
+  min-height: 0;
+}
+
+.cinema-main :deep(.cinema-theater) {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (min-width: 769px) {
+  .cinema-main {
+    height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
+    max-height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
 }
 
 @media (max-width: 768px) {

@@ -249,7 +249,7 @@ const resetFilters = () => {
             <CreateButton />
           </el-aside>
         </el-container>
-        <el-footer >
+        <el-footer style="padding: 0">
           <Footer />
         </el-footer>
       </el-container>

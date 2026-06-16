@@ -66,49 +66,44 @@ const measureArticleHeight = () => {
   return articleHeight + gap
 }
 
+// 等待布局稳定后再测量（避免 height:100% 尚未解析导致偏小）
+const waitForLayout = () => new Promise((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(resolve))
+})
+
+// 根据 layout.css 变量估算主容器高度（height:100% 未就绪时的回退）
+const getFallbackContainerHeight = () => {
+  const styles = getComputedStyle(document.documentElement)
+  const bodyOffset = parseFloat(styles.getPropertyValue('--layout-body-offset')) || 213
+  const extra = parseFloat(styles.getPropertyValue('--layout-main-content-extra')) || 0
+  return window.innerHeight - bodyOffset + extra
+}
+
 // 计算每页显示数量（根据容器高度和实际文章高度）
 const calculatePageSize = () => {
   if (!containerRef.value) return
-  
+
   const container = containerRef.value
-  const containerHeight = container.offsetHeight || container.clientHeight
-  // 如果高度异常，跳过计算
-  if (containerHeight < 100) return
-  
-  // 测量实际的文章高度
-  const articleItemHeight = measureArticleHeight()
-  
-  // 如果无法测量（文章列表为空），使用默认值
-  if (!articleItemHeight) {
-    // 使用默认值 140px
-    const defaultHeight = 140
-    const paginationHeight = 50
-    const containerPadding = 10
-    const availableHeight = containerHeight - paginationHeight - containerPadding
-    let calculatedSize = Math.floor(availableHeight / defaultHeight)
-    calculatedSize = Math.max(3, Math.min(20, calculatedSize))
-    if (calculatedSize !== pageSize.value) {
-      paginationStore.setPageSize(calculatedSize)
-    }
-    return
+  let containerHeight = container.clientHeight
+  if (containerHeight < 200) {
+    containerHeight = getFallbackContainerHeight()
   }
-  
-  // 分页组件高度约 40px，加上 padding-top 10px
+
+  const headerEl = container.querySelector('.content-header')
+  const headerHeight = headerEl?.offsetHeight ?? 0
+
+  const articleItemHeight = measureArticleHeight()
+  const itemHeight = articleItemHeight || 140
+
   const paginationHeight = 50
-  
-  // 容器 padding: top 10px, bottom 0px
-  const containerPadding = 10
-  
-  // 可用高度 = 容器高度 - 分页组件高度 - 容器 padding
-  const availableHeight = containerHeight - paginationHeight - containerPadding
-  
-  // 计算能显示多少篇文章
-  let calculatedSize = Math.floor(availableHeight / articleItemHeight)
-  
-  // 设置最小值为 3，最大值为 20
+  const listPadding = 10
+  const availableHeight = containerHeight - headerHeight - paginationHeight - listPadding
+
+  if (availableHeight < itemHeight) return
+
+  let calculatedSize = Math.floor(availableHeight / itemHeight)
   calculatedSize = Math.max(3, Math.min(20, calculatedSize))
-  
-  // 只有当计算出的值与当前值不同时才更新，避免不必要的重新请求
+
   if (calculatedSize !== pageSize.value) {
     paginationStore.setPageSize(calculatedSize)
   }
@@ -176,6 +171,50 @@ const formatDate = (dateString) => {
   })
 }
 
+// 构建文章列表请求参数
+const buildListParams = () => {
+  const params = {
+    page: currentPage.value,
+    page_size: pageSize.value,
+    sort_by: sortOptions.value.sort_by,
+    sort_order: sortOptions.value.sort_order
+  }
+
+  if (searchFilters.value.author_id) params.author_id = searchFilters.value.author_id
+  if (searchFilters.value.author_name) params.author_name = searchFilters.value.author_name
+  if (searchFilters.value.title) params.title = searchFilters.value.title
+  if (searchFilters.value.start_date) params.start_date = searchFilters.value.start_date
+  if (searchFilters.value.end_date) params.end_date = searchFilters.value.end_date
+
+  return params
+}
+
+// 应用文章列表响应数据
+const applyArticlesResponse = (data) => {
+  articles.value = data.articles || []
+  paginationStore.setTotal(data.total || 0)
+
+  articles.value.forEach((article) => {
+    article.display_avatar = defaultAvatar
+    article.avatar_loading = true
+    article.is_liked = false
+    fetchUserAvatar(article)
+  })
+
+  if (isAuthenticated.value && userId.value) {
+    articles.value.forEach(async (article) => {
+      try {
+        const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/${article.id}/like/status/`)
+        if (response.data?.success) {
+          article.is_liked = response.data.data.is_liked
+        }
+      } catch {
+        // ignore
+      }
+    })
+  }
+}
+
 // 获取所有文章
 const fetchArticles = async (showLoading = true) => {
   if (showLoading) {
@@ -183,142 +222,45 @@ const fetchArticles = async (showLoading = true) => {
   }
   error.value = null
   try {
-    // 构建请求参数，包含筛选和排序
-    const params = {
-      page: currentPage.value,
-      page_size: pageSize.value,
-      sort_by: sortOptions.value.sort_by,
-      sort_order: sortOptions.value.sort_order
-    }
-    
-    // 添加筛选参数（只添加非空值）
-    if (searchFilters.value.author_id) {
-      params.author_id = searchFilters.value.author_id
-    }
-    if (searchFilters.value.author_name) {
-      params.author_name = searchFilters.value.author_name
-    }
-    if (searchFilters.value.title) {
-      params.title = searchFilters.value.title
-    }
-    if (searchFilters.value.start_date) {
-      params.start_date = searchFilters.value.start_date
-    }
-    if (searchFilters.value.end_date) {
-      params.end_date = searchFilters.value.end_date
-    }
-    
     const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
-      params
+      params: buildListParams()
     })
     if (response.data?.success) {
-      const data = response.data.data
-      articles.value = data.articles || []
-      
-      // 更新总记录数到 store
-      paginationStore.setTotal(data.total || 0)
-      
-      // 为每篇文章初始化头像相关属性并获取头像
-      articles.value.forEach(article => {
-        article.display_avatar = defaultAvatar
-        article.avatar_loading = true
-        article.is_liked = false // 初始化喜欢状态
-        fetchUserAvatar(article)
-      })
-      
-      // 如果用户已登录，检查每篇文章的喜欢状态
-      if (isAuthenticated.value && userId.value) {
-        articles.value.forEach(async (article) => {
-          try {
-            const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/${article.id}/like/status/`)
-            if (response.data?.success) {
-              article.is_liked = response.data.data.is_liked
-            }
-          } catch (err) {
-          }
-        })
-      }
-      
-      // 等待 DOM 更新后重新计算 pageSize（使用实际文章高度）
-      await nextTick()
-      // 延迟一下确保文章完全渲染（包括头像加载）
-      setTimeout(async () => {
-        // 如果还在初始化阶段，使用实际高度重新计算
-        if (!isInitialized.value) {
-          const oldPageSize = pageSize.value
-          calculatePageSize()
-          
-          // 如果 pageSize 变化了，需要重新请求（保持 loading 状态）
-          if (oldPageSize !== pageSize.value) {
-            // 保持 loading 状态，重新请求文章（不显示新的 loading，因为已经在 loading 中）
-            try {
-              // 构建请求参数，包含筛选和排序
-              const params = {
-                page: currentPage.value,
-                page_size: pageSize.value,
-                sort_by: sortOptions.value.sort_by,
-                sort_order: sortOptions.value.sort_order
-              }
-              
-              // 添加筛选参数（只添加非空值）
-              if (searchFilters.value.author_id) {
-                params.author_id = searchFilters.value.author_id
-              }
-              if (searchFilters.value.author_name) {
-                params.author_name = searchFilters.value.author_name
-              }
-              if (searchFilters.value.title) {
-                params.title = searchFilters.value.title
-              }
-              if (searchFilters.value.start_date) {
-                params.start_date = searchFilters.value.start_date
-              }
-              if (searchFilters.value.end_date) {
-                params.end_date = searchFilters.value.end_date
-              }
-              
-              const response = await apiClient.get(`${import.meta.env.VITE_API_URL}article/list/`, {
-                params
-              })
-              if (response.data?.success) {
-                const data = response.data.data
-                articles.value = data.articles || []
-                paginationStore.setTotal(data.total || 0)
-                
-                // 为每篇文章初始化头像相关属性并获取头像
-                articles.value.forEach(article => {
-                  article.display_avatar = defaultAvatar
-                  article.avatar_loading = true
-                  fetchUserAvatar(article)
-                })
-              }
-            } catch (err) {
-              error.value = err.message || '请求失败'
-            }
-          }
-          
-          // 初始化完成，结束 loading
-          loading.value = false
-          isInitialized.value = true
-        } else {
-          // 已经初始化完成，正常结束 loading
-          if (showLoading) {
-            loading.value = false
-          }
-        }
-      }, 300)
+      applyArticlesResponse(response.data.data)
     } else {
       error.value = response.data?.error || '获取文章列表失败'
     }
   } catch (err) {
     error.value = err.message || '请求失败'
   } finally {
-    // 只有在不是初始化阶段时才结束 loading
-    // 如果是初始化阶段，loading 会在使用实际高度重新计算并完成最终请求后结束
-    if (showLoading && isInitialized.value) {
+    if (showLoading) {
       loading.value = false
     }
   }
+}
+
+// 初始化：先算 pageSize，拉取列表，再用真实卡片高度校准并必要时重拉
+const initializeArticles = async () => {
+  loading.value = true
+  isInitialized.value = false
+
+  await waitForLayout()
+  calculatePageSize()
+
+  await fetchArticles(false)
+
+  await nextTick()
+  await waitForLayout()
+
+  const sizeBeforeMeasure = pageSize.value
+  calculatePageSize()
+
+  if (pageSize.value !== sizeBeforeMeasure) {
+    await fetchArticles(false)
+  }
+
+  isInitialized.value = true
+  loading.value = false
 }
 
 // 监听页码变化，重新获取文章并滚动到顶部
@@ -391,45 +333,24 @@ const handleLikeClick = async (event, article) => {
 
 // 组件挂载时获取文章列表
 onMounted(async () => {
-  // 从 localStorage 恢复分页状态（如果不存在则默认为第1页）
   paginationStore.syncFromLocalStorage()
-  // 确保当前页码至少为1
   if (paginationStore.currentPage < 1) {
     paginationStore.setCurrentPage(1)
   }
-  
-  // 等待 DOM 渲染完成
+
   await nextTick()
-  
-  // 先计算初始 pageSize（使用默认高度估算，避免等待文章加载）
-  // 延迟一下确保容器高度已经正确设置
-  await new Promise(resolve => setTimeout(resolve, 100))
-  calculatePageSize()
-  
-  // 使用 ResizeObserver 监听容器尺寸变化（包括高度和宽度）
+
   if (containerRef.value) {
-    // 使用防抖，避免频繁计算
     resizeObserver = new ResizeObserver(() => {
-      // 清除之前的定时器
-      if (resizeTimer) {
-        clearTimeout(resizeTimer)
-      }
-      // 延迟 200ms 后再计算，避免频繁触发
+      if (resizeTimer) clearTimeout(resizeTimer)
       resizeTimer = setTimeout(() => {
         calculatePageSize()
       }, 200)
     })
     resizeObserver.observe(containerRef.value)
   }
-  
-  // 等待 pageSize 稳定后再获取文章列表（避免 watch 触发重复请求）
-  await nextTick()
-  // 再延迟一下，确保 pageSize 已经更新完成
-  await new Promise(resolve => setTimeout(resolve, 50))
-  
-  // 获取文章列表（初始化时显示 loading）
-  // 注意：isInitialized 会在文章加载完成并使用实际高度重新计算后设置为 true
-  await fetchArticles(true)
+
+  await initializeArticles()
 })
 
 // 组件卸载时清理 ResizeObserver 和定时器
@@ -656,7 +577,7 @@ onUnmounted(() => {
   color: #999;
 }
 .page-number-container {
-  padding-top: 8px;
+  padding-top: 15px;
   position: relative;
   display: flex;
   justify-content: center;
