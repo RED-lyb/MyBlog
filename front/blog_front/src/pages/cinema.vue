@@ -117,8 +117,7 @@ onMounted(async () => {
   .cinema-main {
     height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
     max-height: calc(100dvh - var(--layout-body-offset) + var(--layout-main-content-extra));
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: hidden;
   }
 }
 

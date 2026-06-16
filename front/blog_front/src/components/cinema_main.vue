@@ -251,14 +251,20 @@ onUnmounted(async () => {
   <div class="cinema-theater">
     <FullScreenLoading :visible="loading || joining" />
 
-    <div class="cinema-layout">
-      <div class="theater-side theater-side--left">
+    <header class="theater-header">
+      <div class="header-left">
         <h1 class="title">{{ displayTitle }}</h1>
         <p class="meta">
           <span>用户：{{ viewerLabel }}</span>
         </p>
       </div>
+      <div class="header-actions">
+        <el-tag v-if="hasRemoteStream" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
+        <el-button :icon="FullScreen" circle title="全屏" @click="toggleFullscreen" />
+      </div>
+    </header>
 
+    <div class="player-stage">
       <div
         ref="playerShellRef"
         class="player-shell"
@@ -272,26 +278,21 @@ onUnmounted(async () => {
           <el-button link type="primary" @click="joinRtc">重新连接</el-button>
         </div>
 
-        <div v-else-if="rtcPhase === 'joining'" class="overlay-mask overlay-waiting">
+        <div v-if="rtcPhase === 'joining'" class="overlay-mask overlay-waiting">
           <p class="overlay-title">正在加入放映厅</p>
         </div>
 
-        <div v-else-if="needUserGesture" class="overlay-mask">
+        <div v-if="needUserGesture" class="overlay-mask">
           <el-button type="primary" size="large" :icon="VideoPlay" @click="handleUserPlay">
             点击播放
           </el-button>
           <p class="overlay-desc">浏览器需要一次点击才能播放声音</p>
         </div>
 
-        <div v-else-if="rtcPhase === 'error'" class="overlay-mask">
+        <div v-if="rtcPhase === 'error'" class="overlay-mask">
           <p class="overlay-title">{{ rtcError }}</p>
           <el-button type="primary" @click="joinRtc">重新连接</el-button>
         </div>
-      </div>
-
-      <div class="theater-side theater-side--right">
-        <el-tag v-if="hasRemoteStream" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
-        <el-button :icon="FullScreen" circle title="全屏" @click="toggleFullscreen" />
       </div>
     </div>
   </div>
@@ -305,82 +306,71 @@ onUnmounted(async () => {
   max-width: 100%;
   height: 100%;
   min-height: 0;
+  gap: 8px;
   box-sizing: border-box;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
-.cinema-layout {
-  display: grid;
+.theater-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.header-left {
+  min-width: 0;
+  flex: 1;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--el-text-color-secondary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.live-tag {
+  font-weight: 600;
+}
+
+.player-stage {
+  width: 100%;
+  max-width: 100%;
   flex: 1;
   min-height: 0;
-  min-width: min-content;
-  height: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  align-content: center;
-  column-gap: clamp(10px, 1.5vw, 16px);
-}
-
-.theater-side--left {
-  grid-column: 1;
-  justify-self: start;
-  align-self: start;
-  min-width: 0;
-  text-align: left;
-}
-
-.theater-side--right {
-  grid-column: 3;
-  justify-self: end;
-  align-self: start;
-  flex-shrink: 0;
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 .player-shell {
-  grid-column: 2;
-  justify-self: center;
-  align-self: start;
   position: relative;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
   container-type: size;
-  isolation: isolate;
-  width: 100%;
-  max-width: 1920px;
-  aspect-ratio: 16 / 9;
-  min-height: 180px;
-}
-
-.title {
-  margin: 0;
-  font-size: clamp(1rem, 2.2vw, 1.35rem);
-  font-weight: 700;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--el-text-color-primary);
-}
-
-.meta {
-  margin: 4px 0 0;
-  font-size: 12px;
-  line-height: 1.3;
-  color: var(--el-text-color-secondary);
-}
-
-.live-tag {
-  font-weight: 600;
 }
 
 .player-shell:fullscreen {
@@ -419,7 +409,6 @@ onUnmounted(async () => {
   inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
 }
 
 .rtc-player :deep(video) {
@@ -431,7 +420,7 @@ onUnmounted(async () => {
 .overlay-mask {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -441,30 +430,17 @@ onUnmounted(async () => {
   text-align: center;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  pointer-events: auto;
 }
 
 @media (min-width: 769px) {
-  .cinema-layout {
+  .player-stage {
     container-type: size;
   }
 
-  .theater-side--left {
-    max-width: min(36cqw, 380px);
-  }
-
   .player-shell {
-    width: min(calc(100cqh * 16 / 9), 100%, 1920px);
-    max-width: 100%;
-    max-height: 100cqh;
-  }
-
-  .title {
-    font-size: clamp(14px, 1.8vw, 20px);
-  }
-
-  .meta {
-    font-size: clamp(11px, 1.2vw, 13px);
+    width: min(100cqw, calc(100cqh * 16 / 9), 1920px);
+    height: min(100cqh, calc(100cqw * 9 / 16), 1080px);
+    aspect-ratio: 16 / 9;
   }
 
   /* 间距保持紧凑；字号随播放器容器放大（cqmin 相对 player-shell） */
@@ -517,45 +493,23 @@ onUnmounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .cinema-theater {
-    overflow: visible;
-  }
-
-  .cinema-layout {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    height: auto;
-    column-gap: 8px;
-    row-gap: 8px;
-  }
-
-  .theater-side--left {
-    flex: 1 1 auto;
-    min-width: 0;
-    order: 1;
-  }
-
-  .theater-side--right {
-    flex: 0 0 auto;
-    order: 2;
-  }
-
-  .player-shell {
-    flex: 1 1 100%;
-    order: 3;
-    width: 100%;
-    max-width: 100%;
-    max-height: none;
+  .theater-header {
+    gap: 8px;
   }
 
   .title {
     font-size: 1rem;
-    white-space: normal;
   }
 
   .meta {
     font-size: 11px;
+  }
+
+  .player-shell {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: none;
   }
 
   .overlay-title {

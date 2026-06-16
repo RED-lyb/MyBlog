@@ -63,16 +63,22 @@ const size=ref('width:'+size_val.size+'rem;height:'+size_val.size+'rem;')
 /* 容器：设置固定大小，作为图标的定位基准 */
 .theme-switch {
   position: relative;
-  cursor: pointer; /* 显示点击指针 */
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* 图标样式：重叠在容器中心 */
 .icon {
-  position: absolute; /* 绝对定位实现重叠 */
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
 }
 
 /* 动画定义：旋转+透明度渐变 */

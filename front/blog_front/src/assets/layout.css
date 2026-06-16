@@ -106,6 +106,9 @@
   }
 
   .common-layout .el-header {
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 }

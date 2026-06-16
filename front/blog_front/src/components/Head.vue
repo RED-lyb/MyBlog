@@ -249,20 +249,53 @@ watch(
 @media (max-width: 768px) {
   .header-mask {
     width: 100%;
-    max-width: 100vw;
+    max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
   .el-menu-demo {
     width: max-content;
     min-width: 100%;
+    max-width: none;
   }
 
   .el-menu-item {
     font-size: 15px;
     padding-left: 12px !important;
     padding-right: 12px !important;
+    flex-shrink: 0;
+  }
+
+  .el-menu-item:nth-child(1) img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+  }
+
+  .el-menu-item:nth-child(1) h1 {
+    font-size: 18px;
+  }
+
+  .el-menu-item:nth-child(8) {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+    overflow: hidden;
+  }
+
+  .el-menu-demo :deep(.theme-switch) {
+    width: 1.6rem !important;
+    height: 1.6rem !important;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .el-menu-demo :deep(.theme-switch .icon) {
+    max-width: 100%;
+    max-height: 100%;
   }
 }
 .el-menu--horizontal>.el-menu-item:nth-child(1) {
