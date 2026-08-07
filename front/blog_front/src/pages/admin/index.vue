@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/user_info.js'
 import { useConfigStore } from '../../stores/config.js'
@@ -116,6 +116,32 @@ import {
   ChatDotRound,
   Film
 } from '@element-plus/icons-vue'
+import { checkLoveNestEditor } from '../../lib/loveNestApi.js'
+
+const LoveNestMenuIcon = {
+  name: 'LoveNestMenuIcon',
+  render() {
+    return h(
+      'svg',
+      {
+        xmlns: 'http://www.w3.org/2000/svg',
+        viewBox: '0 0 1024 1024',
+        width: '1em',
+        height: '1em',
+        fill: 'currentColor',
+      },
+      [
+        h('path', {
+          d: 'M512 896s-272-184-384-320C64 416 128 256 320 256c96 0 160 64 192 128 32-64 96-128 192-128 192 0 256 160 192 320-112 136-384 320-384 320z',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': '64',
+          'stroke-linejoin': 'round',
+        }),
+      ]
+    )
+  },
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -125,9 +151,24 @@ const { config } = storeToRefs(configStore)
 
 onMounted(() => {
   configStore.loadConfig()
+  loadLoveNestAccess()
 })
 
 const sidebarCollapsed = ref(false)
+const canManageLoveNest = ref(false)
+
+async function loadLoveNestAccess() {
+  if (authStore.isAdmin) {
+    canManageLoveNest.value = true
+    return
+  }
+  try {
+    const response = await checkLoveNestEditor()
+    canManageLoveNest.value = !!response.data?.success && !!response.data?.data?.can_edit
+  } catch (error) {
+    canManageLoveNest.value = false
+  }
+}
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
@@ -160,7 +201,8 @@ watch(theme_type, (new_val) => {
   }
 })
 
-const menuItems = computed(() => [
+const menuItems = computed(() => {
+  const items = [
   {
     path: '/admin/dashboard',
     label: '统计面板',
@@ -206,7 +248,18 @@ const menuItems = computed(() => [
     label: '全局配置',
     icon: Setting
   }
-])
+  ]
+
+  if (canManageLoveNest.value) {
+    items.splice(items.length - 1, 0, {
+      path: '/admin/love-nest',
+      label: '爱情小窝',
+      icon: LoveNestMenuIcon,
+    })
+  }
+
+  return items
+})
 
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '确认退出', {

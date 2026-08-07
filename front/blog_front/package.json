@@ -27,7 +27,8 @@
     "tailwindcss": "latest",
     "unplugin-vue-components": "^29.0.0",
     "vue": "^3.5.18",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.1",
+    "vue-seasons-falling": "^0.2.3"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

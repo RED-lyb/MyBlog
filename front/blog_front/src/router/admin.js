@@ -77,6 +77,15 @@ const adminRoutes = [
     meta: {
       title: '全局配置|L-BLOG管理后台'
     }
+  },
+  {
+    path: 'love-nest',
+    name: 'admin_love_nest',
+    component: () => import('../pages/admin/LoveNestManage.vue'),
+    meta: {
+      title: '爱情小窝|L-BLOG管理后台',
+      requiresLoveNestAccess: true
+    }
   }
 ]
 

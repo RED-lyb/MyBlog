@@ -61,6 +61,21 @@ back/cinema/rtc_runtime/*
 # CMake 中间文件与对象在 rtc_build/build/
 back/cinema/rtc_build/build/
 
+# 爱情小窝上传照片
+back/api/static/love_nest/photos/person/*
+!back/api/static/love_nest/photos/person/.gitkeep
+back/api/static/love_nest/photos/scenery/*
+!back/api/static/love_nest/photos/scenery/.gitkeep
+back/api/static/love_nest/photos/food/*
+!back/api/static/love_nest/photos/food/.gitkeep
+back/api/static/love_nest/photos/diary/*
+!back/api/static/love_nest/photos/diary/.gitkeep
+back/api/static/love_nest/photos/*.jpg
+back/api/static/love_nest/photos/*.jpeg
+back/api/static/love_nest/photos/*.png
+back/api/static/love_nest/photos/*.webp
+back/api/static/love_nest/photos/*.gif
+
 # 其他
 .DS_Store
 Thumbs.db

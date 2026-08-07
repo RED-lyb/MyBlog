@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/user_info.js'
 import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import adminRoutes from './admin.js'
+import { checkLoveNestEditor } from '../lib/loveNestApi.js'
 
 /**
  * 检查 token 是否过期（从 api.js 复制，避免循环依赖）
@@ -105,6 +106,15 @@ const routes=[
     component: () => import('../pages/history.vue'),
     meta: {
       title: '更新历史|L-BLOG'
+    }
+  },
+  {
+    path: '/love_nest',
+    name: 'love_nest',
+    component: () => import('../pages/love_nest.vue'),
+    meta: {
+      title: '爱情小窝|L-BLOG',
+      hideGlobalBg: true
     }
   },
   {
@@ -304,8 +314,11 @@ router.beforeEach(async (to, from, next) => {
   // 再次同步状态，确保过期标记被正确应用
   authStore.syncFromLocalStorage()
   
-  // 检查管理员权限
-  if (to.meta.requiresAdmin) {
+  // 检查管理员权限（爱情小窝子路由允许编辑者进入）
+  const requiresAdminRoute = to.matched.some((record) => record.meta.requiresAdmin)
+  const requiresLoveNestAccess = to.matched.some((record) => record.meta.requiresLoveNestAccess)
+
+  if (requiresAdminRoute) {
     // 确保用户信息已同步 - 先同步，再检查
     const userInfo = localStorage.getItem('user_info')
     const accessToken = localStorage.getItem('access_token')
@@ -356,8 +369,18 @@ router.beforeEach(async (to, from, next) => {
       return
     }
     
-    // 再次检查isAdmin，确保从localStorage同步后正确
-    if (!authStore.isAdmin) {
+    // 爱情小窝管理：管理员或指定编辑者可访问
+    let loveNestEditorAllowed = false
+    if (requiresLoveNestAccess && !authStore.isAdmin) {
+      try {
+        const editorResponse = await checkLoveNestEditor()
+        loveNestEditorAllowed = !!editorResponse.data?.success && !!editorResponse.data?.data?.can_edit
+      } catch (e) {
+        loveNestEditorAllowed = false
+      }
+    }
+
+    if (!authStore.isAdmin && !(requiresLoveNestAccess && loveNestEditorAllowed)) {
       try {
         await ElMessageBox.alert('您没有管理员权限', '权限不足', {
           confirmButtonText: '确定',

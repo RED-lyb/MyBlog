@@ -62,4 +62,5 @@ urlpatterns = [
     path('api/feedback/', include('feedback.urls')),  # 反馈相关路由
     path('api/games/', include('games.urls')),  # 游戏相关路由
     path('api/cinema/', include('cinema.urls')),  # 同频影院
+    path('api/love_nest/', include('love_nest.urls')),  # 爱情小窝
 ]

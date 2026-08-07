@@ -1,0 +1,172 @@
+/**
+ * 爱情小窝视觉样式（仅 love_nest 页面引入，固定当代质感风格）
+ */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+.love-nest-page {
+  position: relative;
+  --ln-nav-height: 52px;
+  --ln-bg: #f0ede8;
+  --ln-paper: #fffcf9;
+  --ln-ink: #111111;
+  --ln-muted: #5c5c5c;
+  --ln-accent: #e63b2e;
+  --ln-accent-soft: #111111;
+  --ln-line: #111111;
+  --ln-shadow: 6px 6px 0 rgba(17, 17, 17, 0.92);
+  --ln-radius: 0px;
+  --ln-font-serif: 'Noto Serif SC', 'Songti SC', serif;
+  --ln-font-sans: 'Source Sans 3', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --ln-bg-layer-base: #fefbf3;
+  --ln-bg-layer-overlay: transparent;
+  --ln-bg-grain-opacity: 0.12;
+  --ln-card-backdrop: none;
+
+  min-height: 100vh;
+  color: var(--ln-ink);
+  font-family: var(--ln-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.love-nest-page .ln-card {
+  border-width: 2px;
+  box-shadow: var(--ln-shadow);
+  background: rgba(255, 252, 249, 0.94);
+}
+
+.love-nest-page .ln-section-head {
+  border-bottom-width: 2px;
+}
+
+.love-nest-page .tab-nav-shell {
+  padding: 0;
+  background: rgba(255, 252, 249, 0.72);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--ln-ink);
+  box-shadow: 4px 4px 0 var(--ln-ink);
+}
+
+.love-nest-page .tab-nav-scroll {
+  scrollbar-width: thin;
+}
+
+.love-nest-page .banner-divider {
+  margin-left: 0;
+  width: 56px;
+  height: 3px;
+  background: var(--ln-accent);
+}
+
+.love-nest-page .members-panel {
+  border: 2px solid var(--ln-ink);
+  box-shadow: 4px 4px 0 var(--ln-ink);
+}
+
+.love-nest-page .back-btn {
+  border-width: 2px !important;
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 0 var(--ln-ink) !important;
+}
+
+.ln-serif {
+  font-family: var(--ln-font-serif);
+}
+
+.ln-card {
+  background: var(--ln-paper);
+  border: 1px solid var(--ln-line);
+  border-radius: var(--ln-radius);
+  box-shadow: var(--ln-shadow);
+}
+
+.ln-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ln-line);
+}
+
+.ln-section-head h2 {
+  margin: 0;
+  font-family: var(--ln-font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ln-ink);
+}
+
+.ln-section-head .ln-meta {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ln-muted);
+}
+
+.ln-divider {
+  width: 48px;
+  height: 1px;
+  margin: 16px auto;
+  background: var(--ln-accent-soft);
+}
+
+.ln-stat-value {
+  font-family: var(--ln-font-serif);
+  font-size: 2.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ln-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.ln-stat-label {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--ln-muted);
+}
+
+.love-nest-page .el-button.is-text {
+  color: var(--ln-accent);
+}
+
+.love-nest-page .el-empty__description {
+  color: var(--ln-muted);
+}
+
+.love-nest-page .el-image {
+  border-radius: var(--ln-radius);
+}
+
+.love-nest-page .back-btn {
+  border-color: var(--ln-line) !important;
+  color: var(--ln-ink) !important;
+  background: color-mix(in srgb, var(--ln-paper) 88%, transparent) !important;
+}
+
+/* 相册预览：挂载到 body，全屏遮罩并居中 */
+.el-image-viewer__wrapper {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 3000 !important;
+}
+
+.el-image-viewer__mask {
+  position: fixed !important;
+  inset: 0 !important;
+  opacity: 0.92 !important;
+}
+
+.el-image-viewer__canvas {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.el-image-viewer__img {
+  max-width: min(92vw, 1200px) !important;
+  max-height: 88vh !important;
+  object-fit: contain !important;
+}

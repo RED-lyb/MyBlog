@@ -24,6 +24,7 @@ const activeIndex = computed(() => {
   if (path === '/games' || path.startsWith('/games/')) return '4'
   if (path === '/feedback' || path.startsWith('/feedback/')) return '5'
   if (path === '/history' || path.startsWith('/history/')) return '6'
+  if (path === '/love_nest' || path.startsWith('/love_nest/')) return '65'
   if (config.value && path === `/user_home/${config.value.author_id}`) return '7' // 关于作者页面
   // 匹配 /user_home 或 /user_home/:userId
   if (path.startsWith('/user_home')) return '9-home'
@@ -79,6 +80,7 @@ const handleSelect = (key, keyPath) => {
     '4': '/games', // 趣味游戏
     '5': '/feedback', // 意见反馈
     '6': '/history', // 更新历史
+    '65': '/love_nest', // 爱情小窝
     '7': `/user_home/${authorId}`, // 关于作者（跳转到配置的作者ID主页）
   }
 
@@ -189,6 +191,7 @@ watch(
       <el-menu-item index="4">趣味游戏</el-menu-item>
       <el-menu-item index="5">意见反馈</el-menu-item>
       <el-menu-item index="6">更新历史</el-menu-item>
+      <el-menu-item index="65">爱情小窝</el-menu-item>
       <el-menu-item index="7">关于作者</el-menu-item>
       <el-menu-item index="8" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 10px">
         <theme size="2.5" />

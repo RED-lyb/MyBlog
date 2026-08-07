@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'feedback',                     # 反馈应用
     'games',                        # 游戏应用
     'cinema',                       # 同频影院（RTC 推流 / Token）
+    'love_nest',                    # 爱情小窝
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
 CORS_ALLOWED_ORIGINS = [
