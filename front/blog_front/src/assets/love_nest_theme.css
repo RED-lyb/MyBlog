@@ -28,6 +28,12 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.love-nest-page:has(.love-nest-main--travel) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
 .love-nest-page .ln-card {
   border-width: 2px;
   box-shadow: var(--ln-shadow);
@@ -48,6 +54,8 @@
 
 .love-nest-page .tab-nav-scroll {
   scrollbar-width: thin;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .love-nest-page .banner-divider {
@@ -132,8 +140,13 @@
   color: var(--ln-accent);
 }
 
-.love-nest-page .el-empty__description {
+.ln-empty-hint {
+  margin: 0;
+  padding: 20px 0;
+  text-align: center;
+  font-size: 0.9rem;
   color: var(--ln-muted);
+  letter-spacing: 0.04em;
 }
 
 .love-nest-page .el-image {

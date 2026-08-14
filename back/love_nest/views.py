@@ -2,14 +2,14 @@
 爱情小窝相关视图
 """
 import json
-import os
+import logging
 from datetime import date, datetime
 from functools import wraps
 from io import BytesIO
 from pathlib import Path
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, IntegrityError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -23,22 +23,28 @@ except ImportError:
 
 BASE_DIR = Path(settings.BASE_DIR)
 PHOTOS_DIR = BASE_DIR / 'api' / 'static' / 'love_nest' / 'photos'
-DIARY_DIR = PHOTOS_DIR / 'diary'
 
 ALLOWED_IMAGE_EXT = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')
 PHOTO_UPLOAD_CATEGORIES = ('person', 'scenery', 'food')
-PHOTO_QUERY_CATEGORIES = PHOTO_UPLOAD_CATEGORIES + ('travel',)
-MAX_UPLOAD_BYTES = 8 * 1024 * 1024
-MAX_STORED_BYTES = 5 * 1024 * 1024
+PHOTO_QUERY_CATEGORIES = PHOTO_UPLOAD_CATEGORIES
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+_DIARY_SELECT_SQL = """
+    SELECT d.id, d.diary_date, d.photo_id, d.sentence,
+           p.id, p.filename, p.title, p.caption, p.category, p.travel_city_id
+    FROM love_nest_diaries d
+    LEFT JOIN love_nest_photos p ON d.photo_id = p.id
+"""
+
+_PHOTO_SELECT_COLS = 'id, filename, title, caption, category, travel_city_id'
+
+logger = logging.getLogger(__name__)
 
 
-def _safe_basename(name):
-    if not name or not isinstance(name, str):
-        return None
-    base = os.path.basename(name.strip())
-    if not base or base in ('.', '..') or '..' in name:
-        return None
-    return base
+def _error_json(user_message, *, log_exc=False, status=500):
+    if log_exc:
+        logger.exception(user_message)
+    return JsonResponse({'success': False, 'error': user_message}, status=status)
 
 
 def _image_ext_from_name(name):
@@ -50,7 +56,7 @@ def _image_ext_from_name(name):
 
 
 def _compress_image_bytes(data, ext):
-    if len(data) <= MAX_STORED_BYTES:
+    if len(data) <= MAX_IMAGE_BYTES:
         return data, ext
     if Image is None:
         raise ValueError('图片超过5MB，请换一张较小的图片')
@@ -82,20 +88,20 @@ def _compress_image_bytes(data, ext):
         buf = BytesIO()
         working.save(buf, format='JPEG', quality=quality, optimize=True)
         result = buf.getvalue()
-        if len(result) <= MAX_STORED_BYTES:
+        if len(result) <= MAX_IMAGE_BYTES:
             return result, '.jpg'
         quality = max(50, quality - 8)
         scale *= 0.9
 
-    if len(result) > MAX_UPLOAD_BYTES:
-        raise ValueError('图片压缩后仍过大，请换一张较小的图片')
+    if len(result) > MAX_IMAGE_BYTES:
+        raise ValueError('图片压缩后仍超过5MB，请换一张较小的图片')
     return result, '.jpg'
 
 
 def _save_uploaded_image(uploaded_file, dest_without_suffix):
     data = b''.join(uploaded_file.chunks())
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise ValueError('图片大小不能超过8MB')
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError('图片大小不能超过5MB')
     ext = _image_ext_from_name(uploaded_file.name)
     if not ext:
         raise ValueError(f'不支持的格式，仅支持: {", ".join(ALLOWED_IMAGE_EXT)}')
@@ -107,13 +113,122 @@ def _save_uploaded_image(uploaded_file, dest_without_suffix):
     return dest_path.name
 
 
-def _delete_diary_image(filename):
-    safe_name = _safe_basename(filename)
-    if not safe_name:
-        return
-    path = DIARY_DIR / safe_name
-    if path.is_file():
-        path.unlink()
+def _photo_public_url(filename):
+    if not filename:
+        return None
+    return f'/api/static/love_nest/photos/{filename}'
+
+
+def _get_photo_filename(photo_id):
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT filename FROM love_nest_photos WHERE id = %s', [photo_id])
+        row = cursor.fetchone()
+    if not row or not row[0]:
+        raise ValueError('相册照片不存在')
+    return row[0]
+
+
+def _create_album_photo(uploaded_file, category, title=None, caption=None, travel_city_id=None):
+    if category not in PHOTO_QUERY_CATEGORIES:
+        raise ValueError('无效的照片分类')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO love_nest_photos
+            (filename, title, caption, category, travel_city_id)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            ['', title, caption, category, travel_city_id],
+        )
+        photo_id = cursor.lastrowid
+
+    category_dir = PHOTOS_DIR / category
+    saved_name = _save_uploaded_image(uploaded_file, category_dir / str(int(photo_id)))
+    relative_filename = f'{category}/{saved_name}'
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'UPDATE love_nest_photos SET filename = %s WHERE id = %s',
+            [relative_filename, photo_id],
+        )
+
+    return photo_id, relative_filename
+
+
+def _replace_album_photo_file(photo_id, uploaded_file, category=None):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT filename, category FROM love_nest_photos WHERE id = %s',
+            [photo_id],
+        )
+        row = cursor.fetchone()
+    if not row:
+        raise ValueError('照片不存在')
+
+    old_filename, current_category = row[0], row[1]
+    target_category = category if category in PHOTO_UPLOAD_CATEGORIES else current_category
+
+    category_dir = PHOTOS_DIR / target_category
+    saved_name = _save_uploaded_image(uploaded_file, category_dir / str(int(photo_id)))
+    new_relative = f'{target_category}/{saved_name}'
+
+    if old_filename and old_filename != new_relative:
+        _delete_photo_file(old_filename)
+
+    return new_relative, target_category
+
+
+def _relocate_album_photo_category(photo_id, new_category):
+    if new_category not in PHOTO_UPLOAD_CATEGORIES:
+        raise ValueError('无效的照片分类')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'SELECT filename, category FROM love_nest_photos WHERE id = %s',
+            [photo_id],
+        )
+        row = cursor.fetchone()
+    if not row or not row[0]:
+        raise ValueError('照片不存在')
+
+    old_filename, old_category = row[0], row[1]
+    if old_category == new_category:
+        return old_filename, new_category
+
+    old_path = (PHOTOS_DIR / old_filename).resolve()
+    photos_root = PHOTOS_DIR.resolve()
+    if not str(old_path).startswith(str(photos_root)) or not old_path.is_file():
+        return f'{new_category}/{old_path.name}', new_category
+
+    dest_dir = PHOTOS_DIR / new_category
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = dest_dir / old_path.name
+    if dest_path.exists():
+        dest_path.unlink()
+    old_path.rename(dest_path)
+    return f'{new_category}/{dest_path.name}', new_category
+
+
+def _resolve_diary_photo_id(photo_id, uploaded_file, category):
+    if photo_id:
+        try:
+            photo_id = int(photo_id)
+        except (TypeError, ValueError):
+            raise ValueError('photo_id 无效')
+        _get_photo_filename(photo_id)
+        return photo_id
+
+    if uploaded_file:
+        if category not in PHOTO_UPLOAD_CATEGORIES:
+            raise ValueError('上传新图时必须选择分类：人物、风景或食物')
+        new_photo_id, _filename = _create_album_photo(
+            uploaded_file,
+            category,
+        )
+        return new_photo_id
+
+    return None
 
 
 def _parse_member_ids(raw):
@@ -132,7 +247,7 @@ def _get_config_row():
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, start_date, slogan, member_user_ids, updated_at
+            SELECT id, start_date, slogan, member_user_ids
             FROM love_nest_config
             WHERE id = 1
             """
@@ -244,9 +359,6 @@ def _row_to_photo(row):
         'caption': row[3],
         'category': row[4],
         'travel_city_id': row[5],
-        'sort_order': row[6],
-        'created_by': row[7],
-        'created_at': row[8].isoformat() if row[8] else None,
     }
 
 
@@ -279,8 +391,8 @@ def get_config(request):
         if error:
             return JsonResponse({'success': False, 'error': error}, status=404)
         return JsonResponse({'success': True, 'data': payload})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'获取配置失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('获取配置失败，请稍后重试', log_exc=True)
 
 
 def _build_config_payload():
@@ -295,7 +407,6 @@ def _build_config_payload():
         'slogan': row[2],
         'days_together': _calc_days_together(start_date),
         'members': _fetch_member_profiles(member_ids),
-        'updated_at': row[4].isoformat() if row[4] else None,
     }, None
 
 
@@ -311,7 +422,7 @@ def list_decor_photos(request):
                 SELECT filename, category
                 FROM love_nest_photos
                 WHERE category IN ('person', 'scenery', 'food')
-                ORDER BY sort_order DESC, id DESC
+                ORDER BY id DESC
                 """
             )
             for filename, category in cursor.fetchall():
@@ -323,8 +434,8 @@ def list_decor_photos(request):
                 })
 
         return JsonResponse({'success': True, 'data': {'photos': photos}})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'获取漂浮素材失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('获取漂浮素材失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -338,9 +449,11 @@ def get_photos(request):
 
         where_conditions = []
         params = []
-        if category in PHOTO_QUERY_CATEGORIES:
+        if category in PHOTO_UPLOAD_CATEGORIES:
             where_conditions.append('category = %s')
             params.append(category)
+        else:
+            where_conditions.append("category IN ('person', 'scenery', 'food')")
 
         where_clause = ' AND '.join(where_conditions) if where_conditions else '1=1'
 
@@ -353,11 +466,10 @@ def get_photos(request):
 
             cursor.execute(
                 f"""
-                SELECT id, filename, title, caption, category, travel_city_id,
-                       sort_order, created_by, created_at
+                SELECT {_PHOTO_SELECT_COLS}
                 FROM love_nest_photos
                 WHERE {where_clause}
-                ORDER BY sort_order DESC, created_at DESC
+                ORDER BY id DESC
                 LIMIT %s OFFSET %s
                 """,
                 [*params, page_size, offset],
@@ -376,8 +488,8 @@ def get_photos(request):
                 'total_pages': total_pages,
             },
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'获取照片失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('获取照片失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -403,8 +515,8 @@ def check_editor(request):
                 'is_admin': is_admin,
             },
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'检查权限失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('检查权限失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -426,8 +538,8 @@ def upload_photo(request):
                 status=400,
             )
 
-        if uploaded_file.size > MAX_UPLOAD_BYTES:
-            return JsonResponse({'success': False, 'error': '图片大小不能超过8MB'}, status=400)
+        if uploaded_file.size > MAX_IMAGE_BYTES:
+            return JsonResponse({'success': False, 'error': '图片大小不能超过5MB'}, status=400)
 
         title = (request.POST.get('title') or '').strip() or None
         caption = (request.POST.get('caption') or '').strip() or None
@@ -437,39 +549,20 @@ def upload_photo(request):
                 {'success': False, 'error': '请选择分类：人物、风景或食物'},
                 status=400,
             )
-        sort_order = int(request.POST.get('sort_order', 0) or 0)
-
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO love_nest_photos
-                (filename, title, caption, category, sort_order, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                ['', title, caption, category, sort_order, request.user_id],
-            )
-            photo_id = cursor.lastrowid
-
-        category_dir = PHOTOS_DIR / category
-        category_dir.mkdir(parents=True, exist_ok=True)
         try:
-            saved_name = _save_uploaded_image(uploaded_file, category_dir / str(int(photo_id)))
+            photo_id, _relative_filename = _create_album_photo(
+                uploaded_file,
+                category,
+                title=title,
+                caption=caption,
+            )
         except ValueError as exc:
-            with connection.cursor() as cursor:
-                cursor.execute('DELETE FROM love_nest_photos WHERE id = %s', [photo_id])
             return JsonResponse({'success': False, 'error': str(exc)}, status=400)
 
-        relative_filename = f'{category}/{saved_name}'
-
         with connection.cursor() as cursor:
             cursor.execute(
-                'UPDATE love_nest_photos SET filename = %s WHERE id = %s',
-                [relative_filename, photo_id],
-            )
-            cursor.execute(
-                """
-                SELECT id, filename, title, caption, category, travel_city_id,
-                       sort_order, created_by, created_at
+                f"""
+                SELECT {_PHOTO_SELECT_COLS}
                 FROM love_nest_photos
                 WHERE id = %s
                 """,
@@ -482,18 +575,24 @@ def upload_photo(request):
             'message': '上传成功',
             'data': _row_to_photo(row),
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'上传失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('上传失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
 @love_nest_editor_required
-@require_http_methods(['PUT'])
+@require_http_methods(['PUT', 'POST'])
 def update_photo(request, photo_id):
     try:
-        data = _parse_json_body(request)
-        if data is None:
-            return JsonResponse({'success': False, 'error': '请求体必须是 JSON'}, status=400)
+        content_type = request.content_type or ''
+        uploaded_file = request.FILES.get('file') if 'multipart/form-data' in content_type else None
+
+        if 'multipart/form-data' in content_type:
+            data = request.POST
+        else:
+            data = _parse_json_body(request)
+            if data is None:
+                return JsonResponse({'success': False, 'error': '请求体必须是 JSON 或 multipart/form-data'}, status=400)
 
         fields = []
         params = []
@@ -503,12 +602,32 @@ def update_photo(request, photo_id):
         if 'caption' in data:
             fields.append('caption = %s')
             params.append((data.get('caption') or '').strip() or None)
-        if 'category' in data and data.get('category') in PHOTO_QUERY_CATEGORIES:
+
+        category = (data.get('category') or '').strip() if hasattr(data, 'get') else ''
+        category_in_request = category in PHOTO_UPLOAD_CATEGORIES
+
+        if uploaded_file:
+            try:
+                new_filename, resolved_category = _replace_album_photo_file(
+                    photo_id,
+                    uploaded_file,
+                    category if category_in_request else None,
+                )
+            except ValueError as exc:
+                return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+            fields.append('filename = %s')
+            params.append(new_filename)
             fields.append('category = %s')
-            params.append(data['category'])
-        if 'sort_order' in data:
-            fields.append('sort_order = %s')
-            params.append(int(data.get('sort_order') or 0))
+            params.append(resolved_category)
+        elif category_in_request:
+            try:
+                new_filename, resolved_category = _relocate_album_photo_category(photo_id, category)
+            except ValueError as exc:
+                return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+            fields.append('filename = %s')
+            params.append(new_filename)
+            fields.append('category = %s')
+            params.append(resolved_category)
 
         if not fields:
             return JsonResponse({'success': False, 'error': '没有可更新的字段'}, status=400)
@@ -519,10 +638,11 @@ def update_photo(request, photo_id):
                 f"UPDATE love_nest_photos SET {', '.join(fields)} WHERE id = %s",
                 params,
             )
+            if cursor.rowcount == 0:
+                return JsonResponse({'success': False, 'error': '照片不存在'}, status=404)
             cursor.execute(
-                """
-                SELECT id, filename, title, caption, category, travel_city_id,
-                       sort_order, created_by, created_at
+                f"""
+                SELECT {_PHOTO_SELECT_COLS}
                 FROM love_nest_photos
                 WHERE id = %s
                 """,
@@ -537,8 +657,8 @@ def update_photo(request, photo_id):
             'message': '更新成功',
             'data': _row_to_photo(row),
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'更新失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('更新失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -559,8 +679,8 @@ def delete_photo(request, photo_id):
 
         _delete_photo_file(filename)
         return JsonResponse({'success': True, 'message': '删除成功'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'删除失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('删除失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -601,8 +721,8 @@ def update_config(request):
         if error:
             return JsonResponse({'success': False, 'error': error}, status=404)
         return JsonResponse({'success': True, 'message': '更新成功', 'data': payload})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'更新配置失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('更新配置失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -644,21 +764,20 @@ def update_members(request):
         if error:
             return JsonResponse({'success': False, 'error': error}, status=404)
         return JsonResponse({'success': True, 'message': '更新成功', 'data': payload})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'更新成员失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('更新成员失败，请稍后重试', log_exc=True)
 
 
 def _row_to_diary(row):
-    image_filename = row[2]
+    photo_row = row[4:10] if row[2] and row[4] else None
+    photo = _row_to_photo(photo_row) if photo_row else None
     return {
         'id': row[0],
         'diary_date': row[1].isoformat() if row[1] else None,
-        'image_filename': image_filename,
-        'image_url': f'/api/static/love_nest/photos/diary/{image_filename}' if image_filename else None,
+        'photo_id': row[2],
+        'photo': photo,
+        'image_url': photo['url'] if photo else None,
         'sentence': row[3],
-        'created_by': row[4],
-        'created_at': row[5].isoformat() if row[5] else None,
-        'updated_at': row[6].isoformat() if row[6] else None,
     }
 
 
@@ -667,15 +786,19 @@ def _parse_diary_input(request):
     if 'multipart/form-data' in content_type:
         diary_date = (request.POST.get('diary_date') or '').strip()
         sentence = (request.POST.get('sentence') or '').strip()
+        photo_id = (request.POST.get('photo_id') or '').strip() or None
+        category = (request.POST.get('category') or '').strip() or None
         uploaded_file = request.FILES.get('file')
-        return diary_date, sentence, uploaded_file, None
+        return diary_date, sentence, photo_id, category, uploaded_file, None
 
     data = _parse_json_body(request)
     if data is None:
-        return None, None, None, '请求体必须是 JSON 或 multipart/form-data'
+        return None, None, None, None, None, '请求体必须是 JSON 或 multipart/form-data'
     diary_date = (data.get('diary_date') or '').strip()
     sentence = (data.get('sentence') or data.get('content') or '').strip()
-    return diary_date, sentence, None, None
+    photo_id = data.get('photo_id')
+    category = data.get('category')
+    return diary_date, sentence, photo_id, category, None, None
 
 
 def _validate_diary_fields(diary_date, sentence):
@@ -698,7 +821,6 @@ def _row_to_milestone(row):
         'description': row[3],
         'is_yearly': bool(row[4]),
         'sort_order': row[5],
-        'created_at': row[6].isoformat() if row[6] else None,
     }
 
 
@@ -714,11 +836,9 @@ def get_diaries(request):
             cursor.execute('SELECT COUNT(*) FROM love_nest_diaries')
             total = cursor.fetchone()[0]
             cursor.execute(
-                """
-                SELECT id, diary_date, image_filename, sentence,
-                       created_by, created_at, updated_at
-                FROM love_nest_diaries
-                ORDER BY diary_date ASC, id ASC
+                f"""
+                {_DIARY_SELECT_SQL}
+                ORDER BY d.diary_date ASC, d.id ASC
                 LIMIT %s OFFSET %s
                 """,
                 [page_size, offset],
@@ -737,8 +857,8 @@ def get_diaries(request):
                 'total_pages': total_pages,
             },
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'获取日记失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('获取时光失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -746,7 +866,7 @@ def get_diaries(request):
 @require_POST
 def create_diary(request):
     try:
-        diary_date, sentence, uploaded_file, parse_error = _parse_diary_input(request)
+        diary_date, sentence, photo_id, category, uploaded_file, parse_error = _parse_diary_input(request)
         if parse_error:
             return JsonResponse({'success': False, 'error': parse_error}, status=400)
 
@@ -754,45 +874,37 @@ def create_diary(request):
         if field_error:
             return JsonResponse({'success': False, 'error': field_error}, status=400)
 
+        try:
+            resolved_photo_id = _resolve_diary_photo_id(
+                photo_id,
+                uploaded_file,
+                category,
+            )
+        except ValueError as exc:
+            return JsonResponse({'success': False, 'error': str(exc)}, status=400)
+
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO love_nest_diaries
-                (diary_date, image_filename, sentence, created_by)
-                VALUES (%s, %s, %s, %s)
+                (diary_date, photo_id, sentence)
+                VALUES (%s, %s, %s)
                 """,
-                [diary_date, None, sentence, request.user_id],
+                [diary_date, resolved_photo_id, sentence],
             )
             diary_id = cursor.lastrowid
-
-        image_filename = None
-        if uploaded_file:
-            try:
-                image_filename = _save_uploaded_image(uploaded_file, DIARY_DIR / str(int(diary_id)))
-            except ValueError as exc:
-                with connection.cursor() as cursor:
-                    cursor.execute('DELETE FROM love_nest_diaries WHERE id = %s', [diary_id])
-                return JsonResponse({'success': False, 'error': str(exc)}, status=400)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    'UPDATE love_nest_diaries SET image_filename = %s WHERE id = %s',
-                    [image_filename, diary_id],
-                )
-
-        with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT id, diary_date, image_filename, sentence,
-                       created_by, created_at, updated_at
-                FROM love_nest_diaries WHERE id = %s
+                f"""
+                {_DIARY_SELECT_SQL}
+                WHERE d.id = %s
                 """,
                 [diary_id],
             )
             row = cursor.fetchone()
 
         return JsonResponse({'success': True, 'message': '创建成功', 'data': _row_to_diary(row)})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'创建日记失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('创建时光失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -829,24 +941,22 @@ def update_diary(request, diary_id):
             fields.append('diary_date = %s')
             params.append(diary_date)
 
-        old_image_filename = None
-        new_image_filename = None
-        if uploaded_file:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    'SELECT image_filename FROM love_nest_diaries WHERE id = %s',
-                    [diary_id],
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return JsonResponse({'success': False, 'error': '日记不存在'}, status=404)
-                old_image_filename = row[0]
+        photo_id = data.get('photo_id') if hasattr(data, 'get') and data.get('photo_id') else None
+        category = (data.get('category') or '').strip() if hasattr(data, 'get') and data.get('category') else None
+        if photo_id or uploaded_file:
             try:
-                new_image_filename = _save_uploaded_image(uploaded_file, DIARY_DIR / str(int(diary_id)))
+                resolved_photo_id = _resolve_diary_photo_id(
+                    photo_id,
+                    uploaded_file,
+                    category,
+                )
             except ValueError as exc:
                 return JsonResponse({'success': False, 'error': str(exc)}, status=400)
-            fields.append('image_filename = %s')
-            params.append(new_image_filename)
+            fields.append('photo_id = %s')
+            params.append(resolved_photo_id)
+        elif 'clear_image' in data and data.get('clear_image'):
+            fields.append('photo_id = %s')
+            params.append(None)
 
         if not fields:
             return JsonResponse({'success': False, 'error': '没有可更新的字段'}, status=400)
@@ -858,25 +968,19 @@ def update_diary(request, diary_id):
                 params,
             )
             if cursor.rowcount == 0:
-                if new_image_filename:
-                    _delete_diary_image(new_image_filename)
                 return JsonResponse({'success': False, 'error': '日记不存在'}, status=404)
             cursor.execute(
-                """
-                SELECT id, diary_date, image_filename, sentence,
-                       created_by, created_at, updated_at
-                FROM love_nest_diaries WHERE id = %s
+                f"""
+                {_DIARY_SELECT_SQL}
+                WHERE d.id = %s
                 """,
                 [diary_id],
             )
             row = cursor.fetchone()
 
-        if old_image_filename and new_image_filename and old_image_filename != new_image_filename:
-            _delete_diary_image(old_image_filename)
-
         return JsonResponse({'success': True, 'message': '更新成功', 'data': _row_to_diary(row)})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'更新日记失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('更新时光失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -885,20 +989,13 @@ def update_diary(request, diary_id):
 def delete_diary(request, diary_id):
     try:
         with connection.cursor() as cursor:
-            cursor.execute(
-                'SELECT image_filename FROM love_nest_diaries WHERE id = %s',
-                [diary_id],
-            )
-            row = cursor.fetchone()
-            if not row:
+            cursor.execute('SELECT id FROM love_nest_diaries WHERE id = %s', [diary_id])
+            if not cursor.fetchone():
                 return JsonResponse({'success': False, 'error': '日记不存在'}, status=404)
-            image_filename = row[0]
             cursor.execute('DELETE FROM love_nest_diaries WHERE id = %s', [diary_id])
-
-        _delete_diary_image(image_filename)
         return JsonResponse({'success': True, 'message': '删除成功'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'删除日记失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('删除时光失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -908,8 +1005,7 @@ def get_milestones(request):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, title, milestone_date, description, is_yearly,
-                       sort_order, created_at
+                SELECT id, title, milestone_date, description, is_yearly, sort_order
                 FROM love_nest_milestones
                 ORDER BY sort_order DESC, milestone_date ASC, id ASC
                 """
@@ -919,8 +1015,8 @@ def get_milestones(request):
             'success': True,
             'data': {'milestones': [_row_to_milestone(row) for row in rows]},
         })
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'获取纪念日失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('获取纪念日失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -957,8 +1053,7 @@ def create_milestone(request):
             milestone_id = cursor.lastrowid
             cursor.execute(
                 """
-                SELECT id, title, milestone_date, description, is_yearly,
-                       sort_order, created_at
+                SELECT id, title, milestone_date, description, is_yearly, sort_order
                 FROM love_nest_milestones WHERE id = %s
                 """,
                 [milestone_id],
@@ -966,8 +1061,8 @@ def create_milestone(request):
             row = cursor.fetchone()
 
         return JsonResponse({'success': True, 'message': '创建成功', 'data': _row_to_milestone(row)})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'创建纪念日失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('创建纪念日失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -1016,8 +1111,7 @@ def update_milestone(request, milestone_id):
             )
             cursor.execute(
                 """
-                SELECT id, title, milestone_date, description, is_yearly,
-                       sort_order, created_at
+                SELECT id, title, milestone_date, description, is_yearly, sort_order
                 FROM love_nest_milestones WHERE id = %s
                 """,
                 [milestone_id],
@@ -1027,8 +1121,8 @@ def update_milestone(request, milestone_id):
                 return JsonResponse({'success': False, 'error': '纪念日不存在'}, status=404)
 
         return JsonResponse({'success': True, 'message': '更新成功', 'data': _row_to_milestone(row)})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'更新纪念日失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('更新纪念日失败，请稍后重试', log_exc=True)
 
 
 @csrf_exempt
@@ -1041,5 +1135,277 @@ def delete_milestone(request, milestone_id):
             if cursor.rowcount == 0:
                 return JsonResponse({'success': False, 'error': '纪念日不存在'}, status=404)
         return JsonResponse({'success': True, 'message': '删除成功'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'删除纪念日失败: {str(e)}'}, status=500)
+    except Exception:
+        return _error_json('删除纪念日失败，请稍后重试', log_exc=True)
+
+
+def _province_adcode_from_city(adcode, province_adcode=None):
+    city_code = str(adcode or '').strip()
+    province_code = str(province_adcode or '').strip()
+    if len(city_code) >= 2:
+        derived = f'{city_code[:2]}0000'
+    else:
+        derived = ''
+    if province_code and len(province_code) == 6 and province_code.endswith('0000'):
+        return province_code
+    return derived
+
+
+def _row_to_travel_city(row, photos=None):
+    return {
+        'id': row[0],
+        'adcode': row[1],
+        'province_adcode': _province_adcode_from_city(row[1], row[2]),
+        'city_name': row[3],
+        'note': row[4],
+        'visited_at': row[5].isoformat() if row[5] else None,
+        'photos': photos or [],
+    }
+
+
+def _fetch_travel_photos_by_city():
+    photos_by_city = {}
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            SELECT {_PHOTO_SELECT_COLS}
+            FROM love_nest_photos
+            WHERE travel_city_id IS NOT NULL
+            ORDER BY id DESC
+            """
+        )
+        for row in cursor.fetchall():
+            city_id = row[5]
+            photos_by_city.setdefault(city_id, []).append(_row_to_photo(row))
+    return photos_by_city
+
+
+@csrf_exempt
+@require_GET
+def get_travel(request):
+    try:
+        photos_by_city = _fetch_travel_photos_by_city()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, adcode, province_adcode, city_name, note, visited_at
+                FROM love_nest_travel_cities
+                ORDER BY visited_at DESC, id DESC
+                """
+            )
+            rows = cursor.fetchall()
+
+        cities = []
+        province_stats = {}
+        for row in rows:
+            city = _row_to_travel_city(row, photos_by_city.get(row[0], []))
+            cities.append(city)
+            province_code = _province_adcode_from_city(row[1], row[2])
+            if province_code:
+                province_stats[province_code] = province_stats.get(province_code, 0) + 1
+
+        return JsonResponse({
+            'success': True,
+            'data': {
+                'cities': cities,
+                'province_stats': province_stats,
+                'total_visited': len(cities),
+            },
+        })
+    except Exception:
+        return _error_json('获取旅行数据失败，请稍后重试', log_exc=True)
+
+
+@csrf_exempt
+@require_GET
+def get_travel_city(request, city_id):
+    try:
+        photos_by_city = _fetch_travel_photos_by_city()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, adcode, province_adcode, city_name, note, visited_at
+                FROM love_nest_travel_cities
+                WHERE id = %s
+                """,
+                [city_id],
+            )
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({'success': False, 'error': '城市不存在'}, status=404)
+
+        return JsonResponse({
+            'success': True,
+            'data': _row_to_travel_city(row, photos_by_city.get(row[0], [])),
+        })
+    except Exception:
+        return _error_json('获取城市详情失败，请稍后重试', log_exc=True)
+
+
+@csrf_exempt
+@love_nest_editor_required
+@require_POST
+def create_travel_city(request):
+    try:
+        data = _parse_json_body(request)
+        if data is None:
+            return JsonResponse({'success': False, 'error': '请求体必须是 JSON'}, status=400)
+
+        adcode = (data.get('adcode') or '').strip()
+        province_adcode = (data.get('province_adcode') or '').strip()
+        city_name = (data.get('city_name') or '').strip()
+        if not adcode or not city_name:
+            return JsonResponse({'success': False, 'error': '请选择城市'}, status=400)
+
+        province_adcode = _province_adcode_from_city(adcode, province_adcode)
+        if not province_adcode:
+            return JsonResponse({'success': False, 'error': '省份信息无效'}, status=400)
+
+        note = (data.get('note') or '').strip() or None
+        visited_at = (data.get('visited_at') or '').strip() or None
+        if visited_at:
+            try:
+                date.fromisoformat(visited_at)
+            except ValueError:
+                return JsonResponse({'success': False, 'error': 'visited_at 格式无效'}, status=400)
+
+        photo_id = data.get('photo_id')
+        photo_ids = data.get('photo_ids') or ([] if photo_id is None else [photo_id])
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO love_nest_travel_cities
+                (adcode, province_adcode, city_name, note, visited_at)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                [adcode, province_adcode, city_name, note, visited_at],
+            )
+            city_id = cursor.lastrowid
+
+            for item in photo_ids:
+                if item:
+                    cursor.execute(
+                        """
+                        UPDATE love_nest_photos
+                        SET travel_city_id = %s
+                        WHERE id = %s
+                        """,
+                        [city_id, int(item)],
+                    )
+
+            cursor.execute(
+                """
+                SELECT id, adcode, province_adcode, city_name, note, visited_at
+                FROM love_nest_travel_cities WHERE id = %s
+                """,
+                [city_id],
+            )
+            row = cursor.fetchone()
+
+        photos_by_city = _fetch_travel_photos_by_city()
+        return JsonResponse({
+            'success': True,
+            'message': '创建成功',
+            'data': _row_to_travel_city(row, photos_by_city.get(city_id, [])),
+        })
+    except IntegrityError:
+        return JsonResponse({'success': False, 'error': '该城市已添加过旅行记录'}, status=400)
+    except Exception:
+        return JsonResponse({'success': False, 'error': '创建旅行记录失败，请稍后重试'}, status=500)
+
+
+@csrf_exempt
+@love_nest_editor_required
+@require_http_methods(['PUT'])
+def update_travel_city(request, city_id):
+    try:
+        data = _parse_json_body(request)
+        if data is None:
+            return JsonResponse({'success': False, 'error': '请求体必须是 JSON'}, status=400)
+
+        fields = []
+        params = []
+        for key, column in (
+            ('city_name', 'city_name'),
+            ('note', 'note'),
+            ('visited_at', 'visited_at'),
+        ):
+            if key in data:
+                value = (data.get(key) or '').strip() or None
+                if key == 'visited_at' and value:
+                    try:
+                        date.fromisoformat(value)
+                    except ValueError:
+                        return JsonResponse({'success': False, 'error': 'visited_at 格式无效'}, status=400)
+                fields.append(f'{column} = %s')
+                params.append(value)
+
+        if not fields and 'photo_ids' not in data:
+            return JsonResponse({'success': False, 'error': '没有可更新的字段'}, status=400)
+
+        with connection.cursor() as cursor:
+            if fields:
+                params.append(city_id)
+                cursor.execute(
+                    f"UPDATE love_nest_travel_cities SET {', '.join(fields)} WHERE id = %s",
+                    params,
+                )
+                if cursor.rowcount == 0:
+                    return JsonResponse({'success': False, 'error': '城市不存在'}, status=404)
+
+            if 'photo_ids' in data:
+                photo_ids = data.get('photo_ids') or []
+                cursor.execute(
+                    'UPDATE love_nest_photos SET travel_city_id = NULL WHERE travel_city_id = %s',
+                    [city_id],
+                )
+                for item in photo_ids:
+                    if item:
+                        cursor.execute(
+                            """
+                            UPDATE love_nest_photos
+                            SET travel_city_id = %s
+                            WHERE id = %s
+                            """,
+                            [city_id, int(item)],
+                        )
+
+            cursor.execute(
+                """
+                SELECT id, adcode, province_adcode, city_name, note, visited_at
+                FROM love_nest_travel_cities WHERE id = %s
+                """,
+                [city_id],
+            )
+            row = cursor.fetchone()
+            if not row:
+                return JsonResponse({'success': False, 'error': '城市不存在'}, status=404)
+
+        photos_by_city = _fetch_travel_photos_by_city()
+        return JsonResponse({
+            'success': True,
+            'message': '更新成功',
+            'data': _row_to_travel_city(row, photos_by_city.get(city_id, [])),
+        })
+    except Exception:
+        return _error_json('更新旅行记录失败，请稍后重试', log_exc=True)
+
+
+@csrf_exempt
+@love_nest_editor_required
+@require_http_methods(['DELETE'])
+def delete_travel_city(request, city_id):
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT id FROM love_nest_travel_cities WHERE id = %s', [city_id])
+            if not cursor.fetchone():
+                return JsonResponse({'success': False, 'error': '城市不存在'}, status=404)
+            cursor.execute(
+                'UPDATE love_nest_photos SET travel_city_id = NULL WHERE travel_city_id = %s',
+                [city_id],
+            )
+            cursor.execute('DELETE FROM love_nest_travel_cities WHERE id = %s', [city_id])
+        return JsonResponse({'success': True, 'message': '删除成功'})
+    except Exception:
+        return _error_json('删除旅行记录失败，请稍后重试', log_exc=True)

@@ -1,5 +1,4 @@
-const DEFAULT_MAX_UPLOAD_MB = 8
-const DEFAULT_TARGET_MAX_MB = 5
+const MAX_IMAGE_MB = 5
 
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -25,25 +24,15 @@ function canvasToBlob(canvas, mimeType, quality) {
   })
 }
 
-/**
- * 上传前处理图片：允许最大 8MB，超过 5MB 时尝试压缩到 5MB 以下
- */
-export async function prepareLoveNestImage(
-  file,
-  { maxUploadMB = DEFAULT_MAX_UPLOAD_MB, targetMaxMB = DEFAULT_TARGET_MAX_MB } = {}
-) {
+/** 上传前处理：单张不超过 5MB，超出则尝试压缩到 5MB 以内 */
+export async function prepareLoveNestImage(file, { maxMB = MAX_IMAGE_MB } = {}) {
   if (!file) {
     throw new Error('未选择图片')
   }
 
-  const maxUploadBytes = maxUploadMB * 1024 * 1024
-  const targetBytes = targetMaxMB * 1024 * 1024
+  const maxBytes = maxMB * 1024 * 1024
 
-  if (file.size > maxUploadBytes) {
-    throw new Error(`图片不能超过 ${maxUploadMB}MB`)
-  }
-
-  if (file.size <= targetBytes) {
+  if (file.size <= maxBytes) {
     return file
   }
 
@@ -64,7 +53,7 @@ export async function prepareLoveNestImage(
     ctx.drawImage(image, 0, 0, width, height)
     blob = await canvasToBlob(canvas, mimeType, quality)
 
-    if (blob && blob.size <= targetBytes) {
+    if (blob && blob.size <= maxBytes) {
       break
     }
 
@@ -73,12 +62,8 @@ export async function prepareLoveNestImage(
     height = Math.round(height * 0.9)
   }
 
-  if (!blob) {
-    throw new Error('图片压缩失败')
-  }
-
-  if (blob.size > maxUploadBytes) {
-    throw new Error(`压缩后仍超过 ${maxUploadMB}MB，请换一张较小的图片`)
+  if (!blob || blob.size > maxBytes) {
+    throw new Error(`图片不能超过 ${maxMB}MB`)
   }
 
   const ext = mimeType === 'image/png' ? '.png' : '.jpg'

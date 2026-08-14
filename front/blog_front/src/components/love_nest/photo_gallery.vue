@@ -23,12 +23,23 @@ const hoverRotateMap = new Map()
 
 const hasPhotos = computed(() => props.photos.length > 0)
 
-const photoGroups = computed(() =>
-  PHOTO_GROUPS.map((group) => ({
+const photoGroups = computed(() => {
+  const groups = PHOTO_GROUPS.map((group) => ({
     ...group,
     photos: props.photos.filter((photo) => photo.category === group.key),
   })).filter((group) => group.photos.length > 0)
-)
+
+  const groupedIds = new Set(groups.flatMap((group) => group.photos.map((photo) => photo.id)))
+  const others = props.photos.filter((photo) => !groupedIds.has(photo.id))
+  if (others.length) {
+    groups.push({
+      key: 'other',
+      label: '其他',
+      photos: others,
+    })
+  }
+  return groups
+})
 
 const previewList = computed(() =>
   props.photos.map((photo) => resolveStaticUrl(photo.url))
@@ -81,10 +92,7 @@ onBeforeUnmount(() => {
       <el-skeleton :rows="4" animated />
     </div>
 
-    <el-empty
-      v-else-if="!hasPhotos"
-      description="还没有照片"
-    />
+    <p v-else-if="!hasPhotos" class="ln-empty-hint">还没有照片</p>
 
     <div v-else class="gallery-sections">
       <section
@@ -178,23 +186,34 @@ onBeforeUnmount(() => {
 
 .photo-thumb {
   overflow: visible;
+  border: 3px solid var(--ln-ink);
+  box-shadow: 4px 4px 0 var(--ln-shadow);
+  background: var(--ln-paper);
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.32s ease;
+  transform-origin: center center;
+}
+
+.photo-thumb:hover {
+  transform: scale(1.06) rotate(var(--hover-rotate, 3deg));
+  box-shadow: 6px 6px 0 var(--ln-shadow);
 }
 
 .photo-image {
   width: 100%;
   aspect-ratio: 4 / 5;
-  border: 1px solid var(--ln-line);
+  border: none;
   cursor: zoom-in;
   display: block;
 }
 
-.photo-thumb :deep(.el-image__inner) {
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: center center;
+.photo-thumb :deep(.el-image) {
+  display: block;
+  width: 100%;
 }
 
-.photo-thumb:hover :deep(.el-image__inner) {
-  transform: scale(1.06) rotate(var(--hover-rotate, 3deg));
+.photo-thumb :deep(.el-image__inner) {
+  width: 100%;
+  aspect-ratio: 4 / 5;
 }
 
 .photo-caption-block {

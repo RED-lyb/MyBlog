@@ -53,7 +53,7 @@ function countdownLabel(item) {
       <el-skeleton :rows="3" animated />
     </div>
 
-    <el-empty v-else-if="!hasMilestones" description="还没有纪念日" />
+    <p v-else-if="!hasMilestones" class="ln-empty-hint">还没有纪念日</p>
 
     <div v-else class="cards-grid">
       <article

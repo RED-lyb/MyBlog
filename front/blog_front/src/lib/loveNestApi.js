@@ -98,6 +98,31 @@ export async function deleteLoveNestMilestone(milestoneId) {
   return response
 }
 
+export async function fetchLoveNestTravel() {
+  const response = await apiClient.get(loveNestApiUrl('travel/'))
+  return response
+}
+
+export async function fetchLoveNestTravelCity(cityId) {
+  const response = await apiClient.get(loveNestApiUrl(`travel/${cityId}/`))
+  return response
+}
+
+export async function createLoveNestTravelCity(payload) {
+  const response = await apiClient.post(loveNestApiUrl('travel/create/'), payload)
+  return response
+}
+
+export async function updateLoveNestTravelCity(cityId, payload) {
+  const response = await apiClient.put(loveNestApiUrl(`travel/${cityId}/update/`), payload)
+  return response
+}
+
+export async function deleteLoveNestTravelCity(cityId) {
+  const response = await apiClient.delete(loveNestApiUrl(`travel/${cityId}/delete/`))
+  return response
+}
+
 export function resolveStaticUrl(path) {
   if (!path) return ''
   if (path.startsWith('http://') || path.startsWith('https://')) return path

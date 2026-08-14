@@ -111,6 +111,48 @@
         </el-table>
       </el-tab-pane>
 
+      <el-tab-pane label="旅行" name="travel">
+        <div class="tab-toolbar">
+          <el-button type="primary" plain @click="openTravelCreate">
+            <el-icon><Plus /></el-icon>
+            添加城市
+          </el-button>
+        </div>
+        <el-table v-loading="loadingTravel" :data="travelCities" stripe>
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column prop="city_name" label="城市" min-width="120" />
+          <el-table-column label="省份" min-width="100">
+            <template #default="{ row }">{{ provinceLabel(row.province_adcode) }}</template>
+          </el-table-column>
+          <el-table-column prop="adcode" label="编码" width="100" />
+          <el-table-column prop="visited_at" label="到访日期" width="120" />
+          <el-table-column prop="note" label="感言" min-width="160" show-overflow-tooltip />
+          <el-table-column label="照片" min-width="180">
+            <template #default="{ row }">
+              <div v-if="row.photos?.length" class="travel-thumb-row">
+                <img
+                  v-for="photo in row.photos.slice(0, 4)"
+                  :key="photo.id"
+                  :src="photoUrl(photo)"
+                  :alt="photo.title || row.city_name"
+                  class="travel-thumb"
+                />
+                <span v-if="row.photos.length > 4" class="travel-thumb-more">
+                  +{{ row.photos.length - 4 }}
+                </span>
+              </div>
+              <span v-else class="text-muted">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="160">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openTravelEdit(row)">编辑</el-button>
+              <el-button link type="danger" @click="removeTravel(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
       <el-tab-pane label="纪念日" name="milestones">
         <div class="tab-toolbar">
           <el-button type="primary" plain @click="openMilestoneCreate">
@@ -144,28 +186,29 @@
       @closed="resetPhotoDialog"
     >
       <el-form label-width="80px">
-        <el-form-item v-if="photoDialogMode === 'create'" label="分类">
+        <el-form-item label="分类">
           <el-select v-model="photoForm.category" style="width: 160px;">
             <el-option label="人物" value="person" />
             <el-option label="风景" value="scenery" />
             <el-option label="食物" value="food" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="photoDialogMode === 'create'" label="照片">
+        <el-form-item label="照片">
           <div class="photo-upload-tools">
             <el-upload
               :show-file-list="false"
               accept="image/*"
               :http-request="handlePhotoFilePick"
             >
-              <el-button type="primary" plain>选择图片</el-button>
+              <el-button type="primary" plain>
+                {{ photoDialogMode === 'create' ? '选择图片' : '更换图片' }}
+              </el-button>
             </el-upload>
             <span v-if="photoPendingFile" class="form-tip inline-tip">
               已选：{{ photoPendingFile.name }}
             </span>
           </div>
           <img v-if="photoPreviewSrc" :src="photoPreviewSrc" alt="" class="photo-preview" />
-          <p class="form-tip">单张最大 8MB，超过 5MB 将自动压缩</p>
         </el-form-item>
         <el-form-item label="标题">
           <el-input v-model="photoForm.title" placeholder="可选" />
@@ -182,27 +225,59 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="diaryDialogVisible" :title="diaryDialogTitle" width="560px">
-      <el-form label-width="80px">
+    <el-dialog v-model="diaryDialogVisible" :title="diaryDialogTitle" width="640px">
+      <el-form label-width="88px">
         <el-form-item label="日期">
           <el-date-picker v-model="diaryForm.diary_date" type="date" value-format="YYYY-MM-DD" />
         </el-form-item>
         <el-form-item label="配图">
-          <el-upload
-            :auto-upload="false"
-            :show-file-list="false"
-            accept="image/*"
-            @change="handleDiaryImageSelect"
-          >
-            <el-button type="primary" plain>选择图片</el-button>
-          </el-upload>
+          <el-radio-group v-model="diaryImageMode" class="diary-image-mode">
+            <el-radio-button value="album">从相册选择</el-radio-button>
+            <el-radio-button value="upload">上传新图</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item v-if="diaryImageMode === 'album'" label="相册">
+          <div class="album-picker">
+            <div
+              v-for="photo in albumPickerPhotos"
+              :key="photo.id"
+              class="album-picker__item"
+              :class="{ 'is-selected': diarySelectedPhotoId === photo.id }"
+              @click="selectDiaryPhoto(photo)"
+            >
+              <img :src="photoUrl(photo)" :alt="photo.title || '相册图片'" />
+            </div>
+            <p v-if="!albumPickerPhotos.length" class="form-tip">相册暂无图片</p>
+          </div>
+        </el-form-item>
+
+        <template v-else>
+          <el-form-item label="分类">
+            <el-select v-model="diaryUploadCategory" style="width: 160px;">
+              <el-option label="人物" value="person" />
+              <el-option label="风景" value="scenery" />
+              <el-option label="食物" value="food" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="照片">
+            <el-upload
+              :auto-upload="false"
+              :show-file-list="false"
+              accept="image/*"
+              @change="handleDiaryImageSelect"
+            >
+              <el-button type="primary" plain>选择图片</el-button>
+            </el-upload>
+          </el-form-item>
+        </template>
+
+        <el-form-item v-if="diaryImagePreview" label="预览">
           <img
-            v-if="diaryImagePreview"
             :src="diaryImagePreview"
             alt=""
             class="diary-preview"
           />
-          <p class="form-tip">单张最大 8MB，超过 5MB 将自动压缩</p>
         </el-form-item>
         <el-form-item label="一句话">
           <el-input
@@ -217,6 +292,118 @@
       <template #footer>
         <el-button @click="diaryDialogVisible = false">取消</el-button>
         <el-button type="primary" plain :loading="submitting" @click="submitDiary">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="travelDialogVisible" :title="travelDialogTitle" width="640px">
+      <el-form label-width="88px">
+        <el-form-item label="省份">
+          <el-select
+            v-model="travelForm.province_adcode"
+            filterable
+            placeholder="选择省份"
+            style="width: 220px;"
+            :disabled="!!travelForm.id"
+          >
+            <el-option
+              v-for="item in provinceOptionsFromApi"
+              :key="item.adcode"
+              :label="item.name"
+              :value="item.adcode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="城市">
+          <el-select
+            v-model="travelForm.adcode"
+            filterable
+            placeholder="请先选择省份"
+            style="width: 220px;"
+            :disabled="!!travelForm.id || !travelForm.province_adcode"
+            :loading="loadingTravelCities"
+            @change="onTravelCityChange"
+          >
+            <el-option
+              v-for="item in travelCityOptions"
+              :key="item.adcode"
+              :label="item.name"
+              :value="item.adcode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="到访日期">
+          <el-date-picker
+            v-model="travelForm.visited_at"
+            type="date"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="感言">
+          <el-input v-model="travelForm.note" type="textarea" :rows="3" placeholder="可选" />
+        </el-form-item>
+        <el-form-item label="配图">
+          <el-radio-group v-model="travelImageMode" class="diary-image-mode">
+            <el-radio-button value="album">从相册选择</el-radio-button>
+            <el-radio-button value="upload">上传新图</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="travelImageMode === 'album'" label="相册">
+          <div class="album-picker">
+            <div
+              v-for="photo in albumPickerPhotos"
+              :key="photo.id"
+              class="album-picker__item"
+              :class="{ 'is-selected': travelSelectedPhotoIds.includes(photo.id) }"
+              @click="toggleTravelPhoto(photo.id)"
+            >
+              <img :src="photoUrl(photo)" :alt="photo.title || '相册图片'" />
+            </div>
+            <p v-if="!albumPickerPhotos.length" class="form-tip">相册暂无图片</p>
+          </div>
+          <p v-if="travelSelectedPhotoIds.length" class="form-tip">
+            已选 {{ travelSelectedPhotoIds.length }} 张
+          </p>
+        </el-form-item>
+        <template v-else>
+          <el-form-item label="分类">
+            <el-select v-model="travelUploadCategory" style="width: 160px;">
+              <el-option label="人物" value="person" />
+              <el-option label="风景" value="scenery" />
+              <el-option label="食物" value="food" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="照片">
+            <el-upload
+              multiple
+              :auto-upload="false"
+              :show-file-list="false"
+              accept="image/*"
+              @change="handleTravelImagesSelect"
+            >
+              <el-button type="primary" plain>选择图片</el-button>
+            </el-upload>
+            <div v-if="travelPendingPreviews.length" class="album-picker">
+              <div
+                v-for="(preview, index) in travelPendingPreviews"
+                :key="preview"
+                class="album-picker__item travel-pending-item"
+              >
+                <img :src="preview" alt="待上传" />
+                <button
+                  type="button"
+                  class="travel-pending-remove"
+                  @click="removeTravelPendingFile(index)"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </el-form-item>
+        </template>
+      </el-form>
+      <template #footer>
+        <el-button @click="travelDialogVisible = false">取消</el-button>
+        <el-button type="primary" plain :loading="submitting" @click="submitTravel">保存</el-button>
       </template>
     </el-dialog>
 
@@ -247,7 +434,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -269,9 +456,14 @@ import {
   createLoveNestMilestone,
   updateLoveNestMilestone,
   deleteLoveNestMilestone,
+  fetchLoveNestTravel,
+  createLoveNestTravelCity,
+  updateLoveNestTravelCity,
+  deleteLoveNestTravelCity,
   resolveStaticUrl,
 } from '../../lib/loveNestApi.js'
 import { prepareLoveNestImage } from '../../lib/loveNestImage.js'
+import { PROVINCE_NAMES, fetchProvinceOptions, fetchCityOptions } from '../../lib/loveNestMap.js'
 
 const router = useRouter()
 const apiUrl = import.meta.env.VITE_API_URL
@@ -287,10 +479,12 @@ const userOptions = ref([])
 const photos = ref([])
 const diaries = ref([])
 const milestones = ref([])
+const travelCities = ref([])
 
 const loadingPhotos = ref(false)
 const loadingDiaries = ref(false)
 const loadingMilestones = ref(false)
+const loadingTravel = ref(false)
 const savingConfig = ref(false)
 const savingMembers = ref(false)
 const submitting = ref(false)
@@ -301,6 +495,7 @@ const photoPendingFile = ref(null)
 const photoPreviewSrc = ref('')
 const diaryDialogVisible = ref(false)
 const milestoneDialogVisible = ref(false)
+const travelDialogVisible = ref(false)
 
 const PHOTO_CATEGORY_LABELS = {
   person: '人物',
@@ -312,9 +507,32 @@ function photoCategoryLabel(value) {
   return PHOTO_CATEGORY_LABELS[value] || value || '-'
 }
 
+function provinceLabel(adcode) {
+  return PROVINCE_NAMES[adcode] || adcode || '-'
+}
+
 const photoForm = ref({ id: null, title: '', caption: '', category: 'person' })
-const diaryForm = ref({ id: null, sentence: '', diary_date: '', imageFile: null })
+const diaryForm = ref({ id: null, sentence: '', diary_date: '' })
+const diaryImageMode = ref('album')
+const diarySelectedPhotoId = ref(null)
+const diaryUploadCategory = ref('person')
 const diaryImagePreview = ref('')
+const travelForm = ref({
+  id: null,
+  province_adcode: '',
+  city_name: '',
+  adcode: '',
+  visited_at: '',
+  note: '',
+})
+const travelImageMode = ref('album')
+const travelSelectedPhotoIds = ref([])
+const travelUploadCategory = ref('scenery')
+const travelPendingFiles = ref([])
+const travelPendingPreviews = ref([])
+const provinceOptionsFromApi = ref([])
+const travelCityOptions = ref([])
+const loadingTravelCities = ref(false)
 const milestoneForm = ref({
   id: null,
   title: '',
@@ -326,6 +544,10 @@ const milestoneForm = ref({
 const diaryDialogTitle = computed(() => (diaryForm.value.id ? '编辑时光' : '新建时光'))
 const milestoneDialogTitle = computed(() => (milestoneForm.value.id ? '编辑纪念日' : '新建纪念日'))
 const photoDialogTitle = computed(() => (photoDialogMode.value === 'create' ? '上传照片' : '编辑照片'))
+const travelDialogTitle = computed(() => (travelForm.value.id ? '编辑旅行' : '添加城市'))
+const albumPickerPhotos = computed(() =>
+  photos.value.filter((photo) => ['person', 'scenery', 'food'].includes(photo.category))
+)
 
 function photoUrl(row) {
   return resolveStaticUrl(row.url)
@@ -408,6 +630,65 @@ async function loadMilestones() {
   }
 }
 
+async function loadProvinceOptions() {
+  try {
+    provinceOptionsFromApi.value = await fetchProvinceOptions()
+  } catch {
+    provinceOptionsFromApi.value = Object.entries(PROVINCE_NAMES).map(([adcode, name]) => ({
+      adcode,
+      name,
+    }))
+  }
+}
+
+async function loadTravelCityOptions(provinceAdcode) {
+  if (!provinceAdcode) {
+    travelCityOptions.value = []
+    return
+  }
+  loadingTravelCities.value = true
+  try {
+    travelCityOptions.value = await fetchCityOptions(provinceAdcode)
+  } catch (error) {
+    travelCityOptions.value = []
+    ElMessage.error(error.message || '城市列表加载失败')
+  } finally {
+    loadingTravelCities.value = false
+  }
+}
+
+function onTravelCityChange(adcode) {
+  const city = travelCityOptions.value.find((item) => item.adcode === adcode)
+  if (city) {
+    travelForm.value.adcode = city.adcode
+    travelForm.value.city_name = city.name
+  }
+}
+
+watch(
+  () => travelForm.value.province_adcode,
+  async (code, prevCode) => {
+    if (!travelDialogVisible.value) return
+    await loadTravelCityOptions(code)
+    if (!travelForm.value.id && code !== prevCode) {
+      travelForm.value.adcode = ''
+      travelForm.value.city_name = ''
+    }
+  }
+)
+
+async function loadTravel() {
+  loadingTravel.value = true
+  try {
+    const response = await fetchLoveNestTravel()
+    if (response.data.success) {
+      travelCities.value = response.data.data?.cities || []
+    }
+  } finally {
+    loadingTravel.value = false
+  }
+}
+
 async function saveConfig() {
   savingConfig.value = true
   try {
@@ -475,7 +756,7 @@ function openPhotoEdit(row) {
     category: row.category || 'person',
   }
   photoPendingFile.value = null
-  photoPreviewSrc.value = ''
+  photoPreviewSrc.value = photoUrl(row)
   photoDialogVisible.value = true
 }
 
@@ -503,14 +784,21 @@ async function submitPhotoDialog() {
       return
     }
 
-    const response = await updateLoveNestPhoto(photoForm.value.id, {
-      title: photoForm.value.title,
-      caption: photoForm.value.caption,
-    })
+    const formData = new FormData()
+    formData.append('category', photoForm.value.category || 'person')
+    if (photoForm.value.title) formData.append('title', photoForm.value.title)
+    if (photoForm.value.caption) formData.append('caption', photoForm.value.caption)
+    if (photoPendingFile.value) {
+      formData.append('file', photoPendingFile.value)
+    }
+
+    const response = await updateLoveNestPhoto(photoForm.value.id, formData)
     if (response.data.success) {
       ElMessage.success('已保存')
       photoDialogVisible.value = false
       await loadPhotos()
+    } else {
+      ElMessage.error(response.data.error || '保存失败')
     }
   } catch (error) {
     ElMessage.error(error.response?.data?.error || error.message || '保存失败')
@@ -533,8 +821,12 @@ async function removePhoto(row) {
 }
 
 function openDiaryCreate() {
-  diaryForm.value = { id: null, sentence: '', diary_date: '', imageFile: null }
+  diaryForm.value = { id: null, sentence: '', diary_date: '' }
+  diaryImageMode.value = 'album'
+  diarySelectedPhotoId.value = null
+  diaryUploadCategory.value = 'person'
   diaryImagePreview.value = ''
+  diaryPendingFile.value = null
   diaryDialogVisible.value = true
 }
 
@@ -543,18 +835,32 @@ function openDiaryEdit(row) {
     id: row.id,
     sentence: row.sentence || '',
     diary_date: row.diary_date || '',
-    imageFile: null,
   }
-  diaryImagePreview.value = row.image_url ? resolveStaticUrl(row.image_url) : ''
+  diaryImageMode.value = 'album'
+  diarySelectedPhotoId.value = row.photo_id || null
+  diaryUploadCategory.value = 'person'
+  diaryPendingFile.value = null
+  diaryImagePreview.value = row.photo?.url
+    ? resolveStaticUrl(row.photo.url)
+    : (row.image_url ? resolveStaticUrl(row.image_url) : '')
   diaryDialogVisible.value = true
 }
+
+function selectDiaryPhoto(photo) {
+  diarySelectedPhotoId.value = photo.id
+  diaryImagePreview.value = photoUrl(photo)
+  diaryPendingFile.value = null
+}
+
+const diaryPendingFile = ref(null)
 
 async function handleDiaryImageSelect(uploadFile) {
   const rawFile = uploadFile?.raw || uploadFile
   if (!rawFile) return
   try {
     const file = await prepareLoveNestImage(rawFile)
-    diaryForm.value.imageFile = file
+    diaryPendingFile.value = file
+    diarySelectedPhotoId.value = null
     diaryImagePreview.value = URL.createObjectURL(file)
   } catch (error) {
     ElMessage.error(error.message || '图片处理失败')
@@ -564,31 +870,28 @@ async function handleDiaryImageSelect(uploadFile) {
 async function submitDiary() {
   submitting.value = true
   try {
-    const hasNewImage = !!diaryForm.value.imageFile
-    const useMultipart = hasNewImage || !diaryForm.value.id
+    const formData = new FormData()
+    formData.append('diary_date', diaryForm.value.diary_date || '')
+    formData.append('sentence', diaryForm.value.sentence || '')
 
-    let response
-    if (useMultipart) {
-      const formData = new FormData()
-      formData.append('diary_date', diaryForm.value.diary_date || '')
-      formData.append('sentence', diaryForm.value.sentence || '')
-      if (diaryForm.value.imageFile) {
-        formData.append('file', diaryForm.value.imageFile)
-      }
-      response = diaryForm.value.id
-        ? await updateLoveNestDiary(diaryForm.value.id, formData)
-        : await createLoveNestDiary(formData)
-    } else {
-      response = await updateLoveNestDiary(diaryForm.value.id, {
-        diary_date: diaryForm.value.diary_date,
-        sentence: diaryForm.value.sentence,
-      })
+    if (diaryImageMode.value === 'album' && diarySelectedPhotoId.value) {
+      formData.append('photo_id', String(diarySelectedPhotoId.value))
+    } else if (diaryImageMode.value === 'upload' && diaryPendingFile.value) {
+      formData.append('file', diaryPendingFile.value)
+      formData.append('category', diaryUploadCategory.value)
     }
+
+    const response = diaryForm.value.id
+      ? await updateLoveNestDiary(diaryForm.value.id, formData)
+      : await createLoveNestDiary(formData)
 
     if (response.data.success) {
       ElMessage.success('已保存')
       diaryDialogVisible.value = false
       await loadDiaries()
+      if (diaryImageMode.value === 'upload' && diaryPendingFile.value) {
+        await loadPhotos()
+      }
     } else {
       ElMessage.error(response.data.error || '保存失败')
     }
@@ -606,6 +909,139 @@ async function removeDiary(row) {
     if (response.data.success) {
       ElMessage.success('已删除')
       await loadDiaries()
+    }
+  } catch (error) {
+    if (error !== 'cancel') ElMessage.error('删除失败')
+  }
+}
+
+function resetTravelPendingFiles() {
+  travelPendingPreviews.value.forEach((url) => URL.revokeObjectURL(url))
+  travelPendingFiles.value = []
+  travelPendingPreviews.value = []
+}
+
+function openTravelCreate() {
+  travelForm.value = {
+    id: null,
+    province_adcode: '',
+    city_name: '',
+    adcode: '',
+    visited_at: '',
+    note: '',
+  }
+  travelImageMode.value = 'album'
+  travelSelectedPhotoIds.value = []
+  travelUploadCategory.value = 'scenery'
+  resetTravelPendingFiles()
+  travelCityOptions.value = []
+  travelDialogVisible.value = true
+}
+
+async function openTravelEdit(row) {
+  travelForm.value = {
+    id: row.id,
+    province_adcode: row.province_adcode || '',
+    city_name: row.city_name || '',
+    adcode: row.adcode || '',
+    visited_at: row.visited_at || '',
+    note: row.note || '',
+  }
+  travelImageMode.value = 'album'
+  travelSelectedPhotoIds.value = (row.photos || []).map((photo) => photo.id)
+  resetTravelPendingFiles()
+  travelDialogVisible.value = true
+  await loadTravelCityOptions(row.province_adcode)
+}
+
+function toggleTravelPhoto(photoId) {
+  const ids = travelSelectedPhotoIds.value
+  if (ids.includes(photoId)) {
+    travelSelectedPhotoIds.value = ids.filter((id) => id !== photoId)
+  } else {
+    travelSelectedPhotoIds.value = [...ids, photoId]
+  }
+}
+
+async function handleTravelImagesSelect(uploadFile) {
+  const rawFile = uploadFile?.raw || uploadFile
+  if (!rawFile) return
+  try {
+    const file = await prepareLoveNestImage(rawFile)
+    travelPendingFiles.value.push(file)
+    travelPendingPreviews.value.push(URL.createObjectURL(file))
+  } catch (error) {
+    ElMessage.error(error.message || '图片处理失败')
+  }
+}
+
+function removeTravelPendingFile(index) {
+  const preview = travelPendingPreviews.value[index]
+  if (preview) URL.revokeObjectURL(preview)
+  travelPendingFiles.value.splice(index, 1)
+  travelPendingPreviews.value.splice(index, 1)
+}
+
+async function submitTravel() {
+  submitting.value = true
+  try {
+    if (!travelForm.value.province_adcode || !travelForm.value.adcode) {
+      ElMessage.warning('请选择省份和城市')
+      return
+    }
+
+    let photoIds = [...travelSelectedPhotoIds.value]
+
+    if (travelPendingFiles.value.length) {
+      for (const file of travelPendingFiles.value) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', travelUploadCategory.value)
+        const uploadResponse = await uploadLoveNestPhoto(formData)
+        if (!uploadResponse.data.success) {
+          ElMessage.error(uploadResponse.data.error || '图片上传失败')
+          return
+        }
+        photoIds.push(uploadResponse.data.data.id)
+      }
+      await loadPhotos()
+    }
+
+    const payload = {
+      province_adcode: travelForm.value.province_adcode,
+      city_name: travelForm.value.city_name,
+      adcode: travelForm.value.adcode,
+      visited_at: travelForm.value.visited_at || null,
+      note: travelForm.value.note || null,
+      photo_ids: photoIds,
+    }
+
+    const response = travelForm.value.id
+      ? await updateLoveNestTravelCity(travelForm.value.id, payload)
+      : await createLoveNestTravelCity(payload)
+
+    if (response.data.success) {
+      ElMessage.success('已保存')
+      travelDialogVisible.value = false
+      resetTravelPendingFiles()
+      await loadTravel()
+    } else {
+      ElMessage.error(response.data.error || '保存失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.error || '保存失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function removeTravel(row) {
+  try {
+    await ElMessageBox.confirm('确定删除这条旅行记录？', '确认', { type: 'warning' })
+    const response = await deleteLoveNestTravelCity(row.id)
+    if (response.data.success) {
+      ElMessage.success('已删除')
+      await loadTravel()
     }
   } catch (error) {
     if (error !== 'cancel') ElMessage.error('删除失败')
@@ -634,7 +1070,6 @@ async function submitMilestone() {
   try {
     const payload = { ...milestoneForm.value }
     delete payload.id
-    delete payload.created_at
     const response = milestoneForm.value.id
       ? await updateLoveNestMilestone(milestoneForm.value.id, payload)
       : await createLoveNestMilestone(payload)
@@ -666,7 +1101,15 @@ async function removeMilestone(row) {
 onMounted(async () => {
   const ok = await ensureAccess()
   if (!ok) return
-  await Promise.all([loadConfig(), loadUsers(), loadPhotos(), loadDiaries(), loadMilestones()])
+  await Promise.all([
+    loadProvinceOptions(),
+    loadConfig(),
+    loadUsers(),
+    loadPhotos(),
+    loadDiaries(),
+    loadMilestones(),
+    loadTravel(),
+  ])
 })
 </script>
 
@@ -740,8 +1183,79 @@ onMounted(async () => {
   margin: 0 0 0 12px;
 }
 
+.diary-image-mode {
+  margin-bottom: 0;
+}
+
+.album-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.album-picker__item {
+  border: 2px solid var(--el-border-color);
+  cursor: pointer;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.album-picker__item.is-selected {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 0 1px var(--el-color-primary);
+}
+
+.album-picker__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .text-muted {
   color: var(--el-text-color-secondary);
+}
+
+.travel-thumb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.travel-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.travel-thumb-more {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.travel-pending-item {
+  position: relative;
+}
+
+.travel-pending-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .inline-tip {

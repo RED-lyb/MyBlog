@@ -23,4 +23,9 @@ urlpatterns = [
     path('milestones/create/', views.create_milestone, name='love_nest_create_milestone'),
     path('milestones/<int:milestone_id>/update/', views.update_milestone, name='love_nest_update_milestone'),
     path('milestones/<int:milestone_id>/delete/', views.delete_milestone, name='love_nest_delete_milestone'),
+    path('travel/', views.get_travel, name='love_nest_get_travel'),
+    path('travel/<int:city_id>/', views.get_travel_city, name='love_nest_get_travel_city'),
+    path('travel/create/', views.create_travel_city, name='love_nest_create_travel_city'),
+    path('travel/<int:city_id>/update/', views.update_travel_city, name='love_nest_update_travel_city'),
+    path('travel/<int:city_id>/delete/', views.delete_travel_city, name='love_nest_delete_travel_city'),
 ]

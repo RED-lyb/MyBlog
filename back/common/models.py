@@ -296,7 +296,6 @@ class LoveNestConfig(models.Model):
     start_date = models.DateField(blank=True, null=True, db_comment='在一起的起始日期')
     slogan = models.CharField(max_length=500, blank=True, null=True, db_comment='爱情口号/副标题')
     member_user_ids = models.JSONField(blank=True, null=True, db_comment='可编辑成员用户ID列表')
-    updated_at = models.DateTimeField(db_comment='最后更新时间')
 
     class Meta:
         managed = False
@@ -309,11 +308,8 @@ class LoveNestTravelCity(models.Model):
     adcode = models.CharField(max_length=12, db_comment='市级行政区划代码')
     province_adcode = models.CharField(max_length=12, db_comment='所属省级 adcode')
     city_name = models.CharField(max_length=100, db_comment='城市名称')
-    note = models.TextField(blank=True, null=True, db_comment='旅行感言/记录')
+    note = models.TextField(blank=True, null=True, db_comment='旅行感言/备注')
     visited_at = models.DateField(blank=True, null=True, db_comment='到访日期')
-    created_by = models.PositiveIntegerField(blank=True, null=True, db_comment='创建者用户ID')
-    created_at = models.DateTimeField(db_comment='创建时间')
-    updated_at = models.DateTimeField(db_comment='更新时间')
 
     class Meta:
         managed = False
@@ -321,16 +317,13 @@ class LoveNestTravelCity(models.Model):
 
 
 class LoveNestPhoto(models.Model):
-    """爱情小窝照片表"""
+    """爱情小窝照片表（相册 + 旅行地图共用）"""
     id = models.AutoField(primary_key=True, db_comment='主键，自增')
-    filename = models.CharField(max_length=255, db_comment='图片文件名')
+    filename = models.CharField(max_length=255, db_comment='相对路径，如 person/1.jpg')
     title = models.CharField(max_length=200, blank=True, null=True, db_comment='照片标题')
     caption = models.TextField(blank=True, null=True, db_comment='照片描述')
-    category = models.CharField(max_length=10, db_comment='分类：person/scenery/food/travel')
-    travel_city_id = models.PositiveIntegerField(blank=True, null=True, db_comment='关联旅行城市ID')
-    sort_order = models.IntegerField(default=0, db_comment='排序权重')
-    created_by = models.PositiveIntegerField(blank=True, null=True, db_comment='上传者用户ID')
-    created_at = models.DateTimeField(db_comment='上传时间')
+    category = models.CharField(max_length=10, db_comment='相册分类：person / scenery / food')
+    travel_city_id = models.PositiveIntegerField(blank=True, null=True, db_comment='旅行地图关联城市（一对多）')
 
     class Meta:
         managed = False
@@ -341,11 +334,8 @@ class LoveNestDiary(models.Model):
     """爱情小窝时光表"""
     id = models.AutoField(primary_key=True, db_comment='主键，自增')
     diary_date = models.DateField(db_comment='时光日期')
-    image_filename = models.CharField(max_length=255, blank=True, null=True, db_comment='配图文件名')
+    photo_id = models.PositiveIntegerField(blank=True, null=True, db_comment='配图，关联 love_nest_photos.id（一对一）')
     sentence = models.CharField(max_length=500, db_comment='一句话')
-    created_by = models.PositiveIntegerField(blank=True, null=True, db_comment='作者用户ID')
-    created_at = models.DateTimeField(db_comment='创建时间')
-    updated_at = models.DateTimeField(db_comment='更新时间')
 
     class Meta:
         managed = False
@@ -359,8 +349,7 @@ class LoveNestMilestone(models.Model):
     milestone_date = models.DateField(db_comment='纪念日日期')
     description = models.TextField(blank=True, null=True, db_comment='描述')
     is_yearly = models.BooleanField(default=True, db_comment='是否每年重复提醒')
-    sort_order = models.IntegerField(default=0, db_comment='排序权重')
-    created_at = models.DateTimeField(db_comment='创建时间')
+    sort_order = models.IntegerField(default=0, db_comment='排序权重，管理页可配置')
 
     class Meta:
         managed = False

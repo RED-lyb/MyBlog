@@ -68,8 +68,6 @@ back/api/static/love_nest/photos/scenery/*
 !back/api/static/love_nest/photos/scenery/.gitkeep
 back/api/static/love_nest/photos/food/*
 !back/api/static/love_nest/photos/food/.gitkeep
-back/api/static/love_nest/photos/diary/*
-!back/api/static/love_nest/photos/diary/.gitkeep
 back/api/static/love_nest/photos/*.jpg
 back/api/static/love_nest/photos/*.jpeg
 back/api/static/love_nest/photos/*.png

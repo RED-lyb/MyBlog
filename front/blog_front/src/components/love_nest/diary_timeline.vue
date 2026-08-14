@@ -21,6 +21,7 @@ let autoScrollRaf = null
 let lastFrameTime = 0
 let scrollDirection = 1
 let scrollbarPointerActive = false
+let resizeObserver = null
 
 const SCROLLBAR_GUESS_PX = 16
 
@@ -39,7 +40,8 @@ function formatDate(value) {
 }
 
 function imageUrl(diary) {
-  return resolveStaticUrl(diary.image_url)
+  const url = diary.photo?.url || diary.image_url
+  return resolveStaticUrl(url)
 }
 
 function scheduleResume(delay = 1000) {
@@ -103,9 +105,31 @@ function stopAutoScroll() {
   }
 }
 
+function canAutoScroll() {
+  const el = scrollRef.value
+  if (!el) return false
+  return el.scrollWidth > el.clientWidth + 4
+}
+
+function refreshAutoScrollState() {
+  const el = scrollRef.value
+  if (!el) return
+
+  if (!canAutoScroll()) {
+    stopAutoScroll()
+    el.scrollLeft = 0
+    scrollDirection = 1
+    return
+  }
+
+  if (!autoScrollRaf) {
+    startAutoScroll()
+  }
+}
+
 function tickAutoScroll(now) {
   const el = scrollRef.value
-  if (el && !userPaused.value && el.scrollWidth > el.clientWidth + 4) {
+  if (el && !userPaused.value && canAutoScroll()) {
     const delta = Math.min((now - lastFrameTime) / 1000, 0.05)
     const speed = 36
     el.scrollLeft += scrollDirection * speed * delta
@@ -137,13 +161,33 @@ function unbindUserInteraction() {
   window.removeEventListener('mouseup', onScrollbarPointerUp)
 }
 
+function disconnectResizeObserver() {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+}
+
 watch(
   () => [props.loading, sortedDiaries.value.length],
   async ([loading, count]) => {
+    disconnectResizeObserver()
+    stopAutoScroll()
+
     if (!loading && count > 0) {
       await nextTick()
       bindUserInteraction()
-      startAutoScroll()
+      refreshAutoScrollState()
+
+      const el = scrollRef.value
+      if (el && typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => refreshAutoScrollState())
+        resizeObserver.observe(el)
+        const track = el.querySelector('.moment-track')
+        if (track) resizeObserver.observe(track)
+      }
+    } else {
+      unbindUserInteraction()
     }
   },
   { immediate: true }
@@ -151,6 +195,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopAutoScroll()
+  disconnectResizeObserver()
   if (resumeTimer) {
     window.clearTimeout(resumeTimer)
   }
@@ -169,7 +214,7 @@ onBeforeUnmount(() => {
       <el-skeleton :rows="4" animated />
     </div>
 
-    <el-empty v-else-if="!hasDiaries" description="还没有记录" />
+    <p v-else-if="!hasDiaries" class="ln-empty-hint">还没有记录</p>
 
     <div
       v-else
@@ -200,7 +245,7 @@ onBeforeUnmount(() => {
           <div class="moment-node__bundle">
             <div class="moment-node__photo-wrap">
               <img
-                v-if="diary.image_url"
+                v-if="diary.photo?.url || diary.image_url"
                 class="moment-node__photo"
                 :src="imageUrl(diary)"
                 :alt="diary.sentence"
@@ -266,7 +311,8 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   align-items: stretch;
-  min-width: max(100%, calc(var(--node-count, 1) * 188px));
+  width: max-content;
+  min-width: calc(var(--node-count, 1) * 184px + 96px);
   min-height: 450px;
   padding: 0 48px;
   overflow: visible;
@@ -282,6 +328,18 @@ onBeforeUnmount(() => {
   transform: translateY(-50%);
   box-shadow: 2px 2px 0 var(--ln-shadow);
   pointer-events: none;
+}
+
+/* 右侧黑线延伸，长度与左侧 padding 一致 */
+.moment-axis::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: 48px;
+  height: 100%;
+  background: var(--ln-ink);
+  box-shadow: 2px 2px 0 var(--ln-shadow);
 }
 
 .moment-node {

@@ -36,25 +36,25 @@ function selectTab(value) {
 .ln-nav {
   display: flex;
   width: 100%;
-  min-width: 420px;
+  min-width: 0;
   min-height: var(--ln-nav-height, 52px);
   border: none;
   background: transparent;
 }
 
 .ln-nav__item {
-  flex: 1 0 25%;
-  min-width: 96px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: var(--ln-nav-height, 52px);
-  padding: 0 12px;
+  padding: 0 10px;
   border: none;
   border-right: 2px solid var(--ln-ink);
   background: transparent;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: clamp(0.68rem, 2.4vw, 0.82rem);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ln-ink);
   transition: background 0.18s ease, color 0.18s ease;
@@ -68,6 +68,8 @@ function selectTab(value) {
   position: relative;
   z-index: 1;
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -78,17 +80,5 @@ function selectTab(value) {
 .ln-nav__item.is-active {
   color: var(--ln-paper, #fffcf9);
   background: var(--ln-ink);
-}
-
-@media (max-width: 640px) {
-  .ln-nav {
-    min-width: 380px;
-  }
-
-  .ln-nav__item {
-    min-width: 88px;
-    font-size: 0.72rem;
-    padding: 0 8px;
-  }
 }
 </style>
