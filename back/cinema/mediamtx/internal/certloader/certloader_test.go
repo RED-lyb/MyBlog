@@ -1,0 +1,51 @@
+package certloader_test
+
+import (
+	"crypto/tls"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/bluenviron/mediamtx/internal/certloader"
+	"github.com/bluenviron/mediamtx/internal/test"
+)
+
+func TestCertReload(t *testing.T) {
+	testData, err := tls.X509KeyPair(test.TLSCertPub, test.TLSCertKey)
+	require.NoError(t, err)
+
+	serverCertPath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyPath := test.CreateTempFile(t, test.TLSCertKey)
+
+	loader := &certloader.CertLoader{
+		CertPath: serverCertPath,
+		KeyPath:  serverKeyPath,
+		Parent:   test.NilLogger,
+	}
+	err = loader.Initialize()
+	require.NoError(t, err)
+	defer loader.Close()
+
+	cert, err := loader.GetCertificate(nil)
+	require.NoError(t, err)
+	require.NotNil(t, cert)
+	require.Equal(t, &testData, cert)
+
+	testData, err = tls.X509KeyPair(test.TLSCertPubAlt, test.TLSCertKeyAlt)
+	require.NoError(t, err)
+
+	err = os.WriteFile(serverCertPath, test.TLSCertPubAlt, 0o644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(serverKeyPath, test.TLSCertKeyAlt, 0o644)
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	cert, err = loader.GetCertificate(nil)
+	require.NoError(t, err)
+	require.NotNil(t, cert)
+	require.Equal(t, &testData, cert)
+}

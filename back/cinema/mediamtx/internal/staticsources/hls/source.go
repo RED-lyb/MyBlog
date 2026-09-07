@@ -1,0 +1,167 @@
+// Package hls contains the HLS static source.
+package hls
+
+import (
+	"net/http"
+	"net/http/cookiejar"
+	"strings"
+	"time"
+
+	"github.com/bluenviron/gohlslib/v2"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+
+	"github.com/bluenviron/mediamtx/internal/conf"
+	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/bluenviron/mediamtx/internal/errordumper"
+	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/bluenviron/mediamtx/internal/packetdumper"
+	"github.com/bluenviron/mediamtx/internal/protocols/hls"
+	ptls "github.com/bluenviron/mediamtx/internal/protocols/tls"
+	"github.com/bluenviron/mediamtx/internal/stream"
+)
+
+type parent interface {
+	logger.Writer
+	SetReady(req defs.PathSourceStaticSetReadyReq) defs.PathSourceStaticSetReadyRes
+	SetNotReady(req defs.PathSourceStaticSetNotReadyReq)
+}
+
+// Source is a HLS static source.
+type Source struct {
+	DumpPackets bool
+	ReadTimeout conf.Duration
+	Parent      parent
+}
+
+// Log implements logger.Writer.
+func (s *Source) Log(level logger.Level, format string, args ...any) {
+	s.Parent.Log(level, "[HLS source] "+format, args...)
+}
+
+// Run implements StaticSource.
+func (s *Source) Run(params defs.StaticSourceRunParams) error {
+	var subStream *stream.SubStream
+
+	defer func() {
+		if subStream != nil {
+			s.Parent.SetNotReady(defs.PathSourceStaticSetNotReadyReq{})
+		}
+	}()
+
+	decodeErrors := &errordumper.Dumper{
+		OnReport: func(val uint64, last error) {
+			if val == 1 {
+				s.Log(logger.Warn, "decode error: %v", last)
+			} else {
+				s.Log(logger.Warn, "%d decode errors, last was: %v", val, last)
+			}
+		},
+	}
+
+	decodeErrors.Start()
+	defer decodeErrors.Stop()
+
+	tr := &http.Transport{}
+	defer tr.CloseIdleConnections()
+
+	tlsConfig := ptls.MakeConfig(params.Conf.SourceFingerprint)
+
+	if s.DumpPackets {
+		var proto string
+		if strings.HasPrefix(params.ResolvedSource, "https") {
+			proto = "hlss"
+		} else {
+			proto = "hls"
+		}
+
+		tr.DialContext = (&packetdumper.DialContext{
+			Prefix: proto + "_source_conn",
+		}).Do
+
+		tr.DialTLSContext = (&packetdumper.DialTLSContext{
+			DialContext: tr.DialContext,
+			TLSConfig:   tlsConfig,
+		}).Do
+	} else {
+		tr.TLSClientConfig = tlsConfig
+	}
+
+	jar, _ := cookiejar.New(nil)
+
+	var c *gohlslib.Client
+	c = &gohlslib.Client{
+		URI: params.ResolvedSource,
+		HTTPClient: &http.Client{
+			Timeout:   time.Duration(s.ReadTimeout),
+			Transport: tr,
+			Jar:       jar,
+		},
+		OnDownloadPrimaryPlaylist: func(u string) {
+			s.Log(logger.Debug, "downloading primary playlist %v", u)
+		},
+		OnDownloadStreamPlaylist: func(u string) {
+			s.Log(logger.Debug, "downloading stream playlist %v", u)
+		},
+		OnDownloadSegment: func(u string) {
+			s.Log(logger.Debug, "downloading segment %v", u)
+		},
+		OnDownloadPart: func(u string) {
+			s.Log(logger.Debug, "downloading part %v", u)
+		},
+		OnDecodeError: func(err error) {
+			decodeErrors.Add(err)
+		},
+		OnTracks: func(tracks []*gohlslib.Track) error {
+			medias, err2 := hls.ToStream(c, tracks, params.Conf, &subStream)
+			if err2 != nil {
+				return err2
+			}
+
+			res := s.Parent.SetReady(defs.PathSourceStaticSetReadyReq{
+				Desc:          &description.Session{Medias: medias},
+				UseRTPPackets: false,
+				ReplaceNTP:    false,
+			})
+			if res.Err != nil {
+				return res.Err
+			}
+
+			subStream = res.SubStream
+
+			return nil
+		},
+	}
+
+	err := c.Start()
+	if err != nil {
+		return err
+	}
+
+	waitErr := make(chan error)
+	go func() {
+		waitErr <- c.Wait2()
+	}()
+
+	for {
+		select {
+		case err = <-waitErr:
+			c.Close()
+			return err
+
+		case <-params.ReloadConf:
+
+		case <-params.Context.Done():
+			c.Close()
+			<-waitErr
+			return nil
+		}
+	}
+}
+
+// APISourceDescribe implements StaticSource.
+func (*Source) APISourceDescribe() *defs.APIPathSource {
+	return &defs.APIPathSource{
+		Type: defs.APIPathSourceTypeHLSSource,
+		ID:   "",
+	}
+}

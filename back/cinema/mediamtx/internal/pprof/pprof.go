@@ -1,0 +1,136 @@
+// Package pprof contains a pprof exporter.
+package pprof //nolint:revive
+
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"time"
+
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/gin"
+
+	"github.com/bluenviron/mediamtx/internal/auth"
+	"github.com/bluenviron/mediamtx/internal/conf"
+	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/bluenviron/mediamtx/internal/protocols/httpp"
+)
+
+type pprofAuthManager interface {
+	Authenticate(req *auth.Request) (string, *auth.Error)
+}
+
+type pprofParent interface {
+	logger.Writer
+}
+
+// PPROF is a pprof exporter.
+type PPROF struct {
+	Address        string
+	DumpPackets    bool
+	Encryption     bool
+	ServerKey      string
+	ServerCert     string
+	AllowOrigins   []string
+	TrustedProxies conf.IPNetworks
+	ReadTimeout    conf.Duration
+	WriteTimeout   conf.Duration
+	AuthManager    pprofAuthManager
+	Parent         pprofParent
+
+	httpServer *httpp.Server
+}
+
+// Initialize initializes PPROF.
+func (pp *PPROF) Initialize() error {
+	router := gin.New()
+	router.SetTrustedProxies(pp.TrustedProxies.ToTrustedProxies()) //nolint:errcheck
+	router.Use(pp.middlewarePreflightRequests)
+	router.Use(pp.middlewareAuth)
+
+	pprof.Register(router)
+
+	pp.httpServer = &httpp.Server{
+		Address:           pp.Address,
+		DumpPackets:       pp.DumpPackets,
+		AllowOrigins:      pp.AllowOrigins,
+		DumpPacketsPrefix: "pprof_server_conn",
+		ReadTimeout:       time.Duration(pp.ReadTimeout),
+		WriteTimeout:      time.Duration(pp.WriteTimeout),
+		Encryption:        pp.Encryption,
+		ServerCert:        pp.ServerCert,
+		ServerKey:         pp.ServerKey,
+		Handler:           router,
+		Parent:            pp,
+	}
+	err := pp.httpServer.Initialize()
+	if err != nil {
+		return err
+	}
+
+	str := "started with listener on " + pp.Address
+	if !pp.Encryption {
+		str += " (TCP/HTTP)"
+	} else {
+		str += " (TCP/HTTPS)"
+	}
+	pp.Log(logger.Info, str)
+
+	return nil
+}
+
+// Close closes PPROF.
+func (pp *PPROF) Close() {
+	pp.Log(logger.Info, "closing")
+	pp.httpServer.Close()
+}
+
+// Log implements logger.Writer.
+func (pp *PPROF) Log(level logger.Level, format string, args ...any) {
+	pp.Parent.Log(level, "[pprof] "+format, args...)
+}
+
+func (pp *PPROF) middlewarePreflightRequests(ctx *gin.Context) {
+	if ctx.Request.Method == http.MethodOptions &&
+		ctx.Request.Header.Get("Access-Control-Request-Method") != "" {
+		ctx.Header("Access-Control-Allow-Methods", "OPTIONS, GET")
+		ctx.Header("Access-Control-Allow-Headers", "Authorization")
+		ctx.AbortWithStatus(http.StatusNoContent)
+		return
+	}
+}
+
+func (pp *PPROF) writeErrorNoLog(ctx *gin.Context, status int, err error) {
+	ctx.AbortWithStatusJSON(status, &defs.APIError{
+		Status: defs.APIErrorStatusError,
+		Error:  err.Error(),
+	})
+}
+
+func (pp *PPROF) middlewareAuth(ctx *gin.Context) {
+	req := &auth.Request{
+		Action:               conf.AuthActionPprof,
+		Query:                ctx.Request.URL.RawQuery,
+		Credentials:          httpp.Credentials(ctx.Request),
+		IP:                   net.ParseIP(ctx.ClientIP()),
+		EnableAskCredentials: true,
+	}
+
+	_, err := pp.AuthManager.Authenticate(req)
+	if err != nil {
+		if err.AskCredentials {
+			ctx.Header("WWW-Authenticate", `Basic realm="mediamtx"`)
+			pp.writeErrorNoLog(ctx, http.StatusUnauthorized, fmt.Errorf("authentication error"))
+			return
+		}
+
+		auth.LogAndDelayError(&logger.InlineWriter{
+			Parent: pp,
+			Prefix: fmt.Sprintf("[conn %v]", httpp.RemoteAddr(ctx)),
+		}, err)
+
+		pp.writeErrorNoLog(ctx, http.StatusUnauthorized, fmt.Errorf("authentication error"))
+		return
+	}
+}

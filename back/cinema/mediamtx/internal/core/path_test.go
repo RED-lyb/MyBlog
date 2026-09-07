@@ -1,0 +1,1111 @@
+package core
+
+import (
+	"bufio"
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/bluenviron/gortmplib"
+	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/headers"
+	srt "github.com/datarhei/gosrt"
+	"github.com/pion/rtp"
+	"github.com/pion/sdp/v3"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/bluenviron/mediamtx/internal/protocols/whip"
+	"github.com/bluenviron/mediamtx/internal/test"
+)
+
+type testServer struct {
+	onDescribe func(*gortsplib.ServerHandlerOnDescribeCtx) (*base.Response, *gortsplib.ServerStream, error)
+	onSetup    func(*gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error)
+	onPlay     func(*gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error)
+}
+
+func (sh *testServer) OnDescribe(ctx *gortsplib.ServerHandlerOnDescribeCtx,
+) (*base.Response, *gortsplib.ServerStream, error) {
+	return sh.onDescribe(ctx)
+}
+
+func (sh *testServer) OnSetup(ctx *gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error) {
+	return sh.onSetup(ctx)
+}
+
+func (sh *testServer) OnPlay(ctx *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error) {
+	return sh.onPlay(ctx)
+}
+
+var _ defs.Path = &path{}
+
+func TestPathRunOnDemand(t *testing.T) {
+	for _, ca := range []string{"describe", "setup", "describe and setup"} {
+		t.Run(ca, func(t *testing.T) {
+			onDemand := filepath.Join(t.TempDir(), "on_demand")
+			onUnDemand := filepath.Join(t.TempDir(), "on_undemand")
+
+			p1, ok := newInstance(t, fmt.Sprintf("rtmp: no\n"+
+				"hls: no\n"+
+				"webrtc: no\n"+
+				"paths:\n"+
+				"  '~^(on)demand$':\n"+
+				"    runOnDemand: sh -c \"ON_DEMAND=%s go run ./test_on_demand/main.go\"\n"+
+				"    runOnDemandCloseAfter: 1s\n"+
+				"    runOnUnDemand: touch %s\n", onDemand, onUnDemand))
+			require.Equal(t, true, ok)
+			defer p1.Close()
+
+			var control string
+
+			func() {
+				conn, err := net.Dial("tcp", "localhost:8554")
+				require.NoError(t, err)
+				defer conn.Close()
+				br := bufio.NewReader(conn)
+
+				if ca == "describe" || ca == "describe and setup" {
+					var u *base.URL
+					u, err = base.ParseURL("rtsp://localhost:8554/ondemand?key1=val1&key2=val2")
+					require.NoError(t, err)
+
+					byts, _ := base.Request{
+						Method: base.Describe,
+						URL:    u,
+						Header: base.Header{
+							"CSeq": base.HeaderValue{"1"},
+						},
+					}.Marshal()
+					_, err = conn.Write(byts)
+					require.NoError(t, err)
+
+					var res base.Response
+					err = res.Unmarshal(br)
+					require.NoError(t, err)
+					require.Equal(t, base.StatusOK, res.StatusCode)
+
+					var desc sdp.SessionDescription
+					err = desc.Unmarshal(res.Body)
+					require.NoError(t, err)
+					control, _ = desc.MediaDescriptions[0].Attribute("control")
+					control = "rtsp://localhost:8554/ondemand?key1=val1&key2=val2/" + control
+				} else {
+					control = "rtsp://localhost:8554/ondemand?key1=val1&key2=val2/"
+				}
+
+				if ca == "setup" || ca == "describe and setup" {
+					var u *base.URL
+					u, err = base.ParseURL(control)
+					require.NoError(t, err)
+
+					byts, _ := base.Request{
+						Method: base.Setup,
+						URL:    u,
+						Header: base.Header{
+							"CSeq": base.HeaderValue{"2"},
+							"Transport": headers.Transport{
+								Mode: func() *headers.TransportMode {
+									v := headers.TransportModePlay
+									return &v
+								}(),
+								Protocol:       headers.TransportProtocolTCP,
+								InterleavedIDs: &[2]int{0, 1},
+							}.Marshal(),
+						},
+					}.Marshal()
+					_, err = conn.Write(byts)
+					require.NoError(t, err)
+
+					var res base.Response
+					err = res.Unmarshal(br)
+					require.NoError(t, err)
+					require.Equal(t, base.StatusOK, res.StatusCode)
+				}
+			}()
+
+			for {
+				_, err := os.Stat(onUnDemand)
+				if err == nil {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+
+			_, err := os.Stat(onDemand)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestPathRunOnConnect(t *testing.T) {
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
+
+	for _, ca := range []string{"rtsp", "rtsps", "rtmp", "rtmps", "srt"} {
+		t.Run(ca, func(t *testing.T) {
+			onConnect := filepath.Join(t.TempDir(), "on_connect")
+			onDisconnect := filepath.Join(t.TempDir(), "on_disconnect")
+
+			connType := ""
+
+			func() {
+				p, ok := newInstance(t, fmt.Sprintf(
+					"rtspEncryption: optional\n"+
+						"rtspServerCert: "+serverCertFpath+"\n"+
+						"rtspServerKey: "+serverKeyFpath+"\n"+
+						"rtmpEncryption: optional\n"+
+						"rtmpServerCert: "+serverCertFpath+"\n"+
+						"rtmpServerKey: "+serverKeyFpath+"\n"+
+						"paths:\n"+
+						"  test:\n"+
+						"runOnConnect: sh -c 'echo \"$MTX_CONN_TYPE $MTX_CONN_ID $RTSP_PORT\" > %s'\n"+
+						"runOnDisconnect: sh -c 'echo \"$MTX_CONN_TYPE $MTX_CONN_ID $RTSP_PORT\" > %s'\n",
+					onConnect, onDisconnect))
+				require.Equal(t, true, ok)
+				defer p.Close()
+
+				switch ca {
+				case "rtsp":
+					connType = "rtspConn"
+
+					c := gortsplib.Client{}
+
+					err := c.StartRecording(
+						"rtsp://localhost:8554/test",
+						&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+					require.NoError(t, err)
+					defer c.Close()
+
+				case "rtsps":
+					connType = "rtspsConn"
+
+					c := gortsplib.Client{TLSConfig: &tls.Config{InsecureSkipVerify: true}}
+
+					err := c.StartRecording(
+						"rtsps://localhost:8322/test",
+						&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+					require.NoError(t, err)
+					defer c.Close()
+
+				case "rtmp":
+					connType = "rtmpConn"
+
+					var u *url.URL
+					u, err := url.Parse("rtmp://127.0.0.1:1935/test")
+					require.NoError(t, err)
+
+					conn := &gortmplib.Client{
+						URL:     u,
+						Publish: true,
+					}
+					err = conn.Initialize(context.Background())
+					require.NoError(t, err)
+					defer conn.Close()
+
+				case "rtmps":
+					connType = "rtmpsConn"
+
+					var u *url.URL
+					u, err := url.Parse("rtmps://127.0.0.1:1936/test")
+					require.NoError(t, err)
+
+					conn := &gortmplib.Client{
+						URL:       u,
+						Publish:   true,
+						TLSConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					err = conn.Initialize(context.Background())
+					require.NoError(t, err)
+					defer conn.Close()
+
+				case "srt":
+					connType = "srtConn"
+
+					conf := srt.DefaultConfig()
+					var address string
+					address, err := conf.UnmarshalURL("srt://localhost:8890?streamid=publish:test")
+					require.NoError(t, err)
+
+					err = conf.Validate()
+					require.NoError(t, err)
+
+					var c srt.Conn
+					c, err = srt.Dial("srt", address, conf)
+					require.NoError(t, err)
+					defer c.Close()
+				}
+
+				time.Sleep(500 * time.Millisecond)
+			}()
+
+			var byts []byte
+			byts, err := os.ReadFile(onConnect)
+			require.NoError(t, err)
+			fields := strings.Split(string(byts[:len(byts)-1]), " ")
+			require.Equal(t, connType, fields[0])
+			require.NotEmpty(t, fields[1])
+			require.Equal(t, "8554", fields[2])
+
+			byts, err = os.ReadFile(onDisconnect)
+			require.NoError(t, err)
+			fields = strings.Split(string(byts[:len(byts)-1]), " ")
+			require.Equal(t, connType, fields[0])
+			require.NotEmpty(t, fields[1])
+			require.Equal(t, "8554", fields[2])
+		})
+	}
+}
+
+func TestPathRunOnAvailable(t *testing.T) {
+	onAvailable := filepath.Join(t.TempDir(), "on_available")
+	onUnavailable := filepath.Join(t.TempDir(), "on_unavailable")
+
+	func() {
+		p, ok := newInstance(t, fmt.Sprintf("rtmp: no\n"+
+			"hls: no\n"+
+			"webrtc: no\n"+
+			"paths:\n"+
+			"  ~te(st):\n"+
+			"    runOnAvailable: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_SOURCE_TYPE $MTX_SOURCE_ID $RTSP_PORT $G1\" > %s'\n"+
+			"    runOnUnavailable: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_SOURCE_TYPE $MTX_SOURCE_ID $RTSP_PORT $G1\" > %s'\n",
+			onAvailable, onUnavailable))
+		require.Equal(t, true, ok)
+		defer p.Close()
+
+		c := gortsplib.Client{}
+
+		err := c.StartRecording(
+			"rtsp://localhost:8554/test?query=value",
+			&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+		require.NoError(t, err)
+		defer c.Close()
+
+		time.Sleep(500 * time.Millisecond)
+	}()
+
+	byts, err := os.ReadFile(onAvailable)
+	require.NoError(t, err)
+	fields := strings.Split(string(byts[:len(byts)-1]), " ")
+	require.Equal(t, "test", fields[0])
+	require.Equal(t, "query%3Dvalue", fields[1])
+	require.Equal(t, "rtspSession", fields[2])
+	require.NotEmpty(t, fields[3])
+	require.Equal(t, "8554", fields[4])
+	require.Equal(t, "st", fields[5])
+
+	byts, err = os.ReadFile(onUnavailable)
+	require.NoError(t, err)
+	fields = strings.Split(string(byts[:len(byts)-1]), " ")
+	require.Equal(t, "test", fields[0])
+	require.Equal(t, "query%3Dvalue", fields[1])
+	require.Equal(t, "rtspSession", fields[2])
+	require.NotEmpty(t, fields[3])
+	require.Equal(t, "8554", fields[4])
+	require.Equal(t, "st", fields[5])
+}
+
+func TestPathRunOnAvailableQueryInjection(t *testing.T) {
+	sentinel := filepath.Join(t.TempDir(), "mediamtx_test_query_injection_sentinel")
+
+	for _, ca := range []struct {
+		name   string
+		cmdstr string
+		query  string
+	}{
+		{
+			// $(…) inside double quotes still triggers command substitution.
+			// ${IFS} expands to a space, avoiding a literal space in the query string.
+			name:   "command substitution dollar",
+			cmdstr: "sh -c 'echo \"$MTX_QUERY\"'",
+			query:  "$(touch${IFS}" + sentinel + "1)",
+		},
+		{
+			// > in an unquoted expansion redirects echo's output, creating the file.
+			name:   "redirect",
+			cmdstr: "sh -c 'echo $MTX_QUERY'",
+			query:  ">" + sentinel + "2",
+		},
+		{
+			// & in an unquoted expansion backgrounds echo and runs touch directly.
+			// ${IFS} expands to a space, avoiding a literal space in the query string.
+			name:   "and operator",
+			cmdstr: "sh -c 'echo $MTX_QUERY'",
+			query:  "&touch${IFS}" + sentinel + "3",
+		},
+	} {
+		t.Run(ca.name, func(t *testing.T) {
+			p, ok := newInstance(t, fmt.Sprintf(
+				"rtmp: no\nhls: no\nwebrtc: no\npaths:\n  test:\n    runOnAvailable: %s\n",
+				ca.cmdstr))
+			require.Equal(t, true, ok)
+			defer p.Close()
+
+			c := gortsplib.Client{}
+			err := c.StartRecording(
+				"rtsp://localhost:8554/test?"+ca.query,
+				&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+			require.NoError(t, err)
+			defer c.Close()
+
+			time.Sleep(500 * time.Millisecond)
+
+			_, statErr := os.Stat(sentinel)
+			require.ErrorIs(t, statErr, os.ErrNotExist)
+		})
+	}
+}
+
+func TestPathRunOnOnline(t *testing.T) {
+	onOnline := filepath.Join(t.TempDir(), "on_online")
+	onOffline := filepath.Join(t.TempDir(), "on_offline")
+
+	func() {
+		p, ok := newInstance(t, fmt.Sprintf("rtmp: no\n"+
+			"hls: no\n"+
+			"webrtc: no\n"+
+			"paths:\n"+
+			"  test:\n"+
+			"    alwaysAvailable: yes\n"+
+			"    alwaysAvailableTracks:\n"+
+			"    - codec: H264\n"+
+			"    runOnOnline: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_SOURCE_TYPE $MTX_SOURCE_ID $RTSP_PORT $G1\" "+
+			"> %s; while true; do sleep 1; done'\n"+
+			"    runOnOffline: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_SOURCE_TYPE $MTX_SOURCE_ID $RTSP_PORT $G1\" "+
+			"> %s'\n",
+			onOnline, onOffline))
+		require.Equal(t, true, ok)
+		defer p.Close()
+
+		_, err := os.Stat(onOnline)
+		require.ErrorIs(t, err, os.ErrNotExist)
+
+		c := gortsplib.Client{}
+
+		err = c.StartRecording(
+			"rtsp://localhost:8554/test?query=value",
+			&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+		require.NoError(t, err)
+
+		for {
+			_, err = os.Stat(onOnline)
+			if err == nil {
+				break
+			}
+			require.ErrorIs(t, err, os.ErrNotExist)
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		_, err = os.Stat(onOffline)
+		require.ErrorIs(t, err, os.ErrNotExist)
+
+		c.Close()
+
+		for {
+			_, err = os.Stat(onOffline)
+			if err == nil {
+				break
+			}
+			require.ErrorIs(t, err, os.ErrNotExist)
+			time.Sleep(50 * time.Millisecond)
+		}
+	}()
+
+	byts, err := os.ReadFile(onOnline)
+	require.NoError(t, err)
+	fields := strings.Split(string(byts[:len(byts)-1]), " ")
+	require.Equal(t, "test", fields[0])
+	require.Equal(t, "query%3Dvalue", fields[1])
+	require.Equal(t, "rtspSession", fields[2])
+	require.NotEmpty(t, fields[3])
+	require.Equal(t, "8554", fields[4])
+	require.Equal(t, "", fields[5])
+
+	byts, err = os.ReadFile(onOffline)
+	require.NoError(t, err)
+	fields = strings.Split(string(byts[:len(byts)-1]), " ")
+	require.Equal(t, "test", fields[0])
+	require.Equal(t, "query%3Dvalue", fields[1])
+	require.Equal(t, "rtspSession", fields[2])
+	require.NotEmpty(t, fields[3])
+	require.Equal(t, "8554", fields[4])
+	require.Equal(t, "", fields[5])
+}
+
+func TestPathRunOnRead(t *testing.T) {
+	serverCertFpath := test.CreateTempFile(t, test.TLSCertPub)
+	serverKeyFpath := test.CreateTempFile(t, test.TLSCertKey)
+
+	for _, ca := range []string{"rtsp", "rtsps", "rtmp", "rtmps", "srt", "webrtc"} {
+		t.Run(ca, func(t *testing.T) {
+			onRead := filepath.Join(t.TempDir(), "on_read")
+			onUnread := filepath.Join(t.TempDir(), "on_unread")
+
+			func() {
+				p, ok := newInstance(t, fmt.Sprintf(
+					"rtspEncryption: optional\n"+
+						"rtspServerCert: "+serverCertFpath+"\n"+
+						"rtspServerKey: "+serverKeyFpath+"\n"+
+						"rtmpEncryption: optional\n"+
+						"rtmpServerCert: "+serverCertFpath+"\n"+
+						"rtmpServerKey: "+serverKeyFpath+"\n"+
+						"paths:\n"+
+						"  ~te(st):\n"+
+						"    runOnRead: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_READER_TYPE $MTX_READER_ID $RTSP_PORT $G1\" > %s'\n"+
+						"    runOnUnread: sh -c 'echo \"$MTX_PATH $MTX_QUERY $MTX_READER_TYPE $MTX_READER_ID $RTSP_PORT $G1\" > %s'\n",
+					onRead, onUnread))
+				require.Equal(t, true, ok)
+				defer p.Close()
+
+				media0 := test.UniqueMediaH264()
+
+				source := gortsplib.Client{}
+
+				err := source.StartRecording(
+					"rtsp://localhost:8554/test",
+					&description.Session{Medias: []*description.Media{media0}})
+				require.NoError(t, err)
+				defer source.Close()
+
+				writerDone := make(chan struct{})
+				defer func() { <-writerDone }()
+
+				writerTerminate := make(chan struct{})
+				defer close(writerTerminate)
+
+				go func() {
+					defer close(writerDone)
+					i := 0
+					for {
+						select {
+						case <-time.After(100 * time.Millisecond):
+						case <-writerTerminate:
+							return
+						}
+						err2 := source.WritePacketRTP(media0, &rtp.Packet{
+							Header: rtp.Header{
+								Version:        2,
+								Marker:         true,
+								PayloadType:    96,
+								SequenceNumber: uint16(123 + i),
+								Timestamp:      uint32(45343 + i*90000),
+								SSRC:           563423,
+							},
+							Payload: []byte{5},
+						})
+						require.NoError(t, err2)
+						i++
+					}
+				}()
+
+				switch ca {
+				case "rtsp":
+					var u *base.URL
+					u, err = base.ParseURL("rtsp://127.0.0.1:8554/test?query=value")
+					require.NoError(t, err)
+
+					reader := gortsplib.Client{
+						Scheme: u.Scheme,
+						Host:   u.Host,
+					}
+
+					err = reader.Start()
+					require.NoError(t, err)
+					defer reader.Close()
+
+					var desc *description.Session
+					desc, _, err = reader.Describe(u)
+					require.NoError(t, err)
+
+					err = reader.SetupAll(desc.BaseURL, desc.Medias)
+					require.NoError(t, err)
+
+					_, err = reader.Play(nil)
+					require.NoError(t, err)
+
+				case "rtsps":
+					var u *base.URL
+					u, err = base.ParseURL("rtsps://127.0.0.1:8322/test?query=value")
+					require.NoError(t, err)
+
+					reader := gortsplib.Client{
+						Scheme:    u.Scheme,
+						Host:      u.Host,
+						TLSConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+
+					err = reader.Start()
+					require.NoError(t, err)
+					defer reader.Close()
+
+					var desc *description.Session
+					desc, _, err = reader.Describe(u)
+					require.NoError(t, err)
+
+					err = reader.SetupAll(desc.BaseURL, desc.Medias)
+					require.NoError(t, err)
+
+					_, err = reader.Play(nil)
+					require.NoError(t, err)
+
+				case "rtmp":
+					var u *url.URL
+					u, err = url.Parse("rtmp://127.0.0.1:1935/test?query=value")
+					require.NoError(t, err)
+
+					conn := &gortmplib.Client{
+						URL:     u,
+						Publish: false,
+					}
+					err = conn.Initialize(context.Background())
+					require.NoError(t, err)
+					defer conn.Close()
+
+					r := &gortmplib.Reader{
+						Conn: conn,
+					}
+					err = r.Initialize()
+					require.NoError(t, err)
+
+				case "rtmps":
+					var u *url.URL
+					u, err = url.Parse("rtmps://127.0.0.1:1936/test?query=value")
+					require.NoError(t, err)
+
+					conn := &gortmplib.Client{
+						URL:       u,
+						Publish:   false,
+						TLSConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					err = conn.Initialize(context.Background())
+					require.NoError(t, err)
+					defer conn.Close()
+
+					go func() {
+						for i := range uint16(3) {
+							err2 := source.WritePacketRTP(media0, &rtp.Packet{
+								Header: rtp.Header{
+									Version:        2,
+									Marker:         true,
+									PayloadType:    96,
+									SequenceNumber: 123 + i,
+									Timestamp:      45343 + uint32(i)*2*90000,
+									SSRC:           563423,
+								},
+								Payload: []byte{5},
+							})
+							require.NoError(t, err2)
+						}
+					}()
+
+					r := &gortmplib.Reader{
+						Conn: conn,
+					}
+					err = r.Initialize()
+					require.NoError(t, err)
+
+				case "srt":
+					conf := srt.DefaultConfig()
+					var address string
+					address, err = conf.UnmarshalURL("srt://localhost:8890?streamid=read:test:query=value")
+					require.NoError(t, err)
+
+					err = conf.Validate()
+					require.NoError(t, err)
+
+					var reader srt.Conn
+					reader, err = srt.Dial("srt", address, conf)
+					require.NoError(t, err)
+					defer reader.Close()
+
+				case "webrtc":
+					tr := &http.Transport{}
+					defer tr.CloseIdleConnections()
+					hc := &http.Client{Transport: tr}
+
+					var u *url.URL
+					u, err = url.Parse("http://localhost:8889/test/whep?query=value")
+					require.NoError(t, err)
+
+					c := &whip.Client{
+						HTTPClient: hc,
+						URL:        u,
+						Log:        test.NilLogger,
+					}
+
+					err = c.Initialize(context.Background())
+					require.NoError(t, err)
+					defer checkClose(t, c.Close)
+				}
+
+				time.Sleep(500 * time.Millisecond)
+			}()
+
+			var readerType string
+
+			switch ca {
+			case "rtsp":
+				readerType = "rtspSession"
+			case "rtsps":
+				readerType = "rtspsSession"
+			case "rtmp":
+				readerType = "rtmpConn"
+			case "rtmps":
+				readerType = "rtmpsConn"
+			case "srt":
+				readerType = "srtConn"
+			case "webrtc":
+				readerType = "webRTCSession"
+			}
+
+			var byts []byte
+			byts, err := os.ReadFile(onRead)
+			require.NoError(t, err)
+			fields := strings.Split(string(byts[:len(byts)-1]), " ")
+			require.Equal(t, "test", fields[0])
+			require.Equal(t, "query%3Dvalue", fields[1])
+			require.Equal(t, readerType, fields[2])
+			require.NotEmpty(t, fields[3])
+			require.Equal(t, "8554", fields[4])
+			require.Equal(t, "st", fields[5])
+
+			byts, err = os.ReadFile(onUnread)
+			require.NoError(t, err)
+			fields = strings.Split(string(byts[:len(byts)-1]), " ")
+			require.Equal(t, "test", fields[0])
+			require.Equal(t, "query%3Dvalue", fields[1])
+			require.Equal(t, readerType, fields[2])
+			require.NotEmpty(t, fields[3])
+			require.Equal(t, "8554", fields[4])
+			require.Equal(t, "st", fields[5])
+		})
+	}
+}
+
+func TestPathRunOnRecordSegment(t *testing.T) {
+	onRecordSegmentCreate := filepath.Join(t.TempDir(), "on_record_segment_create")
+	onRecordSegmentComplete := filepath.Join(t.TempDir(), "on_record_segment_complete")
+
+	recordDir := t.TempDir()
+	var err error
+
+	func() {
+		p, ok := newInstance(t, fmt.Sprintf("record: yes\n"+
+			"recordPath: %s\n"+
+			"paths:\n"+
+			"  test:\n"+
+			"    runOnRecordSegmentCreate: sh -c 'echo \"$MTX_SEGMENT_PATH $RTSP_PORT\" > %s'\n"+
+			"    runOnRecordSegmentComplete: sh -c 'echo \"$MTX_SEGMENT_PATH $MTX_SEGMENT_DURATION $RTSP_PORT\" > %s'\n",
+			filepath.Join(recordDir, "%path/%Y-%m-%d_%H-%M-%S-%f"),
+			onRecordSegmentCreate,
+			onRecordSegmentComplete,
+		))
+		require.Equal(t, true, ok)
+		defer p.Close()
+
+		media0 := test.UniqueMediaH264()
+
+		source := gortsplib.Client{}
+
+		err = source.StartRecording(
+			"rtsp://localhost:8554/test",
+			&description.Session{Medias: []*description.Media{media0}})
+		require.NoError(t, err)
+		defer source.Close()
+
+		for i := range 4 {
+			err = source.WritePacketRTP(media0, &rtp.Packet{
+				Header: rtp.Header{
+					Version:        2,
+					Marker:         true,
+					PayloadType:    96,
+					SequenceNumber: 1123 + uint16(i),
+					Timestamp:      45343 + 90000*uint32(i),
+					SSRC:           563423,
+				},
+				Payload: []byte{5},
+			})
+			require.NoError(t, err)
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}()
+
+	byts, err := os.ReadFile(onRecordSegmentCreate)
+	require.NoError(t, err)
+	fields := strings.Split(string(byts[:len(byts)-1]), " ")
+	require.True(t, strings.HasPrefix(fields[0], recordDir))
+	require.Equal(t, "8554", fields[1])
+
+	byts, err = os.ReadFile(onRecordSegmentComplete)
+	require.NoError(t, err)
+	fields = strings.Split(string(byts[:len(byts)-1]), " ")
+	require.True(t, strings.HasPrefix(fields[0], recordDir))
+	require.Equal(t, "3", fields[1])
+	require.Equal(t, "8554", fields[2])
+}
+
+func TestPathMaxReaders(t *testing.T) {
+	p, ok := newInstance(t, "paths:\n"+
+		"  all_others:\n"+
+		"    maxReaders: 1\n")
+	require.Equal(t, true, ok)
+	defer p.Close()
+
+	source := gortsplib.Client{}
+
+	err := source.StartRecording(
+		"rtsp://localhost:8554/mystream",
+		&description.Session{Medias: []*description.Media{
+			test.UniqueMediaH264(),
+			test.UniqueMediaMPEG4Audio(),
+		}})
+	require.NoError(t, err)
+	defer source.Close()
+
+	for i := range 2 {
+		var u *base.URL
+		u, err = base.ParseURL("rtsp://127.0.0.1:8554/mystream")
+		require.NoError(t, err)
+
+		reader := gortsplib.Client{
+			Scheme: u.Scheme,
+			Host:   u.Host,
+		}
+
+		err = reader.Start()
+		require.NoError(t, err)
+		defer reader.Close()
+
+		var desc *description.Session
+		desc, _, err = reader.Describe(u)
+		require.NoError(t, err)
+
+		err = reader.SetupAll(desc.BaseURL, desc.Medias)
+		if i != 1 {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+		}
+	}
+}
+
+func TestPathRecord(t *testing.T) {
+	dir := t.TempDir()
+
+	p, ok := newInstance(t, "api: yes\n"+
+		"record: yes\n"+
+		"recordPath: "+filepath.Join(dir, "%path/%Y-%m-%d_%H-%M-%S-%f")+"\n"+
+		"paths:\n"+
+		"  all_others:\n"+
+		"    record: yes\n")
+	require.Equal(t, true, ok)
+	defer p.Close()
+
+	media0 := test.UniqueMediaH264()
+
+	source := gortsplib.Client{}
+
+	err := source.StartRecording(
+		"rtsp://localhost:8554/mystream",
+		&description.Session{Medias: []*description.Media{media0}})
+	require.NoError(t, err)
+	defer source.Close()
+
+	for i := range 4 {
+		err = source.WritePacketRTP(media0, &rtp.Packet{
+			Header: rtp.Header{
+				Version:        2,
+				Marker:         true,
+				PayloadType:    96,
+				SequenceNumber: 1123 + uint16(i),
+				Timestamp:      45343 + 90000*uint32(i),
+				SSRC:           563423,
+			},
+			Payload: []byte{5},
+		})
+		require.NoError(t, err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	files, err := os.ReadDir(filepath.Join(dir, "mystream"))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(files))
+
+	tr := &http.Transport{}
+	defer tr.CloseIdleConnections()
+	hc := &http.Client{Transport: tr}
+
+	httpRequest(t, hc, http.MethodPatch, "http://localhost:9997/v3/config/paths/patch/all_others", map[string]any{
+		"record": false,
+	}, nil)
+
+	time.Sleep(500 * time.Millisecond)
+
+	httpRequest(t, hc, http.MethodPatch, "http://localhost:9997/v3/config/paths/patch/all_others", map[string]any{
+		"record": true,
+	}, nil)
+
+	time.Sleep(500 * time.Millisecond)
+
+	for i := 4; i < 8; i++ {
+		err = source.WritePacketRTP(media0, &rtp.Packet{
+			Header: rtp.Header{
+				Version:        2,
+				Marker:         true,
+				PayloadType:    96,
+				SequenceNumber: 1123 + uint16(i),
+				Timestamp:      45343 + 90000*uint32(i),
+				SSRC:           563423,
+			},
+			Payload: []byte{5},
+		})
+		require.NoError(t, err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	files, err = os.ReadDir(filepath.Join(dir, "mystream"))
+	require.NoError(t, err)
+	require.Equal(t, 2, len(files))
+}
+
+func TestPathFallback(t *testing.T) {
+	for _, ca := range []string{
+		"absolute",
+		"relative",
+		"source",
+	} {
+		t.Run(ca, func(t *testing.T) {
+			var cnf string
+
+			switch ca {
+			case "absolute":
+				cnf = "paths:\n" +
+					"  path1:\n" +
+					"    fallback: rtsp://localhost:8554/path2\n" +
+					"  path2:\n"
+
+			case "relative":
+				cnf = "paths:\n" +
+					"  path1:\n" +
+					"    fallback: /path2\n" +
+					"  path2:\n"
+
+			case "source":
+				cnf = "paths:\n" +
+					"  path1:\n" +
+					"    fallback: /path2\n" +
+					"    source: rtsp://localhost:3333/nonexistent\n" +
+					"  path2:\n"
+			}
+
+			p1, ok := newInstance(t, cnf)
+			require.Equal(t, true, ok)
+			defer p1.Close()
+
+			source := gortsplib.Client{}
+			err := source.StartRecording("rtsp://localhost:8554/path2",
+				&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+			require.NoError(t, err)
+			defer source.Close()
+
+			u, err := base.ParseURL("rtsp://localhost:8554/path1")
+			require.NoError(t, err)
+
+			dest := gortsplib.Client{
+				Scheme: u.Scheme,
+				Host:   u.Host,
+			}
+
+			err = dest.Start()
+			require.NoError(t, err)
+			defer dest.Close()
+
+			desc, _, err := dest.Describe(u)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(desc.Medias))
+		})
+	}
+}
+
+func TestPathResolveSource(t *testing.T) {
+	var strm *gortsplib.ServerStream
+
+	s := gortsplib.Server{
+		Handler: &testServer{
+			onDescribe: func(ctx *gortsplib.ServerHandlerOnDescribeCtx,
+			) (*base.Response, *gortsplib.ServerStream, error) {
+				require.Equal(t, "key=val", ctx.Query)
+				require.Equal(t, "/a", ctx.Path)
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onSetup: func(_ *gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onPlay: func(_ *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, nil
+			},
+		},
+		RTSPAddress: "127.0.0.1:8555",
+	}
+
+	err := s.Start()
+	require.NoError(t, err)
+	defer s.Close()
+
+	strm = &gortsplib.ServerStream{
+		Server: &s,
+		Desc:   &description.Session{Medias: []*description.Media{test.MediaH264}},
+	}
+	err = strm.Initialize()
+	require.NoError(t, err)
+	defer strm.Close()
+
+	p, ok := newInstance(t,
+		"paths:\n"+
+			"  '~^test_(.+)$':\n"+
+			"    source: rtsp://127.0.0.1:8555/$G1?$MTX_QUERY\n"+
+			"    sourceOnDemand: yes\n"+
+			"  'all_others':\n")
+	require.Equal(t, true, ok)
+	defer p.Close()
+
+	u, err := base.ParseURL("rtsp://127.0.0.1:8554/test_a?key=val")
+	require.NoError(t, err)
+
+	reader := gortsplib.Client{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+	}
+
+	err = reader.Start()
+	require.NoError(t, err)
+	defer reader.Close()
+
+	_, _, err = reader.Describe(u)
+	require.NoError(t, err)
+}
+
+func TestPathOverridePublisher(t *testing.T) {
+	for _, ca := range []string{
+		"enabled",
+		"disabled",
+	} {
+		t.Run(ca, func(t *testing.T) {
+			cnf := "rtmp: no\n" +
+				"paths:\n" +
+				"  all_others:\n"
+
+			if ca == "disabled" {
+				cnf += "    overridePublisher: no\n"
+			}
+
+			p, ok := newInstance(t, cnf)
+			require.Equal(t, true, ok)
+			defer p.Close()
+
+			medi := test.UniqueMediaH264()
+
+			s1 := gortsplib.Client{}
+
+			err := s1.StartRecording("rtsp://localhost:8554/teststream",
+				&description.Session{Medias: []*description.Media{medi}})
+			require.NoError(t, err)
+			defer s1.Close()
+
+			s2 := gortsplib.Client{}
+
+			err = s2.StartRecording("rtsp://localhost:8554/teststream",
+				&description.Session{Medias: []*description.Media{medi}})
+			if ca == "enabled" {
+				require.NoError(t, err)
+				defer s2.Close()
+			} else {
+				require.Error(t, err)
+			}
+
+			frameRecv := make(chan struct{})
+
+			u, err := base.ParseURL("rtsp://localhost:8554/teststream")
+			require.NoError(t, err)
+
+			c := gortsplib.Client{
+				Scheme: u.Scheme,
+				Host:   u.Host,
+			}
+
+			err = c.Start()
+			require.NoError(t, err)
+			defer c.Close()
+
+			desc, _, err := c.Describe(u)
+			require.NoError(t, err)
+
+			err = c.SetupAll(desc.BaseURL, desc.Medias)
+			require.NoError(t, err)
+
+			c.OnPacketRTP(desc.Medias[0], desc.Medias[0].Formats[0], func(pkt *rtp.Packet) {
+				if ca == "enabled" {
+					require.Equal(t, []byte{5, 15, 16, 17, 18}, pkt.Payload)
+				} else {
+					require.Equal(t, []byte{5, 11, 12, 13, 14}, pkt.Payload)
+				}
+				close(frameRecv)
+			})
+
+			_, err = c.Play(nil)
+			require.NoError(t, err)
+
+			if ca == "enabled" {
+				err = s1.Wait()
+				require.EqualError(t, err, "EOF")
+
+				err = s2.WritePacketRTP(medi, &rtp.Packet{
+					Header: rtp.Header{
+						Version:        0x02,
+						PayloadType:    96,
+						SequenceNumber: 57899,
+						Timestamp:      345234345,
+						SSRC:           978651231,
+						Marker:         true,
+					},
+					Payload: []byte{5, 15, 16, 17, 18},
+				})
+				require.NoError(t, err)
+			} else {
+				err = s1.WritePacketRTP(medi, &rtp.Packet{
+					Header: rtp.Header{
+						Version:        0x02,
+						PayloadType:    96,
+						SequenceNumber: 57899,
+						Timestamp:      345234345,
+						SSRC:           978651231,
+						Marker:         true,
+					},
+					Payload: []byte{5, 11, 12, 13, 14},
+				})
+				require.NoError(t, err)
+			}
+
+			<-frameRecv
+		})
+	}
+}

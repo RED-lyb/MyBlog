@@ -1,0 +1,149 @@
+package core
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bluenviron/mediamtx/internal/test"
+)
+
+func newInstance(t *testing.T, conf string) (*Core, bool) {
+	if conf == "" {
+		return New([]string{})
+	}
+
+	tmpf := test.CreateTempFile(t, []byte(conf))
+
+	return New([]string{tmpf})
+}
+
+func TestCoreErrors(t *testing.T) {
+	for _, ca := range []struct {
+		name string
+		conf string
+	}{
+		{
+			"logger",
+			"logDestinations: [file]\n" +
+				"logFile: /nonexisting/nonexist\n" +
+				"sysLogPrefix: /mediamtx\n",
+		},
+		{
+			"metrics",
+			"metrics: yes\n" +
+				"metricsAddress: invalid\n",
+		},
+		{
+			"pprof",
+			"pprof: yes\n" +
+				"pprofAddress: invalid\n",
+		},
+		{
+			"playback",
+			"playback: yes\n" +
+				"playbackAddress: invalid\n",
+		},
+		{
+			"rtsp",
+			"rtspAddress: invalid\n",
+		},
+		{
+			"rtsps",
+			"rtspEncryption: strict\n" +
+				"rtspAddress: invalid\n",
+		},
+		{
+			"rtmp",
+			"rtmpAddress: invalid\n",
+		},
+		{
+			"rtmps",
+			"rtmpEncryption: strict\n" +
+				"rtmpAddress: invalid\n",
+		},
+		{
+			"hls",
+			"hlsAddress: invalid\n",
+		},
+		{
+			"webrtc",
+			"webrtcAddress: invalid\n",
+		},
+		{
+			"srt",
+			"srtAddress: invalid\n",
+		},
+		{
+			"api",
+			"api: yes\n" +
+				"apiAddress: invalid\n",
+		},
+	} {
+		t.Run(ca.name, func(t *testing.T) {
+			_, ok := newInstance(t, ca.conf)
+			require.Equal(t, false, ok)
+		})
+	}
+}
+
+func TestCoreHotReloading(t *testing.T) {
+	confPath := filepath.Join(t.TempDir(), "rtsp-conf")
+
+	err := os.WriteFile(confPath, []byte("paths:\n"+
+		"  test1:\n"+
+		"    publishUser: myuser\n"+
+		"    publishPass: mypass\n"),
+		0o644)
+	require.NoError(t, err)
+
+	p, ok := New([]string{confPath})
+	require.Equal(t, true, ok)
+	defer p.Close()
+
+	func() {
+		c := gortsplib.Client{}
+		err = c.StartRecording("rtsp://localhost:8554/test1",
+			&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+		require.EqualError(t, err, "bad status code: 401 (Unauthorized)")
+	}()
+
+	err = os.WriteFile(confPath, []byte("paths:\n"+
+		"  test1:\n"),
+		0o644)
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	func() {
+		conn := gortsplib.Client{}
+		err = conn.StartRecording("rtsp://localhost:8554/test1",
+			&description.Session{Medias: []*description.Media{test.UniqueMediaH264()}})
+		require.NoError(t, err)
+		defer conn.Close()
+	}()
+}
+
+func TestCoreHotReloadingAndLoggerError(t *testing.T) {
+	confPath := filepath.Join(t.TempDir(), "rtsp-conf")
+
+	err := os.WriteFile(confPath, []byte(""),
+		0o644)
+	require.NoError(t, err)
+
+	p, ok := New([]string{confPath})
+	require.Equal(t, true, ok)
+	defer p.Close()
+
+	err = os.WriteFile(confPath, []byte("logDestinations: [file]\n"+
+		"logFile: /nonexisting/nonexist\n"),
+		0o644)
+	require.NoError(t, err)
+
+	p.Wait()
+}

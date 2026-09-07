@@ -1,0 +1,17 @@
+# Related projects
+
+- [gortsplib (RTSP library used internally)](https://github.com/bluenviron/gortsplib)
+- [gohlslib (HLS library used internally)](https://github.com/bluenviron/gohlslib)
+- [gortmplib (RTMP library used internally)](https://github.com/bluenviron/gortmplib)
+- [mediacommon (codecs and formats library used internally)](https://github.com/bluenviron/mediacommon)
+- [mediamtx-rpicamera (Raspberry Pi Camera component)](https://github.com/bluenviron/mediamtx-rpicamera)
+- [datarhei/gosrt (SRT library used internally)](https://github.com/datarhei/gosrt)
+- [pion/webrtc (WebRTC library used internally)](https://github.com/pion/webrtc)
+- [pion/sdp (SDP library used internally)](https://github.com/pion/sdp)
+- [pion/rtp (RTP library used internally)](https://github.com/pion/rtp)
+- [pion/rtcp (RTCP library used internally)](https://github.com/pion/rtcp)
+- [quic-go/quic-go (QUIC library used internally)](https://github.com/quic-go/quic-go)
+- [quic-go/webtransport-go (WebTransport library used internally)](https://github.com/quic-go/webtransport-go)
+- [go-astits (MPEG-TS library used internally)](https://github.com/asticode/go-astits)
+- [go-mp4 (MP4 library used internally)](https://github.com/abema/go-mp4)
+- [hls.js (browser-side HLS library used internally)](https://github.com/video-dev/hls.js)

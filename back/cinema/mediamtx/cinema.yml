@@ -1,0 +1,23 @@
+# 同频影院专用 MediaMTX 配置（由 Django 启动 mediamtx 时加载）
+logLevel: info
+logDestinations: [stdout]
+
+api: yes
+apiAddress: 127.0.0.1:9997
+
+rtsp: yes
+rtspAddress: 127.0.0.1:8554
+
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigins: ['*']
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigins: ['*']
+# 公网部署时补充服务器公网 IP 或域名，例如：
+# webrtcAdditionalHosts: [1.2.3.4, example.com]
+
+paths:
+  cinema:
+    source: publisher

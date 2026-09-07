@@ -1,0 +1,27 @@
+package rtsp
+
+import (
+	"testing"
+
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bluenviron/mediamtx/internal/auth"
+)
+
+func TestCredentials(t *testing.T) {
+	rr := &base.Request{
+		Header: base.Header{
+			"Authorization": []string{
+				"Basic bXl1c2VyOm15cGFzcw==",
+			},
+		},
+	}
+
+	c := Credentials(rr)
+
+	require.Equal(t, &auth.Credentials{
+		User: "myuser",
+		Pass: "mypass",
+	}, c)
+}

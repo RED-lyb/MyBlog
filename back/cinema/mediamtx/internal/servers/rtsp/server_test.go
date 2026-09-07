@@ -1,0 +1,713 @@
+package rtsp
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
+	"testing"
+	"time"
+
+	"github.com/bluenviron/gortsplib/v5"
+	rtspauth "github.com/bluenviron/gortsplib/v5/pkg/auth"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
+	"github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts"
+	tscodecs "github.com/bluenviron/mediacommon/v2/pkg/formats/mpegts/codecs"
+	"github.com/pion/rtp"
+	"github.com/pires/go-proxyproto"
+	"github.com/stretchr/testify/require"
+
+	"github.com/bluenviron/mediamtx/internal/auth"
+	"github.com/bluenviron/mediamtx/internal/conf"
+	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/bluenviron/mediamtx/internal/externalcmd"
+	"github.com/bluenviron/mediamtx/internal/stream"
+	"github.com/bluenviron/mediamtx/internal/test"
+	"github.com/bluenviron/mediamtx/internal/unit"
+)
+
+type dummyPath struct{}
+
+func (p *dummyPath) Name() string {
+	return "teststream"
+}
+
+func (p *dummyPath) SafeConf() *conf.Path {
+	return &conf.Path{}
+}
+
+func (p *dummyPath) ExternalCmdEnv() externalcmd.Environment {
+	return externalcmd.Environment{}
+}
+
+func (p *dummyPath) RemovePublisher(_ defs.PathRemovePublisherReq) {
+}
+
+func (p *dummyPath) RemoveReader(_ defs.PathRemoveReaderReq) {
+}
+
+func TestServerPublish(t *testing.T) {
+	for _, ca := range []string{"basic", "digest", "basic+digest"} {
+		for _, encrypt := range []string{"plain", "tls"} {
+			for _, proxy := range []string{"no_proxy", "proxy"} {
+				t.Run(ca+"_"+encrypt+"_"+proxy, func(t *testing.T) {
+					var serverCertFpath string
+					var serverKeyFpath string
+
+					if encrypt == "tls" {
+						serverCertFpath = test.CreateTempFile(t, test.TLSCertPub)
+						serverKeyFpath = test.CreateTempFile(t, test.TLSCertKey)
+					}
+
+					_, ipnet, err := net.ParseCIDR("127.0.0.1/32")
+					require.NoError(t, err)
+					trustedProxies := conf.IPNetworks{conf.IPNetwork(*ipnet)}
+
+					var strm *stream.Stream
+					var reader *stream.Reader
+					defer func() {
+						strm.RemoveReader(reader)
+					}()
+					dataReceived := make(chan struct{})
+
+					n := 0
+
+					pathManager := &test.PathManager{
+						FindPathConfImpl: func(req defs.PathFindPathConfReq) (*defs.PathFindPathConfRes, error) {
+							require.Equal(t, "teststream", req.AccessRequest.Name)
+							require.Equal(t, "param=value", req.AccessRequest.Query)
+
+							if ca == "basic" {
+								require.Nil(t, req.AccessRequest.CustomVerifyFunc)
+
+								if req.AccessRequest.Credentials.User == "" && req.AccessRequest.Credentials.Pass == "" {
+									return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+								}
+
+								require.Equal(t, "myuser", req.AccessRequest.Credentials.User)
+								require.Equal(t, "mypass", req.AccessRequest.Credentials.Pass)
+							} else {
+								ok := req.AccessRequest.CustomVerifyFunc("myuser", "mypass")
+								if n == 0 {
+									require.False(t, ok)
+									n++
+									return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+								}
+								require.True(t, ok)
+							}
+
+							return &defs.PathFindPathConfRes{Conf: &conf.Path{}, User: req.AccessRequest.Credentials.User}, nil
+						},
+						AddPublisherImpl: func(req defs.PathAddPublisherReq) (*defs.PathAddPublisherRes, error) {
+							require.Equal(t, "teststream", req.AccessRequest.Name)
+							require.Equal(t, "param=value", req.AccessRequest.Query)
+							require.True(t, req.AccessRequest.SkipAuth)
+
+							strm = &stream.Stream{
+								OrigDesc:          req.Desc,
+								WriteQueueSize:    512,
+								RTPMaxPayloadSize: 1450,
+								Parent:            test.NilLogger,
+							}
+							err2 := strm.Initialize()
+							require.NoError(t, err2)
+
+							subStream := &stream.SubStream{
+								Stream:        strm,
+								UseRTPPackets: true,
+							}
+							err2 = subStream.Initialize()
+							require.NoError(t, err2)
+
+							reader = &stream.Reader{Parent: test.NilLogger}
+
+							reader.OnData(
+								strm.OrigDesc.Medias[0],
+								strm.OrigDesc.Medias[0].Formats[0],
+								func(u *unit.Unit) error {
+									require.Equal(t, unit.PayloadH264{
+										test.FormatH264.SPS,
+										test.FormatH264.PPS,
+										{5, 2, 3, 4},
+									}, u.Payload)
+									close(dataReceived)
+									return nil
+								})
+
+							strm.AddReader(reader)
+
+							return &defs.PathAddPublisherRes{Path: &dummyPath{}, SubStream: subStream}, nil
+						},
+					}
+
+					var authMethods []rtspauth.VerifyMethod
+					switch ca {
+					case "basic":
+						authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodBasic}
+					case "digest":
+						authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodDigestMD5}
+					default:
+						authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodBasic, rtspauth.VerifyMethodDigestMD5}
+					}
+
+					s := &Server{
+						Address:        "127.0.0.1:8557",
+						AuthMethods:    authMethods,
+						ReadTimeout:    conf.Duration(10 * time.Second),
+						WriteTimeout:   conf.Duration(10 * time.Second),
+						WriteQueueSize: 512,
+						Transports:     conf.RTSPTransports{gortsplib.ProtocolTCP: {}},
+						Encryption:     encrypt == "tls",
+						ServerCert:     serverCertFpath,
+						ServerKey:      serverKeyFpath,
+						TrustedProxies: trustedProxies,
+						PathManager:    pathManager,
+						Parent:         test.NilLogger,
+					}
+					err = s.Initialize()
+					require.NoError(t, err)
+					defer s.Close()
+
+					var scheme string
+					if encrypt == "tls" {
+						scheme = "rtsps"
+					} else {
+						scheme = "rtsp"
+					}
+
+					var dialContext func(ctx context.Context, network, address string) (net.Conn, error)
+					if proxy == "proxy" {
+						dialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+							c, err2 := (&net.Dialer{}).DialContext(ctx, network, address)
+							if err2 != nil {
+								return nil, err2
+							}
+							header := &proxyproto.Header{
+								Version:           1,
+								Command:           proxyproto.PROXY,
+								TransportProtocol: proxyproto.TCPv4,
+								SourceAddr:        &net.TCPAddr{IP: net.ParseIP("192.168.1.100"), Port: 1234},
+								DestinationAddr:   &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8557},
+							}
+							_, err2 = header.WriteTo(c)
+							if err2 != nil {
+								return nil, err2
+							}
+							return c, nil
+						}
+					}
+
+					source := gortsplib.Client{
+						TLSConfig:   &tls.Config{InsecureSkipVerify: true},
+						DialContext: dialContext,
+					}
+
+					media0 := test.UniqueMediaH264()
+
+					err = source.StartRecording(
+						scheme+"://myuser:mypass@127.0.0.1:8557/teststream?param=value",
+						&description.Session{Medias: []*description.Media{media0}})
+					require.NoError(t, err)
+					defer source.Close()
+
+					err = source.WritePacketRTP(media0, &rtp.Packet{
+						Header: rtp.Header{
+							Version:        2,
+							Marker:         true,
+							PayloadType:    96,
+							SequenceNumber: 123,
+							Timestamp:      45343,
+							SSRC:           563423,
+						},
+						Payload: []byte{5, 2, 3, 4},
+					})
+					require.NoError(t, err)
+
+					<-dataReceived
+
+					list, err := s.APISessionsList()
+					require.NoError(t, err)
+					require.Equal(t, &defs.APIRTSPSessionList{
+						Items: []defs.APIRTSPSession{
+							{
+								ID:                 list.Items[0].ID,
+								Created:            list.Items[0].Created,
+								RemoteAddr:         list.Items[0].RemoteAddr,
+								State:              "publish",
+								Path:               "teststream",
+								Query:              "param=value",
+								User:               "myuser",
+								UserAgent:          list.Items[0].UserAgent,
+								InboundBytes:       list.Items[0].InboundBytes,
+								InboundRTPPackets:  list.Items[0].InboundRTPPackets,
+								OutboundBytes:      list.Items[0].OutboundBytes,
+								BytesReceived:      list.Items[0].BytesReceived,
+								BytesSent:          list.Items[0].BytesSent,
+								Conns:              list.Items[0].Conns,
+								RTPPacketsReceived: list.Items[0].RTPPacketsReceived,
+								Transport:          new("TCP"),
+								Profile: func() *string {
+									if encrypt == "tls" {
+										return new("SAVP")
+									}
+									return new("AVP")
+								}(),
+							},
+						},
+					}, list)
+				})
+			}
+		}
+	}
+}
+
+func TestServerPublishMPEGTS(t *testing.T) {
+	var strm *stream.Stream
+	var reader *stream.Reader
+	defer func() {
+		if strm != nil && reader != nil {
+			strm.RemoveReader(reader)
+		}
+	}()
+
+	dataReceived := make(chan struct{})
+
+	pathConf := &conf.Path{RTSPDemuxMpegts: true}
+
+	pathManager := &test.PathManager{
+		FindPathConfImpl: func(req defs.PathFindPathConfReq) (*defs.PathFindPathConfRes, error) {
+			require.Equal(t, "teststream", req.AccessRequest.Name)
+			require.Equal(t, "param=value", req.AccessRequest.Query)
+			return &defs.PathFindPathConfRes{Conf: pathConf}, nil
+		},
+		AddPublisherImpl: func(req defs.PathAddPublisherReq) (*defs.PathAddPublisherRes, error) {
+			require.Equal(t, "teststream", req.AccessRequest.Name)
+			require.Equal(t, "param=value", req.AccessRequest.Query)
+			require.True(t, req.AccessRequest.SkipAuth)
+			require.False(t, req.UseRTPPackets)
+			require.True(t, req.ReplaceNTP)
+			require.Same(t, pathConf, req.ConfToCompare)
+			require.Equal(t, &description.Session{Medias: []*description.Media{{
+				Type: description.MediaTypeVideo,
+				Formats: []format.Format{&format.H264{
+					PayloadTyp:        96,
+					PacketizationMode: 1,
+				}},
+			}}}, req.Desc)
+
+			strm = &stream.Stream{
+				OrigDesc:          req.Desc,
+				WriteQueueSize:    512,
+				RTPMaxPayloadSize: 1450,
+				Parent:            test.NilLogger,
+			}
+			err := strm.Initialize()
+			require.NoError(t, err)
+
+			subStream := &stream.SubStream{
+				Stream:        strm,
+				UseRTPPackets: false,
+			}
+			err = subStream.Initialize()
+			require.NoError(t, err)
+
+			reader = &stream.Reader{Parent: test.NilLogger}
+			n := 0
+
+			reader.OnData(
+				strm.OrigDesc.Medias[0],
+				strm.OrigDesc.Medias[0].Formats[0],
+				func(u *unit.Unit) error {
+					if n == 0 {
+						require.Equal(t, unit.PayloadH264{
+							test.FormatH264.SPS,
+							test.FormatH264.PPS,
+							{5, 1},
+						}, u.Payload)
+						close(dataReceived)
+					}
+					n++
+					return nil
+				})
+
+			strm.AddReader(reader)
+
+			return &defs.PathAddPublisherRes{Path: &dummyPath{}, SubStream: subStream}, nil
+		},
+	}
+
+	s := &Server{
+		Address:        "127.0.0.1:8557",
+		ReadTimeout:    conf.Duration(10 * time.Second),
+		WriteTimeout:   conf.Duration(10 * time.Second),
+		WriteQueueSize: 512,
+		Transports:     conf.RTSPTransports{gortsplib.ProtocolTCP: {}},
+		PathManager:    pathManager,
+		Parent:         test.NilLogger,
+	}
+	err := s.Initialize()
+	require.NoError(t, err)
+	defer s.Close()
+
+	source := gortsplib.Client{}
+
+	media0 := &description.Media{
+		Type:    description.MediaTypeApplication,
+		Formats: []format.Format{&format.MPEGTS{}},
+	}
+
+	err = source.StartRecording(
+		"rtsp://127.0.0.1:8557/teststream?param=value",
+		&description.Session{Medias: []*description.Media{media0}})
+	require.NoError(t, err)
+	defer source.Close()
+
+	track := &mpegts.Track{Codec: &tscodecs.H264{}}
+
+	var buf bytes.Buffer
+	bw := bufio.NewWriter(&buf)
+	w := &mpegts.Writer{W: bw, Tracks: []*mpegts.Track{track}}
+	err = w.Initialize()
+	require.NoError(t, err)
+
+	// the MPEG-TS muxer needs two PES packets in order to write the first one
+	err = w.WriteH264(track, 0, 0, [][]byte{
+		test.FormatH264.SPS,
+		test.FormatH264.PPS,
+		{5, 1},
+	})
+	require.NoError(t, err)
+
+	err = w.WriteH264(track, 0, 0, [][]byte{{5, 2}})
+	require.NoError(t, err)
+
+	err = bw.Flush()
+	require.NoError(t, err)
+
+	raw := buf.Bytes()
+	require.NotEmpty(t, raw)
+	require.Zero(t, len(raw)%188)
+
+	tsPackets := make([][]byte, 0, len(raw)/188)
+	for len(raw) > 0 {
+		tsPackets = append(tsPackets, raw[:188:188])
+		raw = raw[188:]
+	}
+
+	encoder, err := media0.Formats[0].(*format.MPEGTS).CreateEncoder()
+	require.NoError(t, err)
+
+	rtpPackets, err := encoder.Encode(tsPackets)
+	require.NoError(t, err)
+
+	for _, pkt := range rtpPackets {
+		err = source.WritePacketRTP(media0, pkt)
+		require.NoError(t, err)
+	}
+
+	<-dataReceived
+}
+
+func TestServerRead(t *testing.T) {
+	for _, ca := range []string{"basic", "digest", "basic+digest"} {
+		t.Run(ca, func(t *testing.T) {
+			desc := &description.Session{Medias: []*description.Media{test.MediaH264}}
+
+			strm := &stream.Stream{
+				OrigDesc:          desc,
+				WriteQueueSize:    512,
+				RTPMaxPayloadSize: 1450,
+				Parent:            test.NilLogger,
+			}
+			err := strm.Initialize()
+			require.NoError(t, err)
+
+			subStream := &stream.SubStream{
+				Stream:        strm,
+				UseRTPPackets: false,
+			}
+			err = subStream.Initialize()
+			require.NoError(t, err)
+
+			n := 0
+
+			pathManager := &test.PathManager{
+				DescribeImpl: func(req defs.PathDescribeReq) (*defs.PathDescribeRes, error) {
+					require.Equal(t, "teststream", req.AccessRequest.Name)
+					require.Equal(t, "param=value", req.AccessRequest.Query)
+
+					if ca == "basic" {
+						require.Nil(t, req.AccessRequest.CustomVerifyFunc)
+
+						if req.AccessRequest.Credentials.User == "" && req.AccessRequest.Credentials.Pass == "" {
+							return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+						}
+
+						require.Equal(t, "myuser", req.AccessRequest.Credentials.User)
+						require.Equal(t, "mypass", req.AccessRequest.Credentials.Pass)
+					} else {
+						ok := req.AccessRequest.CustomVerifyFunc("myuser", "mypass")
+						if n == 0 {
+							require.False(t, ok)
+							n++
+							return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+						}
+						require.True(t, ok)
+					}
+
+					return &defs.PathDescribeRes{
+						Path:   &dummyPath{},
+						Stream: strm,
+					}, nil
+				},
+				AddReaderImpl: func(req defs.PathAddReaderReq) (*defs.PathAddReaderRes, error) {
+					require.Equal(t, "teststream", req.AccessRequest.Name)
+					require.Equal(t, "param=value", req.AccessRequest.Query)
+
+					if ca == "basic" {
+						require.Nil(t, req.AccessRequest.CustomVerifyFunc)
+						require.Equal(t, "myuser", req.AccessRequest.Credentials.User)
+						require.Equal(t, "mypass", req.AccessRequest.Credentials.Pass)
+					} else {
+						ok := req.AccessRequest.CustomVerifyFunc("myuser", "mypass")
+						require.True(t, ok)
+					}
+
+					return &defs.PathAddReaderRes{Path: &dummyPath{}, User: req.AccessRequest.Credentials.User, Stream: strm}, nil
+				},
+			}
+
+			var authMethods []rtspauth.VerifyMethod
+			switch ca {
+			case "basic":
+				authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodBasic}
+			case "digest":
+				authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodDigestMD5}
+			default:
+				authMethods = []rtspauth.VerifyMethod{rtspauth.VerifyMethodBasic, rtspauth.VerifyMethodDigestMD5}
+			}
+
+			s := &Server{
+				Address:        "127.0.0.1:8557",
+				AuthMethods:    authMethods,
+				ReadTimeout:    conf.Duration(10 * time.Second),
+				WriteTimeout:   conf.Duration(10 * time.Second),
+				WriteQueueSize: 512,
+				Transports:     conf.RTSPTransports{gortsplib.ProtocolTCP: {}},
+				PathManager:    pathManager,
+				Parent:         test.NilLogger,
+			}
+			err = s.Initialize()
+			require.NoError(t, err)
+			defer s.Close()
+
+			u, err := base.ParseURL("rtsp://myuser:mypass@127.0.0.1:8557/teststream?param=value")
+			require.NoError(t, err)
+
+			reader := gortsplib.Client{
+				Scheme: u.Scheme,
+				Host:   u.Host,
+			}
+
+			err = reader.Start()
+			require.NoError(t, err)
+			defer reader.Close()
+
+			desc2, _, err := reader.Describe(u)
+			require.NoError(t, err)
+
+			err = reader.SetupAll(desc2.BaseURL, desc2.Medias)
+			require.NoError(t, err)
+
+			recv := make(chan struct{})
+
+			reader.OnPacketRTPAny(func(_ *description.Media, _ format.Format, p *rtp.Packet) {
+				require.Equal(t, &rtp.Packet{
+					Header: rtp.Header{
+						Version:        2,
+						Marker:         true,
+						PayloadType:    96,
+						SequenceNumber: p.SequenceNumber,
+						Timestamp:      p.Timestamp,
+						SSRC:           p.SSRC,
+					},
+					Payload: []byte{
+						0x18, 0x00, 0x19, 0x67, 0x42, 0xc0, 0x28, 0xd9,
+						0x00, 0x78, 0x02, 0x27, 0xe5, 0x84, 0x00, 0x00,
+						0x03, 0x00, 0x04, 0x00, 0x00, 0x03, 0x00, 0xf0,
+						0x3c, 0x60, 0xc9, 0x20, 0x00, 0x04, 0x08, 0x06,
+						0x07, 0x08, 0x00, 0x04, 0x05, 0x02, 0x03, 0x04,
+					},
+				}, p)
+				close(recv)
+			})
+
+			_, err = reader.Play(nil)
+			require.NoError(t, err)
+
+			subStream.WriteUnit(desc.Medias[0], desc.Medias[0].Formats[0], &unit.Unit{
+				NTP: time.Time{},
+				Payload: unit.PayloadH264{
+					{5, 2, 3, 4}, // IDR
+				},
+			})
+
+			<-recv
+
+			list, err := s.APISessionsList()
+			require.NoError(t, err)
+			require.Equal(t, &defs.APIRTSPSessionList{
+				Items: []defs.APIRTSPSession{
+					{
+						ID:                 list.Items[0].ID,
+						Created:            list.Items[0].Created,
+						RemoteAddr:         list.Items[0].RemoteAddr,
+						State:              "read",
+						Path:               "teststream",
+						Query:              "param=value",
+						User:               "myuser",
+						UserAgent:          list.Items[0].UserAgent,
+						InboundBytes:       list.Items[0].InboundBytes,
+						InboundRTPPackets:  list.Items[0].InboundRTPPackets,
+						OutboundBytes:      list.Items[0].OutboundBytes,
+						OutboundRTPPackets: list.Items[0].OutboundRTPPackets,
+						BytesReceived:      list.Items[0].BytesReceived,
+						BytesSent:          list.Items[0].BytesSent,
+						Conns:              list.Items[0].Conns,
+						RTPPacketsReceived: list.Items[0].RTPPacketsReceived,
+						RTPPacketsSent:     list.Items[0].RTPPacketsSent,
+						Transport:          new("TCP"),
+						Profile:            new("AVP"),
+					},
+				},
+			}, list)
+		})
+	}
+}
+
+func TestServerRedirect(t *testing.T) {
+	for _, ca := range []string{"relative", "absolute"} {
+		t.Run(ca, func(t *testing.T) {
+			desc := &description.Session{Medias: []*description.Media{test.MediaH264}}
+
+			strm := &stream.Stream{
+				OrigDesc:          desc,
+				WriteQueueSize:    512,
+				RTPMaxPayloadSize: 1450,
+				Parent:            test.NilLogger,
+			}
+			err := strm.Initialize()
+			require.NoError(t, err)
+
+			subStream := &stream.SubStream{
+				Stream:        strm,
+				UseRTPPackets: true,
+			}
+			err = subStream.Initialize()
+			require.NoError(t, err)
+
+			pathManager := &test.PathManager{
+				DescribeImpl: func(req defs.PathDescribeReq) (*defs.PathDescribeRes, error) {
+					if req.AccessRequest.Name == "path1" {
+						if ca == "relative" {
+							return &defs.PathDescribeRes{
+								Redirect: "/path2",
+							}, nil
+						}
+						return &defs.PathDescribeRes{
+							Redirect: "rtsp://localhost:8557/path2",
+						}, nil
+					}
+
+					if req.AccessRequest.Credentials.User == "" && req.AccessRequest.Credentials.Pass == "" {
+						return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+					}
+
+					require.Equal(t, "path2", req.AccessRequest.Name)
+					require.Equal(t, "", req.AccessRequest.Query)
+					require.Equal(t, "myuser", req.AccessRequest.Credentials.User)
+					require.Equal(t, "mypass", req.AccessRequest.Credentials.Pass)
+
+					return &defs.PathDescribeRes{
+						Path:   &dummyPath{},
+						Stream: strm,
+					}, nil
+				},
+			}
+
+			s := &Server{
+				Address:        "127.0.0.1:8557",
+				AuthMethods:    []rtspauth.VerifyMethod{rtspauth.VerifyMethodBasic},
+				ReadTimeout:    conf.Duration(10 * time.Second),
+				WriteTimeout:   conf.Duration(10 * time.Second),
+				WriteQueueSize: 512,
+				Transports:     conf.RTSPTransports{gortsplib.ProtocolTCP: {}},
+				PathManager:    pathManager,
+				Parent:         test.NilLogger,
+			}
+			err = s.Initialize()
+			require.NoError(t, err)
+			defer s.Close()
+
+			u, err := base.ParseURL("rtsp://myuser:mypass@127.0.0.1:8557/path1?param=value")
+			require.NoError(t, err)
+
+			reader := gortsplib.Client{
+				Scheme: u.Scheme,
+				Host:   u.Host,
+			}
+
+			err = reader.Start()
+			require.NoError(t, err)
+			defer reader.Close()
+
+			desc2, _, err := reader.Describe(u)
+			require.NoError(t, err)
+
+			require.Equal(t, desc.Medias[0].Formats, desc2.Medias[0].Formats)
+		})
+	}
+}
+
+func TestAuthError(t *testing.T) {
+	pathManager := &test.PathManager{
+		DescribeImpl: func(req defs.PathDescribeReq) (*defs.PathDescribeRes, error) {
+			if req.AccessRequest.Credentials.User == "" && req.AccessRequest.Credentials.Pass == "" {
+				return nil, &auth.Error{AskCredentials: true, Wrapped: fmt.Errorf("auth error")}
+			}
+
+			return nil, &auth.Error{Wrapped: fmt.Errorf("auth error")}
+		},
+	}
+
+	s := &Server{
+		Address:        "127.0.0.1:8557",
+		ReadTimeout:    conf.Duration(10 * time.Second),
+		WriteTimeout:   conf.Duration(10 * time.Second),
+		WriteQueueSize: 512,
+		PathManager:    pathManager,
+		Parent:         test.NilLogger,
+	}
+	err := s.Initialize()
+	require.NoError(t, err)
+	defer s.Close()
+
+	u, err := base.ParseURL("rtsp://myuser:mypass@127.0.0.1:8557/teststream?param=value")
+	require.NoError(t, err)
+
+	reader := gortsplib.Client{
+		Scheme: u.Scheme,
+		Host:   u.Host,
+	}
+
+	err = reader.Start()
+	require.NoError(t, err)
+	defer reader.Close()
+
+	_, _, err = reader.Describe(u)
+	require.EqualError(t, err, "bad status code: 401 (Unauthorized)")
+}

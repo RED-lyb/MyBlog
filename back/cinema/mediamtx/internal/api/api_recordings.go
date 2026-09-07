@@ -1,0 +1,155 @@
+package api //nolint:revive
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/bluenviron/mediamtx/internal/conf"
+	"github.com/bluenviron/mediamtx/internal/defs"
+	"github.com/bluenviron/mediamtx/internal/recordstore"
+)
+
+// this prevents directory traversal.
+// functionally it's useless since there's already conf.IsValidPathName, but it's needed by CodeQL.
+func absolutePathInside(base string, candidate string) (string, error) {
+	baseAbs, err := filepath.Abs(filepath.Clean(base))
+	if err != nil {
+		return "", err
+	}
+
+	candidateAbs, err := filepath.Abs(filepath.Clean(candidate))
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(candidateAbs, baseAbs) {
+		return "", fmt.Errorf("path escapes base directory")
+	}
+
+	return candidateAbs, nil
+}
+
+func recordingsOfPath(
+	pathConf *conf.Path,
+	pathName string,
+) *defs.APIRecording {
+	ret := &defs.APIRecording{
+		Name: pathName,
+	}
+
+	segments, _ := recordstore.FindSegments(pathConf, pathName, nil, nil)
+
+	ret.Segments = make([]defs.APIRecordingSegment, len(segments))
+
+	for i, seg := range segments {
+		ret.Segments[i] = defs.APIRecordingSegment{
+			Start: seg.Start,
+		}
+	}
+
+	return ret
+}
+
+func (a *API) onRecordingsList(ctx *gin.Context) {
+	a.mutex.RLock()
+	c := a.Conf
+	a.mutex.RUnlock()
+
+	pathNames := recordstore.FindAllPathsWithSegments(c.Paths)
+
+	data := defs.APIRecordingList{}
+
+	data.ItemCount = len(pathNames)
+	pageCount, err := paginate(&pathNames, ctx.Query("itemsPerPage"), ctx.Query("page"))
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+	data.PageCount = pageCount
+
+	data.Items = make([]defs.APIRecording, len(pathNames))
+
+	for i, pathName := range pathNames {
+		pathConf, _, _ := conf.FindPathConf(c.Paths, pathName)
+		data.Items[i] = *recordingsOfPath(pathConf, pathName)
+	}
+
+	ctx.JSON(http.StatusOK, data)
+}
+
+func (a *API) onRecordingsGet(ctx *gin.Context) {
+	pathName, ok := paramName(ctx)
+	if !ok {
+		a.writeError(ctx, http.StatusBadRequest, fmt.Errorf("invalid name"))
+		return
+	}
+
+	a.mutex.RLock()
+	c := a.Conf
+	a.mutex.RUnlock()
+
+	pathConf, _, err := conf.FindPathConf(c.Paths, pathName)
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, recordingsOfPath(pathConf, pathName))
+}
+
+func (a *API) onRecordingDeleteSegment(ctx *gin.Context) {
+	pathName := ctx.Query("path")
+
+	start, err := time.Parse(time.RFC3339, ctx.Query("start"))
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, fmt.Errorf("invalid 'start' parameter: %w", err))
+		return
+	}
+
+	a.mutex.RLock()
+	c := a.Conf
+	a.mutex.RUnlock()
+
+	pathConf, _, err := conf.FindPathConf(c.Paths, pathName)
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	commonPath := recordstore.CommonPath(pathConf.RecordPath)
+
+	pathFormat := recordstore.PathAddExtension(
+		strings.ReplaceAll(pathConf.RecordPath, "%path", pathName),
+		pathConf.RecordFormat,
+	)
+
+	pathFormat, err = absolutePathInside(commonPath, pathFormat)
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	segmentPath := recordstore.Path{
+		Start: start,
+	}.Encode(pathFormat)
+
+	segmentPath, err = absolutePathInside(commonPath, segmentPath)
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	err = os.Remove(segmentPath)
+	if err != nil {
+		a.writeError(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	a.writeOK(ctx)
+}

@@ -291,16 +291,21 @@ crontab -e
 
 ### 同频影院
 
-* 编译推流可执行文件：`back/cinema/scripts/deploy_rtc_runtime.sh`
-* 配置`config_back.json`，填写火山引擎 `rtc.app_id` / `rtc.app_key`
-* 推流规格（`rtc.video_encoder_config`）：**1920×1080、30fps、max_bitrate 4000（4 Mbps）**
+* 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+，**无需联网下载 hls.js**）
+* 配置 `config_back.json` 中的 `mediamtx` 节点（公网部署时填写 `public_host` 或 `webrtc_public_base_url`）
+* 依赖系统已安装 `ffmpeg`；MP4 建议使用 H.264 + AAC 编码以便浏览器 WebRTC/HLS 播放
+* 管理后台启动推流后，观众页通过 WebRTC(WHEP) 或 HLS 观看（由 `playback_mode` 决定，默认 `webrtc`）
 
-* 安装构建工具及编译依赖
 ```bash
-dnf install -y cmake gcc-c++ make pkgconfig
-dnf install -y ffmpeg libavcodec-devel libavformat-devel libavutil-devel libswscale-devel libswresample-devel
-dnf install -y mesa-libGL-devel libX11-devel
+# 安装 ffmpeg（OpenCloudOS / RHEL 系）
+dnf install -y ffmpeg
+
+# 安装 Go 1.26+ 后编译 mediamtx
+cd /webproject/my-blog/back/cinema/scripts
+./deploy_mediamtx.sh
 ```
+
+公网 WebRTC 需在 `back/cinema/mediamtx/cinema.yml` 中配置 `webrtcAdditionalHosts`（服务器公网 IP 或域名），并开放 UDP 8189 等端口。
 
 ## 参与贡献
 1. 李远博
