@@ -1,4 +1,4 @@
-export const GEO_DATAV_BASE = 'https://geo.datav.aliyun.com/areas_v3/bound'
+export const GEO_DATAV_BASE = '/geo/areas_v3/bound'
 
 export const PROVINCE_NAMES = {
   '110000': '北京',
