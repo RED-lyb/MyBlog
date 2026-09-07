@@ -1,39 +1,49 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/user_info.js'
 import { ElMessage } from 'element-plus'
 import { FullScreen, VideoPlay } from '@element-plus/icons-vue'
 import FullScreenLoading from '../pages/FullScreenLoading.vue'
-import { fetchCinemaList } from '../lib/cinemaApi.js'
-import { resolveLoggedInViewerIdentity } from '../lib/cinemaGuestId.js'
-import { CinemaRtcViewer, fetchCinemaToken } from '../lib/cinemaRtcViewer.js'
+import { fetchCinemaList, fetchCinemaStreamStatus } from '../lib/cinemaApi.js'
+import { startCinemaStreamPoll, stopCinemaStreamPoll } from '../lib/cinemaStreamPoll.js'
+import { resolveViewerIdentity } from '../lib/cinemaViewerIdentity.js'
+import { showCinemaLoginDialog } from '../lib/guestDialog.js'
+import { CinemaViewer } from '../lib/cinemaViewer.js'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const { username } = storeToRefs(authStore)
 
 const loading = ref(true)
-const joining = ref(false)
-/** idle | joining | in_room | watching | error */
-const rtcPhase = ref('idle')
-const rtcError = ref('')
+const playerPhase = ref('idle')
+const playerError = ref('')
 const needUserGesture = ref(false)
-const hasRemoteStream = ref(false)
+const gestureLoading = ref(false)
+const hasStream = ref(false)
 
-const rtcConfig = ref({
-  app_id: '',
-  room_id: '',
-  publisher_user_id: '',
+const streamConfig = ref({
+  running: false,
   cinema_filename: null,
+  playback: null,
+  started_at: null,
+  prelude_seconds: 10,
 })
 
+const videoRef = ref(null)
 const playerShellRef = ref(null)
-const playerDomRef = ref(null)
-const viewerIdentity = ref({ rtcUserId: '', displayName: '' })
+const viewerIdentity = ref({ displayName: '' })
 const isMobileLayout = ref(false)
 const isMobileFsLandscape = ref(false)
 
 const MOBILE_MEDIA = '(max-width: 768px)'
+const STATUS_POLL_MS = 5000
+
+let statusPollInFlight = false
+let preludeTimer = null
+let connectGeneration = 0
+const preludeClock = ref(Date.now())
 
 const syncMobileLayout = () => {
   isMobileLayout.value = window.matchMedia(MOBILE_MEDIA).matches
@@ -52,148 +62,237 @@ const onFullscreenChange = () => {
   }
 }
 
-const viewer = new CinemaRtcViewer({
-  onRoomJoined: () => {
-    if (rtcPhase.value !== 'error') {
-      rtcPhase.value = 'in_room'
+const viewer = new CinemaViewer({
+  onStreamStart: () => {
+    hasStream.value = true
+    startPreludeTicker()
+    if (playerPhase.value !== 'error') {
+      playerPhase.value = 'watching'
     }
   },
-  onPublisherStream: () => {
-    hasRemoteStream.value = true
-    rtcPhase.value = 'watching'
-  },
-  onPublisherUnpublish: () => {
-    hasRemoteStream.value = false
-    if (rtcPhase.value !== 'error') {
-      rtcPhase.value = 'in_room'
-    }
-  },
-  onPublisherLeave: () => {
-    hasRemoteStream.value = false
-    if (rtcPhase.value !== 'error') {
-      rtcPhase.value = 'in_room'
+  onStreamStop: () => {
+    hasStream.value = false
+    if (playerPhase.value !== 'error') {
+      playerPhase.value = 'idle'
     }
   },
   onAutoplayFailed: () => {
     needUserGesture.value = true
   },
+  onNeedUnmute: () => {
+    if (playerPhase.value === 'watching' || playerPhase.value === 'connecting') {
+      needUserGesture.value = true
+    }
+  },
   onAutoplayRecovered: () => {
     needUserGesture.value = false
+    gestureLoading.value = false
   },
-  onDuplicateLogin: () => {
-    rtcError.value = '账号在其他页面重复进房，已断开'
-    rtcPhase.value = 'error'
-    leaveRtc()
-  },
-  onError: () => {
-    // RTC 错误由 overlay 提示，避免在控制台输出敏感信息
+  onError: (err) => {
+    const msg = String(err || '')
+    if (msg.includes('retrying')) return
+    playerError.value = playerPhase.value === 'connecting'
+      ? (msg || '连接放映流失败')
+      : '播放连接中断'
+    playerPhase.value = 'error'
+    hasStream.value = false
   },
 })
 
-let joinGeneration = 0
-
 const displayTitle = computed(() => {
-  const name = rtcConfig.value.cinema_filename
+  const name = streamConfig.value.cinema_filename
   if (name) return String(name).replace(/\.mp4$/i, '')
   return '同频影院'
 })
 
 const viewerLabel = computed(() => viewerIdentity.value.displayName || username.value || '')
 
+const isLoggedIn = computed(() => !!resolveViewerIdentity(authStore))
+
 const showNoStreamHint = computed(() => {
-  return rtcPhase.value === 'in_room' && !hasRemoteStream.value
+  return !streamConfig.value.running && playerPhase.value !== 'error'
 })
 
-const loadRtcConfig = async () => {
+const applyStreamPayload = (stream) => {
+  streamConfig.value = {
+    running: !!stream?.running,
+    cinema_filename: stream?.cinema_filename || null,
+    playback: stream?.playback || null,
+    started_at: stream?.started_at || null,
+    prelude_seconds: stream?.prelude_seconds ?? 10,
+  }
+}
+
+const inPrelude = computed(() => {
+  if (!streamConfig.value.running || !streamConfig.value.started_at) return false
+  const elapsed = (preludeClock.value - new Date(streamConfig.value.started_at).getTime()) / 1000
+  return elapsed < (streamConfig.value.prelude_seconds || 10)
+})
+
+const preludeRemainSec = computed(() => {
+  if (!inPrelude.value || !streamConfig.value.started_at) return 0
+  const elapsed = (preludeClock.value - new Date(streamConfig.value.started_at).getTime()) / 1000
+  return Math.max(0, Math.ceil((streamConfig.value.prelude_seconds || 10) - elapsed))
+})
+
+const waitVideoEl = async () => {
+  for (let i = 0; i < 20; i += 1) {
+    await nextTick()
+    if (videoRef.value) return true
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  return !!videoRef.value
+}
+
+const stopPlayer = async () => {
+  connectGeneration += 1
+  needUserGesture.value = false
+  hasStream.value = false
+  await viewer.stop()
+  if (playerPhase.value !== 'error') {
+    playerPhase.value = 'idle'
+  }
+}
+
+const startPlayer = async () => {
+  const gen = ++connectGeneration
+  const cfg = streamConfig.value
+
+  const loggedIn = resolveViewerIdentity(authStore)
+  if (!loggedIn) {
+    playerError.value = '请先登录后再观看'
+    playerPhase.value = 'error'
+    return
+  }
+  viewerIdentity.value = loggedIn
+
+  if (!cfg.running || !cfg.playback) {
+    await stopPlayer()
+    return
+  }
+
+  const domReady = await waitVideoEl()
+  if (!domReady) {
+    playerError.value = '播放器未就绪'
+    playerPhase.value = 'error'
+    return
+  }
+
+  playerError.value = ''
+  playerPhase.value = 'connecting'
+  needUserGesture.value = false
+  hasStream.value = false
+
+  try {
+    const ok = await viewer.play({
+      videoEl: videoRef.value,
+      playback: cfg.playback,
+    })
+    if (gen !== connectGeneration) return
+    if (!ok) {
+      playerError.value = '连接放映流失败'
+      playerPhase.value = 'error'
+      await viewer.stop()
+      return
+    }
+    hasStream.value = true
+    if (playerPhase.value !== 'error') {
+      playerPhase.value = 'watching'
+    }
+  } catch (e) {
+    if (gen !== connectGeneration) return
+    playerError.value = e.message || '连接放映厅失败'
+    playerPhase.value = 'error'
+    await viewer.stop()
+    ElMessage.error(playerError.value)
+  }
+}
+
+const shouldStartPlayer = () => {
+  if (playerPhase.value === 'connecting') return false
+  if (playerPhase.value === 'error') return false
+  if (hasStream.value && playerPhase.value === 'watching') return false
+  return !hasStream.value || playerPhase.value === 'idle'
+}
+
+const refreshStreamStatus = async () => {
+  if (statusPollInFlight) return
+  statusPollInFlight = true
+  try {
+    const { response } = await fetchCinemaStreamStatus()
+    if (!response.data?.success) {
+      throw new Error(response.data?.error || '获取放映状态失败')
+    }
+    const stream = response.data.data || {}
+    const wasRunning = streamConfig.value.running
+    applyStreamPayload(stream)
+
+    if (!isLoggedIn.value) {
+      await stopPlayer()
+      if (stream.running) {
+        playerError.value = '请先登录后再观看'
+        playerPhase.value = 'error'
+      } else if (playerPhase.value === 'error') {
+        playerError.value = '请先登录后再观看'
+      }
+      return
+    }
+
+    if (stream.running) {
+      if (!wasRunning || shouldStartPlayer()) {
+        await startPlayer()
+      }
+    } else {
+      await stopPlayer()
+    }
+  } finally {
+    statusPollInFlight = false
+  }
+}
+
+const loadInitialConfig = async () => {
   const { response } = await fetchCinemaList()
   if (!response.data?.success) {
     throw new Error(response.data?.error || '获取影院配置失败')
   }
-  const stream = response.data.data?.stream || {}
-  rtcConfig.value = {
-    app_id: stream.app_id || '',
-    room_id: stream.room_id || '',
-    publisher_user_id: stream.user_id || '',
-    cinema_filename: stream.cinema_filename || null,
+  const data = response.data.data || {}
+  applyStreamPayload(data.stream || {})
+  if (data.stream?.running && isLoggedIn.value) {
+    await startPlayer()
+  } else if (!isLoggedIn.value && data.stream?.running) {
+    playerError.value = '请先登录后再观看'
+    playerPhase.value = 'error'
   }
 }
 
-const waitPlayerDom = async () => {
-  for (let i = 0; i < 20; i += 1) {
-    await nextTick()
-    if (playerDomRef.value) return true
-    await new Promise((r) => setTimeout(r, 50))
-  }
-  return !!playerDomRef.value
-}
-
-const leaveRtc = async () => {
-  joinGeneration += 1
-  joining.value = false
-  needUserGesture.value = false
-  hasRemoteStream.value = false
-  await viewer.leave()
-  if (rtcPhase.value !== 'error') {
-    rtcPhase.value = 'idle'
-  }
-}
-
-const joinRtc = async () => {
-  const gen = ++joinGeneration
-  const cfg = rtcConfig.value
-  if (!cfg.app_id || !cfg.room_id || !cfg.publisher_user_id) {
-    rtcError.value = '放映厅未就绪，请稍后再试'
-    rtcPhase.value = 'error'
-    return
-  }
-
-  const loggedIn = resolveLoggedInViewerIdentity(authStore)
-  if (!loggedIn?.rtcUserId) {
-    rtcError.value = '请先登录后再观看'
-    rtcPhase.value = 'error'
-    return
-  }
-
-  const domReady = await waitPlayerDom()
-  if (!domReady) {
-    rtcError.value = '播放器未就绪'
-    rtcPhase.value = 'error'
-    return
-  }
-
-  joining.value = true
-  rtcError.value = ''
-  rtcPhase.value = 'joining'
-  hasRemoteStream.value = false
-  viewerIdentity.value = loggedIn
-
-  try {
-    const tokenResult = await fetchCinemaToken(cfg.room_id, loggedIn.rtcUserId)
-    if (gen !== joinGeneration) return
-
-    await viewer.join({
-      appId: cfg.app_id,
-      roomId: cfg.room_id,
-      userId: tokenResult.user_id,
-      token: tokenResult.token,
-      publisherUserId: cfg.publisher_user_id,
-      renderDom: playerDomRef.value,
-    })
-    if (gen !== joinGeneration) return
-  } catch (e) {
-    rtcError.value = e.message || '连接放映厅失败'
-    rtcPhase.value = 'error'
-    await viewer.leave()
-    ElMessage.error(rtcError.value)
-  } finally {
-    if (gen === joinGeneration) {
-      joining.value = false
-    }
-  }
-}
+const pollStreamStatus = () => refreshStreamStatus()
 
 const handleUserPlay = async () => {
-  await viewer.playFailedUsers()
+  if (gestureLoading.value) return
+  gestureLoading.value = true
+  const ok = await viewer.playWithUserGesture()
+  if (ok) {
+    needUserGesture.value = false
+    ElMessage.success('声音已开启')
+  } else {
+    gestureLoading.value = false
+    ElMessage.warning('开启声音失败，请重试')
+  }
+}
+
+const goToLogin = () => {
+  showCinemaLoginDialog(router, '/home')
+}
+
+const retryConnect = async () => {
+  playerPhase.value = 'idle'
+  playerError.value = ''
+  try {
+    await refreshStreamStatus()
+  } catch (e) {
+    playerError.value = e.message || '重新连接失败'
+    playerPhase.value = 'error'
+  }
 }
 
 const toggleFullscreen = async () => {
@@ -206,7 +305,7 @@ const toggleFullscreen = async () => {
         try {
           await screen.orientation?.lock?.('landscape-primary')
         } catch {
-          // iOS 等可能不支持，由 CSS 旋转兜底
+          // iOS 等可能不支持
         }
       }
     } else {
@@ -217,8 +316,32 @@ const toggleFullscreen = async () => {
   }
 }
 
+const stopPreludeTicker = () => {
+  if (preludeTimer) {
+    clearInterval(preludeTimer)
+    preludeTimer = null
+  }
+}
+
+const startPreludeTicker = () => {
+  stopPreludeTicker()
+  if (streamConfig.value.running) {
+    preludeTimer = setInterval(() => {
+      preludeClock.value = Date.now()
+    }, 500)
+  }
+}
+
+const startStatusPolling = () => {
+  startCinemaStreamPoll(pollStreamStatus, STATUS_POLL_MS)
+}
+
+const stopStatusPolling = () => {
+  stopCinemaStreamPoll()
+}
+
 const handlePageHide = () => {
-  viewer.leave()
+  viewer.stop()
 }
 
 onMounted(async () => {
@@ -229,27 +352,29 @@ onMounted(async () => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   window.addEventListener('pagehide', handlePageHide)
   try {
-    await loadRtcConfig()
-    await joinRtc()
+    await loadInitialConfig()
   } catch (e) {
-    rtcError.value = e.message || '初始化失败'
-    rtcPhase.value = 'error'
+    playerError.value = e.message || '初始化失败'
+    playerPhase.value = 'error'
   } finally {
     loading.value = false
+    startStatusPolling()
   }
 })
 
 onUnmounted(async () => {
+  stopStatusPolling()
+  stopPreludeTicker()
   window.removeEventListener('resize', syncMobileLayout)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   window.removeEventListener('pagehide', handlePageHide)
-  await leaveRtc()
+  await stopPlayer()
 })
 </script>
 
 <template>
   <div class="cinema-theater">
-    <FullScreenLoading :visible="loading || joining" />
+    <FullScreenLoading :visible="loading" />
 
     <header class="theater-header">
       <div class="header-left">
@@ -259,7 +384,7 @@ onUnmounted(async () => {
         </p>
       </div>
       <div class="header-actions">
-        <el-tag v-if="hasRemoteStream" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
+        <el-tag v-if="hasStream" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
         <el-button :icon="FullScreen" circle title="全屏" @click="toggleFullscreen" />
       </div>
     </header>
@@ -270,28 +395,48 @@ onUnmounted(async () => {
         class="player-shell"
         :class="{ 'mobile-fs-landscape': isMobileFsLandscape }"
       >
-        <div ref="playerDomRef" class="rtc-player" />
+        <video
+          ref="videoRef"
+          class="cinema-video"
+          playsinline
+          autoplay
+          preload="auto"
+          disablepictureinpicture
+          disableremoteplayback
+        />
 
         <div v-if="showNoStreamHint" class="overlay-mask overlay-waiting">
           <p class="overlay-title">当前暂无放映</p>
           <p class="overlay-desc">等待放映开始</p>
-          <el-button link type="primary" @click="joinRtc">重新连接</el-button>
+          <el-button link type="primary" @click="retryConnect">刷新状态</el-button>
         </div>
 
-        <div v-if="rtcPhase === 'joining'" class="overlay-mask overlay-waiting">
-          <p class="overlay-title">正在加入放映厅</p>
+        <div v-if="playerPhase === 'connecting' && !hasStream" class="overlay-mask overlay-waiting">
+          <p class="overlay-title">正在连接放映流</p>
         </div>
 
-        <div v-if="needUserGesture" class="overlay-mask">
-          <el-button type="primary" size="large" :icon="VideoPlay" @click="handleUserPlay">
-            点击播放
+        <div v-if="hasStream && inPrelude" class="overlay-mask overlay-prelude">
+          <p class="overlay-title">放映即将开始</p>
+          <p class="overlay-desc">约 {{ preludeRemainSec }} 秒后开始正片</p>
+        </div>
+
+        <div v-if="needUserGesture && hasStream" class="overlay-mask overlay-sound">
+          <el-button
+            type="primary"
+            size="large"
+            :icon="VideoPlay"
+            :loading="gestureLoading"
+            @click="handleUserPlay"
+          >
+            开启声音
           </el-button>
-          <p class="overlay-desc">浏览器需要一次点击才能播放声音</p>
+          <p class="overlay-desc">画面已开始播放，点击开启声音</p>
         </div>
 
-        <div v-if="rtcPhase === 'error'" class="overlay-mask">
-          <p class="overlay-title">{{ rtcError }}</p>
-          <el-button type="primary" @click="joinRtc">重新连接</el-button>
+        <div v-if="playerPhase === 'error'" class="overlay-mask">
+          <p class="overlay-title">{{ playerError }}</p>
+          <el-button v-if="!isLoggedIn" type="primary" @click="goToLogin">去登录</el-button>
+          <el-button v-else type="primary" @click="retryConnect">重新连接</el-button>
         </div>
       </div>
     </div>
@@ -382,7 +527,6 @@ onUnmounted(async () => {
   border-radius: 0;
 }
 
-/* 手机竖屏全屏：旋转 90° 横屏铺满，避免上下大黑边 */
 .player-shell.mobile-fs-landscape:fullscreen,
 .player-shell.mobile-fs-landscape:-webkit-full-screen {
   width: 100vh !important;
@@ -398,23 +542,24 @@ onUnmounted(async () => {
   transform-origin: center center;
 }
 
-.player-shell.mobile-fs-landscape:fullscreen .rtc-player,
-.player-shell.mobile-fs-landscape:-webkit-full-screen .rtc-player {
+.player-shell.mobile-fs-landscape:fullscreen .cinema-video,
+.player-shell.mobile-fs-landscape:-webkit-full-screen .cinema-video {
   width: 100%;
   height: 100%;
 }
 
-.rtc-player {
+.cinema-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  object-fit: contain;
+  background: #000;
+  pointer-events: none;
 }
 
-.rtc-player :deep(video) {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain;
+.cinema-video::-webkit-media-controls {
+  display: none !important;
 }
 
 .overlay-mask {
@@ -443,7 +588,6 @@ onUnmounted(async () => {
     aspect-ratio: 16 / 9;
   }
 
-  /* 间距保持紧凑；字号随播放器容器放大（cqmin 相对 player-shell） */
   .overlay-mask {
     gap: clamp(2px, 0.6cqmin, 4px);
     padding: clamp(3px, 1.2cqmin, 8px);
@@ -476,6 +620,16 @@ onUnmounted(async () => {
 
 .overlay-waiting {
   background: rgba(0, 0, 0, 0.72);
+}
+
+.overlay-sound {
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.overlay-prelude {
+  background: rgba(0, 0, 0, 0.82);
+  pointer-events: none;
 }
 
 .overlay-title {

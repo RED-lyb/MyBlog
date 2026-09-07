@@ -56,10 +56,10 @@ back/api/static/games/game_images/*
 back/api/static/games/game_images/.gitkeep
 
 # 同频影院
-back/cinema/rtc_runtime/*
-!back/cinema/rtc_runtime/.gitkeep
-# CMake 中间文件与对象在 rtc_build/build/
-back/cinema/rtc_build/build/
+back/cinema/mediamtx_runtime/*
+!back/cinema/mediamtx_runtime/.gitkeep
+back/cinema/stream_runtime/*
+!back/cinema/stream_runtime/.gitkeep
 
 # 爱情小窝上传照片
 back/api/static/love_nest/photos/person/*

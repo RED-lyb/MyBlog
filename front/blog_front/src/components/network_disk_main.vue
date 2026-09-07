@@ -82,14 +82,14 @@ const isRootDirectory = computed(() => {
   return props.pathParts.length === 0
 })
 
-// 是否可以编辑（不在根目录且只选中一个项目）
-const canEditSelected = computed(() => {
-  return !isRootDirectory.value && isSingleItemSelected.value
-})
-
 // 是否可以删除（在自己的文件空间下）
 const canDeleteSelected = computed(() => {
   return props.canDelete && props.isAuthenticated && props.currentOwnerId === props.userId
+})
+
+// 是否可以编辑（自己的文件空间、不在根目录、且只选中一个项目）
+const canEditSelected = computed(() => {
+  return canDeleteSelected.value && !isRootDirectory.value && isSingleItemSelected.value
 })
 
 // 面包屑
@@ -178,6 +178,9 @@ const handleDownloadSelected = async () => {
 
 // 编辑选中的文件/文件夹（重命名）
 const handleEditSelected = () => {
+  if (!canEditSelected.value) {
+    return
+  }
   if (selectedItems.value.length !== 1) {
     ElMessage.warning('请选择一个项目进行重命名')
     return

@@ -13,3 +13,4 @@ PyJWT==2.8.0
 cryptography==41.0.7
 python-dotenv==1.0.0
 bleach[css]==6.3.0
+PyYAML==6.0.3

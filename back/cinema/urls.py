@@ -3,7 +3,6 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('get/token', views.get_token, name='cinema_get_token'),
     path('list/', views.cinema_list, name='cinema_list'),
     path('stream/status/', views.stream_status, name='cinema_stream_status'),
     path('admin/list/', views.admin_cinema_list, name='cinema_admin_list'),
@@ -12,4 +11,6 @@ urlpatterns = [
     path('admin/stream/start/', views.admin_start_stream, name='cinema_admin_start'),
     path('admin/stream/stop/', views.admin_stop_stream, name='cinema_admin_stop'),
     path('admin/runtime/', views.admin_runtime_info, name='cinema_admin_runtime'),
+    path('admin/config/', views.admin_cinema_config, name='cinema_admin_config'),
+    path('mtx/webrtc/<path:subpath>', views.mediamtx_webrtc_proxy, name='cinema_mtx_webrtc_proxy'),
 ]

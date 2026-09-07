@@ -53,7 +53,7 @@ INSTALLED_APPS = [
     'history',                      # 更新历史应用
     'feedback',                     # 反馈应用
     'games',                        # 游戏应用
-    'cinema',                       # 同频影院（RTC 推流 / Token）
+    'cinema',                       # 同频影院（MediaMTX 推流）
     'love_nest',                    # 爱情小窝
 ]
 #允许指定域名跨域，开发环境需要，生产环境使用nginx代理，可以不配置
@@ -63,6 +63,27 @@ CORS_ALLOWED_ORIGINS = [
 ]
 #允许携带cookie
 CORS_ALLOW_CREDENTIALS = True
+# WHEP 需要浏览器读取 Location / Link；ICE trickle 需要 If-Match
+CORS_EXPOSE_HEADERS = ['Location', 'Link', 'ETag', 'ID', 'Accept-Patch']
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'authorization',
+    'content-type',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'if-match',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'HEAD',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',

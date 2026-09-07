@@ -1,5 +1,5 @@
 """
-同频影院：片库目录、RTC Token、推流进程管理
+同频影院：片库目录、MediaMTX 推流进程管理
 """
 import json
 import os
@@ -7,28 +7,37 @@ import re
 import signal
 import subprocess
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+import yaml
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from history.views import admin_required
 
-from . import access_token
-from .rtc_config import (
+from .cinema_log import cinema_log
+from .mediamtx_config import (
     ALLOWED_CINEMA_VIDEO_EXT,
-    BLOG_CONFIG_FILE,
-    CINEMA_DIR,
     BLOG_LOG_FILE,
+    CINEMA_DIR,
     LOG_DIR,
     MAX_CINEMA_VIDEO_BYTES,
-    RTC_RUNTIME_DIR,
+    MEDIAMTX_BINARY,
+    MEDIAMTX_CONFIG_FILE,
+    MEDIAMTX_PID_FILE,
+    MEDIAMTX_RUNTIME_DIR,
     STREAM_PID_FILE,
     STREAM_STATE_FILE,
-    get_rtc_settings,
+    STREAM_RUNTIME_DIR,
+    build_admin_config_payload,
+    build_playback_payload,
+    get_mediamtx_settings,
+    save_admin_config,
 )
 
 
@@ -43,20 +52,115 @@ def _error(message, code=400, extra=None):
     return JsonResponse(body, status=code)
 
 
-def _token_response(code=200, message='请求成功', user_id=None, room_id=None, data=None):
-    """与 bytedance_server Flask 响应格式一致，供 rtccli 解析"""
-    return JsonResponse(
-        {
-            'user_id': user_id,
-            'room_id': room_id,
-            'data': data,
-            'message': message,
-        },
-        status=code,
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def http_error_302(self, req, fp, code, msg, headers):
+        raise urllib.error.HTTPError(req.full_url, code, msg, headers, fp)
+
+    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+
+
+_MEDIAMTX_PROXY_OPENER = urllib.request.build_opener(_NoRedirectHandler)
+
+
+def _rewrite_mediamtx_location(location, upstream_origin, proxy_prefix):
+    if not location:
+        return location
+    if location.startswith(upstream_origin):
+        return f'{proxy_prefix}{location[len(upstream_origin):]}'
+    if location.startswith('/'):
+        return f'{proxy_prefix}{location}'
+    return location
+
+
+def _header_values(headers, name):
+    if hasattr(headers, 'get_all'):
+        values = headers.get_all(name)
+        if values:
+            return values
+    value = headers.get(name)
+    return [value] if value else []
+
+
+def _copy_mediamtx_proxy_headers(upstream, response, mtx):
+    upstream_origin = f'http://127.0.0.1:{mtx["webrtc_port"]}'
+    proxy_prefix = '/api/cinema/mtx/webrtc'
+
+    content_type = upstream.headers.get('Content-Type')
+    if content_type:
+        response['Content-Type'] = content_type
+
+    for header in ('Cache-Control', 'ETag', 'ID', 'Accept-Patch'):
+        value = upstream.headers.get(header)
+        if value:
+            response[header] = value
+
+    link_values = _header_values(upstream.headers, 'Link')
+    if link_values:
+        response['Link'] = ', '.join(link_values)
+
+    location = upstream.headers.get('Location')
+    if location:
+        response['Location'] = _rewrite_mediamtx_location(
+            location, upstream_origin, proxy_prefix,
+        )
+
+    response['Access-Control-Expose-Headers'] = (
+        'Location, Link, ETag, ID, Accept-Patch'
     )
 
 
-_RTC_USER_ID_RE = re.compile(r'^[0-9a-zA-Z_\-@.]{1,128}$')
+def _proxy_request_headers(request):
+    headers = {}
+    content_type = request.META.get('CONTENT_TYPE') or request.META.get('HTTP_CONTENT_TYPE')
+    if content_type:
+        headers['Content-Type'] = content_type
+
+    for name in ('Authorization', 'If-Match', 'Accept', 'Cookie'):
+        value = request.META.get(f'HTTP_{name.upper().replace("-", "_")}')
+        if value:
+            headers[name] = value
+    return headers
+
+
+def _mediamtx_proxy(request, subpath):
+    mtx = get_mediamtx_settings()
+    target = f'http://127.0.0.1:{mtx["webrtc_port"]}/{subpath}'
+    query = request.META.get('QUERY_STRING')
+    if query:
+        target += f'?{query}'
+
+    headers = _proxy_request_headers(request)
+    body = None
+    if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+        body = request.body or None
+
+    upstream_req = urllib.request.Request(
+        target,
+        data=body,
+        headers=headers,
+        method=request.method,
+    )
+
+    try:
+        with _MEDIAMTX_PROXY_OPENER.open(upstream_req, timeout=60) as upstream_resp:
+            payload = upstream_resp.read()
+            response = HttpResponse(payload, status=upstream_resp.status)
+            _copy_mediamtx_proxy_headers(upstream_resp, response, mtx)
+            return response
+    except urllib.error.HTTPError as exc:
+        payload = exc.read() if exc.fp is not None else b''
+        response = HttpResponse(payload, status=exc.code)
+        _copy_mediamtx_proxy_headers(exc, response, mtx)
+        return response
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        cinema_log(f'mediamtx proxy error: {exc}')
+        return HttpResponse(str(exc), status=502, content_type='text/plain')
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'HEAD', 'OPTIONS', 'POST', 'PATCH', 'DELETE'])
+def mediamtx_webrtc_proxy(request, subpath):
+    return _mediamtx_proxy(request, subpath)
 
 
 def _safe_cinema_filename(name):
@@ -112,23 +216,22 @@ def _read_stream_state():
 
 
 def _write_stream_state(state):
-    RTC_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     with open(STREAM_STATE_FILE, 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 
-def _read_pid():
-    if not STREAM_PID_FILE.is_file():
+def _read_pid(pid_file):
+    if not pid_file.is_file():
         return None
     try:
-        raw = STREAM_PID_FILE.read_text(encoding='utf-8').strip()
+        raw = pid_file.read_text(encoding='utf-8').strip()
         return int(raw) if raw else None
     except Exception:
         return None
 
 
 def _proc_state(pid):
-    """读取 /proc 进程状态，不存在返回 None。"""
     try:
         with open(f'/proc/{pid}/status', encoding='utf-8') as f:
             for line in f:
@@ -140,7 +243,6 @@ def _proc_state(pid):
 
 
 def _reap_process(pid):
-    """回收子进程，避免僵尸进程被误判为仍在推流。"""
     if not pid or pid <= 0:
         return
     try:
@@ -155,7 +257,6 @@ def _reap_process(pid):
 
 
 def _is_process_running(pid):
-    """进程存在且非僵尸才算推流中。"""
     if not pid or pid <= 0:
         return False
     state = _proc_state(pid)
@@ -171,35 +272,10 @@ def _is_process_running(pid):
     return True
 
 
-def _kill_all_rtccli():
-    """快速结束全部 rtccli，防止残留进程在中途续播。"""
-    pid = _read_pid()
-    if pid:
+def _clear_pid_file(pid_file):
+    if pid_file.is_file():
         try:
-            os.kill(pid, signal.SIGTERM)
-        except OSError:
-            pass
-    subprocess.run(
-        ['pkill', '-9', '-x', 'rtccli'],
-        stderr=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        check=False,
-    )
-    if pid:
-        _reap_process(pid)
-    time.sleep(0.05)
-
-
-def _clear_stream_files():
-    if STREAM_PID_FILE.is_file():
-        try:
-            STREAM_PID_FILE.unlink()
-        except OSError:
-            pass
-    lock_file = RTC_RUNTIME_DIR / 'stream.lock'
-    if lock_file.is_file():
-        try:
-            lock_file.unlink()
+            pid_file.unlink()
         except OSError:
             pass
 
@@ -215,107 +291,268 @@ def _mark_stream_stopped(state=None):
         _write_stream_state(state)
 
 
-def _reconcile_stream_state():
-    """进程已退出但 pid/状态未更新时同步为已停止。"""
-    pid = _read_pid()
+def _reconcile_ffmpeg_state():
+    pid = _read_pid(STREAM_PID_FILE)
     if pid and _is_process_running(pid):
         return pid, True
 
     if pid:
+        cinema_log(f'ffmpeg pid={pid} exited, stream ended')
         _reap_process(pid)
-    _clear_stream_files()
+    _clear_pid_file(STREAM_PID_FILE)
     _mark_stream_stopped()
     return None, False
 
 
-def _get_stream_status():
-    pid, running = _reconcile_stream_state()
-    state = _read_stream_state()
-    if running:
-        pid = pid or _read_pid()
-    return state, pid, running
+def _kill_ffmpeg_publish():
+    pid = _read_pid(STREAM_PID_FILE)
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        _reap_process(pid)
+
+    mtx = get_mediamtx_settings()
+    pattern = f'ffmpeg.*{re.escape(mtx["rtsp_publish_url"])}'
+    subprocess.run(
+        ['pkill', '-f', pattern],
+        stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        check=False,
+    )
+    time.sleep(0.05)
 
 
-def _stop_stream_process():
-    _kill_all_rtccli()
-    _clear_stream_files()
+def _stop_ffmpeg_publish():
+    cinema_log('stop ffmpeg publish')
+    _kill_ffmpeg_publish()
+    _clear_pid_file(STREAM_PID_FILE)
     _mark_stream_stopped()
 
 
-def _rtccli_path():
-    exe = RTC_RUNTIME_DIR / 'rtccli'
-    return exe if exe.is_file() else None
+def _mediamtx_path_online(mtx, timeout=6.0):
+    """等待 mediamtx 路径上有推流源（ffmpeg 已连上）"""
+    url = f'{mtx["api_url"]}/v3/paths/get/{mtx["path_name"]}'
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=1.0) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if data.get('online') or data.get('ready'):
+                    tracks = []
+                    source = data.get('source') or {}
+                    for track in source.get('tracks') or []:
+                        tracks.append(track.get('type') or track.get('codec') or str(track))
+                    cinema_log(
+                        f'mediamtx path online: tracks={tracks or "unknown"} '
+                        f'bytesReceived={source.get("bytesReceived")}'
+                    )
+                    return True, data
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
+            cinema_log(f'mediamtx path poll: {exc}')
+        time.sleep(0.15)
+    cinema_log(f'mediamtx path online timeout after {timeout}s')
+    return False, None
+
+
+def _probe_video_size(cinema_path):
+    try:
+        result = subprocess.run(
+            [
+                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x',
+                str(cinema_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        w, h = result.stdout.strip().split('x')
+        return max(int(w), 2), max(int(h), 2)
+    except Exception:
+        return 1280, 720
+
+
+def _combined_clip_path(mtx, cinema_path, w, h):
+    prelude = int(mtx.get('prelude_seconds', 10))
+    return STREAM_RUNTIME_DIR / f'combined_{cinema_path.stem}_{w}x{h}_p{prelude}.mp4'
+
+
+def _prepare_combined_clip(mtx, cinema_path, w, h):
+    """
+    离线合成黑场+正片（filter concat 可快速完成且时间戳连续）。
+    再用单一 -re 输入实时推流，避免 concat demuxer 在直播中的音频 DTS 断裂。
+    """
+    out = _combined_clip_path(mtx, cinema_path, w, h)
+    if out.is_file() and out.stat().st_mtime >= cinema_path.stat().st_mtime:
+        return out
+
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    prelude_s = str(int(mtx.get('prelude_seconds', 10)))
+    size = f'{w}x{h}'
+    filter_complex = (
+        f'[0:v]format=yuv420p,setsar=1[bv];'
+        f'[1:a]atrim=0:{prelude_s},asetpts=PTS-STARTPTS[ba];'
+        f'[2:v]fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,'
+        f'pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setsar=1,setpts=PTS-STARTPTS[mv];'
+        f'[2:a]aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[ma];'
+        f'[bv][ba][mv][ma]concat=n=2:v=1:a=1[outv][outa]'
+    )
+    cmd = [
+        mtx['ffmpeg_bin'],
+        '-y', '-nostdin', '-hide_banner', '-loglevel', 'error',
+        '-f', 'lavfi', '-i', f'color=c=black:s={size}:r=30:d={prelude_s}',
+        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+        '-i', str(cinema_path.resolve()),
+        '-filter_complex', filter_complex,
+        '-map', '[outv]', '-map', '[outa]',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-g', '30', '-bf', '0',
+        '-c:a', 'aac', '-ar', '48000', '-ac', '2',
+        str(out.resolve()),
+    ]
+    subprocess.run(cmd, check=True, timeout=600)
+    return out
+
+
+def _build_ffmpeg_cmd(mtx, combined_path):
+    """从已合成的完整片源以 1x 实时速度推流。"""
+    return [
+        mtx['ffmpeg_bin'],
+        '-nostdin',
+        '-hide_banner',
+        '-loglevel', 'info',
+        '-re',
+        '-i', str(combined_path.resolve()),
+        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
+        '-force_key_frames', 'expr:gte(t,n_forced*1)',
+        '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
+        '-application', 'lowdelay', '-b:a', '96k',
+        '-f', 'rtsp', '-rtsp_transport', 'tcp',
+        mtx['rtsp_publish_url'],
+    ]
+
+
+def _mediamtx_binary_path():
+    return MEDIAMTX_BINARY if MEDIAMTX_BINARY.is_file() else None
+
+
+def _is_mediamtx_running():
+    pid = _read_pid(MEDIAMTX_PID_FILE)
+    if pid and _is_process_running(pid):
+        return True, pid
+
+    mtx = get_mediamtx_settings()
+    try:
+        req = urllib.request.Request(
+            f'{mtx["api_url"]}/v3/config/global/get',
+            method='GET',
+        )
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            if resp.status == 200:
+                return True, pid
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+        pass
+
+    if pid:
+        _reap_process(pid)
+    _clear_pid_file(MEDIAMTX_PID_FILE)
+    return False, None
+
+
+def _start_mediamtx():
+    running, pid = _is_mediamtx_running()
+    if running:
+        return True, pid, ''
+
+    exe = _mediamtx_binary_path()
+    if not exe:
+        return False, None, '未找到 mediamtx 可执行文件，请运行 deploy_mediamtx.sh'
+
+    if not MEDIAMTX_CONFIG_FILE.is_file():
+        return False, None, f'未找到配置文件: {MEDIAMTX_CONFIG_FILE}'
+
+    MEDIAMTX_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    cinema_log('mediamtx starting')
+    log_file = open(BLOG_LOG_FILE, 'a', encoding='utf-8')
+    log_file.write(f'\n[{datetime.now().isoformat(timespec="seconds")}] [mediamtx] process start\n')
+    try:
+        proc = subprocess.Popen(
+            [str(exe), str(MEDIAMTX_CONFIG_FILE.resolve())],
+            cwd=str(MEDIAMTX_RUNTIME_DIR),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    finally:
+        log_file.close()
+
+    if proc.poll() is not None:
+        return False, None, 'mediamtx 启动失败，请查看 log/back.log'
+
+    MEDIAMTX_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
+    for _ in range(30):
+        time.sleep(0.1)
+        if _is_mediamtx_running()[0]:
+            return True, proc.pid, ''
+        if proc.poll() is not None:
+            return False, None, 'mediamtx 启动后退出，请查看 log/back.log'
+
+    return False, None, 'mediamtx 启动超时，请查看 log/back.log'
 
 
 def _runtime_ready():
-    exe = _rtccli_path()
-    if not exe:
-        return False, '未找到 rtccli，请编译'
-    rtc = get_rtc_settings()
-    if not rtc['app_id'] or not rtc['app_key']:
-        return False, '请配置 app_id 与 app_key'
+    if not _mediamtx_binary_path():
+        return False, '未找到 mediamtx，请运行 back/cinema/scripts/deploy_mediamtx.sh'
     return True, ''
 
 
-def _stream_payload(state, pid, running, rtc):
-    return {
+def _stream_payload(state, pid, running, mtx):
+    payload = {
         'running': running,
         'pid': pid if running else None,
-        'room_id': state.get('room_id') or rtc['default_room_id'],
-        'user_id': state.get('user_id') or rtc['default_user_id'],
+        'path_name': mtx['path_name'],
         'cinema_filename': state.get('cinema_filename'),
-        'app_id': rtc['app_id'],
         'started_at': state.get('started_at'),
+        'prelude_seconds': mtx.get('prelude_seconds', 10),
+        'playback': build_playback_payload(mtx),
     }
+    return payload
 
 
-@csrf_exempt
-@require_POST
-def get_token(request):
-    """POST /api/cinema/get/token — 与 Flask token 服务兼容"""
-    try:
-        body = json.loads(request.body.decode('utf-8') or '{}')
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return _token_response(400, '未携带json数据或格式错误')
-
-    user_id = (body.get('user_id') or '').strip()
-    room_id = body.get('room_id')
-    if not user_id or not room_id:
-        return _token_response(400, '未携带json数据或格式错误')
-    if not _RTC_USER_ID_RE.fullmatch(user_id):
-        return _token_response(400, 'user_id 格式无效')
-
-    rtc = get_rtc_settings()
-    if not rtc['app_id'] or not rtc['app_key']:
-        return _token_response(500, 'RTC 未配置 app_id / app_key')
-
-    token_str = access_token.create_rtc_token(
-        rtc['app_id'],
-        rtc['app_key'],
-        str(room_id),
-        str(user_id),
-        rtc['expire_ts'],
-    )
-    return _token_response(200, '请求成功', user_id, room_id, token_str)
+def _get_stream_status():
+    pid, running = _reconcile_ffmpeg_state()
+    state = _read_stream_state()
+    mtx = get_mediamtx_settings()
+    if running:
+        pid = pid or _read_pid(STREAM_PID_FILE)
+    return state, pid, running, mtx
 
 
 @require_GET
 def cinema_list(request):
     cinema_files = _scan_cinema_files()
-    state, pid, running = _get_stream_status()
-    rtc = get_rtc_settings()
+    state, pid, running, mtx = _get_stream_status()
+    mediamtx_running, _ = _is_mediamtx_running()
     return _success({
         'cinema': cinema_files,
-        'stream': _stream_payload(state, pid, running, rtc),
+        'stream': _stream_payload(state, pid, running, mtx),
+        'mediamtx_running': mediamtx_running,
     })
 
 
 @require_GET
 def stream_status(request):
-    state, pid, running = _get_stream_status()
-    rtc = get_rtc_settings()
-    payload = _stream_payload(state, pid, running, rtc)
-    payload['rtc_runtime_ready'] = _rtccli_path() is not None
+    state, pid, running, mtx = _get_stream_status()
+    mediamtx_running, mediamtx_pid = _is_mediamtx_running()
+    payload = _stream_payload(state, pid, running, mtx)
+    payload['mediamtx_running'] = mediamtx_running
+    payload['mediamtx_pid'] = mediamtx_pid
+    payload['mediamtx_ready'] = _mediamtx_binary_path() is not None
     return _success(payload)
 
 
@@ -357,7 +594,7 @@ def admin_delete_cinema(request, filename):
     if not path or not path.is_file():
         return _error('影片不存在', 404)
 
-    state, _, running = _get_stream_status()
+    state, _, running, _ = _get_stream_status()
     if state.get('cinema_filename') == path.name and running:
         return _error('该影片正在推流中，请先停止推流')
 
@@ -386,50 +623,63 @@ def admin_start_stream(request):
     if not cinema_path or not cinema_path.is_file():
         return _error('影片文件不存在', 404)
 
-    rtc = get_rtc_settings()
-    room_id = (body.get('room_id') or rtc['default_room_id']).strip()
-    user_id = (body.get('user_id') or rtc['default_user_id']).strip()
+    mtx = get_mediamtx_settings()
+    started, mediamtx_pid, start_err = _start_mediamtx()
+    if not started:
+        return _error(start_err or 'mediamtx 启动失败', 500)
 
-    name_re = re.compile(r'^[a-zA-Z0-9@._-]{1,128}$')
-    if not name_re.match(room_id) or not name_re.match(user_id):
-        return _error('room_id / user_id 格式无效（1-128 位字母数字及 @._-）')
+    _stop_ffmpeg_publish()
+    cinema_log(f'--- start stream: {cinema_path.name} ---')
 
-    _stop_stream_process()
-
-    RTC_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    exe = _rtccli_path()
-    if not BLOG_CONFIG_FILE.is_file():
-        return _error(f'未找到博客配置: {BLOG_CONFIG_FILE}', 500)
+    try:
+        w, h = _probe_video_size(cinema_path)
+        t_prep = time.time()
+        combined_path = _prepare_combined_clip(mtx, cinema_path, w, h)
+        cinema_log(
+            f'combined clip ready: {combined_path.name} '
+            f'prep_ms={int((time.time() - t_prep) * 1000)}'
+        )
+    except subprocess.CalledProcessError:
+        cinema_log('combined clip generation failed', tag='ffmpeg')
+        return _error('影片合成失败，请查看 log/back.log', 500)
+    except OSError as exc:
+        return _error(f'推流准备失败: {exc}', 500)
+
+    ffmpeg_cmd = _build_ffmpeg_cmd(mtx, combined_path)
+    cinema_log('ffmpeg cmd: ' + ' '.join(ffmpeg_cmd))
 
     log_file = open(BLOG_LOG_FILE, 'a', encoding='utf-8')
+    log_file.write(f'\n[{datetime.now().isoformat(timespec="seconds")}] [ffmpeg] process start\n')
     try:
         proc = subprocess.Popen(
-            [
-                str(exe),
-                str(cinema_path.resolve()),
-                room_id,
-                user_id,
-                str(BLOG_CONFIG_FILE.resolve()),
-            ],
-            cwd=str(RTC_RUNTIME_DIR),
+            ffmpeg_cmd,
+            cwd=str(STREAM_RUNTIME_DIR),
             stdout=log_file,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
     finally:
         log_file.close()
 
     if proc.poll() is not None:
-        return _error('rtccli 启动失败，请查看 log/back.log', 500)
+        cinema_log('ffmpeg exited immediately after start', tag='ffmpeg')
+        return _error('ffmpeg 推流启动失败，请查看 log/back.log', 500)
+
+    t0 = time.time()
+    path_ready, _path_data = _mediamtx_path_online(mtx)
+    cinema_log(
+        f'ffmpeg pid={proc.pid} path_ready={path_ready} '
+        f'wait_ms={int((time.time() - t0) * 1000)}'
+    )
 
     STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
     state = {
         'running': True,
         'pid': proc.pid,
-        'room_id': room_id,
-        'user_id': user_id,
+        'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
         'started_at': datetime.now().isoformat(timespec='seconds'),
     }
@@ -437,10 +687,11 @@ def admin_start_stream(request):
 
     return _success({
         'pid': proc.pid,
-        'room_id': room_id,
-        'user_id': user_id,
+        'mediamtx_pid': mediamtx_pid,
+        'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
-        'config_file': str(BLOG_CONFIG_FILE),
+        'playback': build_playback_payload(mtx),
+        'path_ready': path_ready,
         'log_file': str(BLOG_LOG_FILE),
     }, '推流已启动')
 
@@ -449,22 +700,54 @@ def admin_start_stream(request):
 @require_POST
 @admin_required
 def admin_stop_stream(request):
-    _stop_stream_process()
+    _stop_ffmpeg_publish()
     return _success({'running': False}, '推流已停止')
 
 
 @require_GET
 @admin_required
 def admin_runtime_info(request):
-    exe = _rtccli_path()
-    rtc = get_rtc_settings()
-    _, pid, running = _get_stream_status()
+    exe = _mediamtx_binary_path()
+    mtx = get_mediamtx_settings()
+    _, pid, running, _ = _get_stream_status()
+    mediamtx_running, mediamtx_pid = _is_mediamtx_running()
     return _success({
-        'rtc_runtime_dir': str(RTC_RUNTIME_DIR),
-        'rtccli_exists': exe is not None,
-        'rtccli_path': str(exe) if exe else None,
+        'mediamtx_runtime_dir': str(MEDIAMTX_RUNTIME_DIR),
+        'mediamtx_binary_exists': exe is not None,
+        'mediamtx_binary_path': str(exe) if exe else None,
+        'mediamtx_config': str(MEDIAMTX_CONFIG_FILE),
+        'mediamtx_running': mediamtx_running,
+        'mediamtx_pid': mediamtx_pid,
         'cinema_dir': str(CINEMA_DIR),
-        'app_id_configured': bool(rtc['app_id']),
         'stream_running': running,
-        'token_endpoint': f"http://{rtc['token_server_host']}:{rtc['token_server_port']}{rtc['token_server_path']}",
+        'ffmpeg_pid': pid if running else None,
+        'rtsp_publish_url': mtx['rtsp_publish_url'],
+        'playback': build_playback_payload(mtx),
+        'log_file': str(BLOG_LOG_FILE),
     })
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'PUT'])
+@admin_required
+def admin_cinema_config(request):
+    if request.method == 'GET':
+        try:
+            return _success(build_admin_config_payload())
+        except (OSError, ValueError, yaml.YAMLError) as exc:
+            return _error(f'读取配置失败: {exc}', 500)
+
+    try:
+        body = json.loads(request.body.decode('utf-8') or '{}')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return _error('请求体不是有效 JSON')
+
+    try:
+        payload = save_admin_config(body)
+    except ValueError as exc:
+        return _error(str(exc))
+    except (OSError, yaml.YAMLError) as exc:
+        return _error(f'保存配置失败: {exc}', 500)
+
+    cinema_log('cinema config updated from admin')
+    return _success(payload, '配置已保存')

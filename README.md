@@ -291,10 +291,12 @@ crontab -e
 
 ### 同频影院
 
-* 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+，**无需联网下载 hls.js**）
-* 配置 `config_back.json` 中的 `mediamtx` 节点（公网部署时填写 `public_host` 或 `webrtc_public_base_url`）
-* 依赖系统已安装 `ffmpeg`；MP4 建议使用 H.264 + AAC 编码以便浏览器 WebRTC/HLS 播放
-* 管理后台启动推流后，观众页通过 WebRTC(WHEP) 或 HLS 观看（由 `playback_mode` 决定，默认 `webrtc`）
+* 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）
+* 应用配置在 `config_back.json` 的 `mediamtx` 节点：`prelude_seconds`（开播前黑场秒数，默认 10）、`ffmpeg_bin`
+* MediaMTX 写在 `back/cinema/mediamtx/cinema.yml`；流路径固定为 `cinema`，RTSP/API/信令固定 `127.0.0.1`。管理后台可改黑场、ffmpeg、日志级别和公网 ICE 地址
+* 依赖系统已安装 `ffmpeg`（需支持 `libopus`）；MP4 视频建议 H.264，音频由 ffmpeg 转为 Opus
+* 推流与放映相关日志均写入 `log/back.log`（`[cinema]` / `[ffmpeg]` / mediamtx 进程输出），由现有后端日志轮转管理
+* 管理后台启动推流后，观众页通过 WebRTC(WHEP) 观看
 
 ```bash
 # 安装 ffmpeg（OpenCloudOS / RHEL 系）
@@ -305,7 +307,7 @@ cd /webproject/my-blog/back/cinema/scripts
 ./deploy_mediamtx.sh
 ```
 
-公网 WebRTC 需在 `back/cinema/mediamtx/cinema.yml` 中配置 `webrtcAdditionalHosts`（服务器公网 IP 或域名），并开放 UDP 8189 等端口。
+公网 WebRTC：博客与 MediaMTX 同机时，在管理页填写 `webrtcAdditionalHosts`（这台服务器的公网 IP 或域名），防火墙放行 **UDP 8189**。RTSP（8554）和控制 API（9997）保持 `127.0.0.1`，不要对公网开放。
 
 ## 参与贡献
 1. 李远博

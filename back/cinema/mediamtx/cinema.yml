@@ -1,4 +1,6 @@
 # 同频影院专用 MediaMTX 配置（由 Django 启动 mediamtx 时加载）
+# RTSP / API / WebRTC 信令仅监听 127.0.0.1；公网观众通过 Django 代理信令，
+# 音视频 UDP 走 webrtcLocalUDPAddress（默认 8189），需在 webrtcAdditionalHosts 填公网 IP 或域名。
 logLevel: info
 logDestinations: [stdout]
 
@@ -8,14 +10,13 @@ apiAddress: 127.0.0.1:9997
 rtsp: yes
 rtspAddress: 127.0.0.1:8554
 
-hls: yes
-hlsAddress: :8888
-hlsAllowOrigins: ['*']
+hls: no
 
 webrtc: yes
-webrtcAddress: :8889
+webrtcAddress: 127.0.0.1:8889
+webrtcLocalUDPAddress: :8189
 webrtcAllowOrigins: ['*']
-# 公网部署时补充服务器公网 IP 或域名，例如：
+# 博客与 MediaMTX 同机时，这里填这台服务器的公网 IP 或域名，例如：
 # webrtcAdditionalHosts: [1.2.3.4, example.com]
 
 paths:
