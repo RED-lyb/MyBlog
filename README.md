@@ -291,7 +291,7 @@ crontab -e
 
 ### 同频影院
 
-* 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）
+* 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）。`go build` 会下载 WebRTC/RTSP 等第三方库；国内可 `export GOPROXY=https://goproxy.cn,direct`。若希望服务器不联网编译：在有网机器执行 `./deploy_mediamtx.sh vendor`，把 `back/cinema/mediamtx/vendor/` 拷到服务器同路径后再编译。
 * 应用配置在 `config_back.json` 的 `mediamtx` 节点：`prelude_seconds`（开播前黑场秒数，默认 10）、`ffmpeg_bin`
 * MediaMTX 写在 `back/cinema/mediamtx/cinema.yml`；流路径固定为 `cinema`，RTSP/API/信令固定 `127.0.0.1`。管理后台可改黑场、ffmpeg、日志级别和公网 ICE 地址
 * 依赖系统已安装 `ffmpeg`（需支持 `libopus`）；MP4 视频建议 H.264，音频由 ffmpeg 转为 Opus
@@ -303,7 +303,9 @@ crontab -e
 dnf install -y ffmpeg
 
 # 安装 Go 1.26+ 后编译 mediamtx
+# 国内镜像（可选）：export GOPROXY=https://goproxy.cn,direct
 cd /webproject/my-blog/back/cinema/scripts
+# 有网机器可先：./deploy_mediamtx.sh vendor
 ./deploy_mediamtx.sh
 ```
 

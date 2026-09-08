@@ -1,8 +1,11 @@
 # Python 虚拟环境和依赖
 blog_env/
 venv/
-env/
+/env/
 .venv/
+
+# MediaMTX 的 go mod vendor 产物（体积大，用 deploy_mediamtx.sh vendor 生成后拷到服务器即可）
+back/cinema/mediamtx/vendor/
 
 # IDE 配置文件
 .vscode/

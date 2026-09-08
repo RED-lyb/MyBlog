@@ -16,10 +16,11 @@ HLS_DST="${MEDIAMTX_SRC}/internal/servers/hls/hls.min.js"
 
 usage() {
   cat <<'EOF'
-用法: deploy_mediamtx.sh [build]
+用法: deploy_mediamtx.sh [build|vendor]
 
   (无参数)  从 back/cinema/mediamtx 源码编译
   build     同上，强制重新编译
+  vendor    把 Go 依赖下载到 mediamtx/vendor/（只需联网一次）
 
 要求:
   - Go 1.26+
@@ -29,6 +30,11 @@ usage() {
   脚本会将 mediamtx_embed/ 同步到 mediamtx 源码目录后直接 go build，
   不执行 go generate，避免下载 hls.js / 树莓派资源。
   mediamtx 源码已纳入本仓库（back/cinema/mediamtx/），无需单独 clone。
+
+  go build 会按 go.mod 拉取 WebRTC/RTSP 等第三方库。国内可先：
+    export GOPROXY=https://goproxy.cn,direct
+  有网的机器上执行 ./deploy_mediamtx.sh vendor，把 mediamtx/vendor/ 拷到
+  服务器同路径后，再编译会走 -mod=vendor，不再访问网络。
 EOF
 }
 
@@ -48,7 +54,7 @@ sync_embed_assets() {
   echo "  ${HLS_SRC} → ${HLS_DST}"
 }
 
-build_mediamtx() {
+require_go_and_src() {
   if [[ ! -f "${MEDIAMTX_SRC}/main.go" ]]; then
     echo "未找到源码: ${MEDIAMTX_SRC}"
     echo "请确认 mediamtx 已置于 back/cinema/mediamtx"
@@ -59,20 +65,44 @@ build_mediamtx() {
     echo "请先安装 Go 1.26+：https://go.dev/dl/"
     exit 1
   fi
+}
 
+vendor_mediamtx() {
+  require_go_and_src
+  echo "下载 Go 依赖到 ${MEDIAMTX_SRC}/vendor"
+  (
+    cd "${MEDIAMTX_SRC}"
+    go mod vendor
+  )
+  echo "完成: ${MEDIAMTX_SRC}/vendor"
+  echo "把该目录同步到编译机同路径后，再执行 ./deploy_mediamtx.sh 即可离线编译。"
+}
+
+build_mediamtx() {
+  require_go_and_src
   sync_embed_assets
 
   echo "编译 mediamtx → ${RUNTIME_DIR}"
   mkdir -p "${RUNTIME_DIR}"
   (
     cd "${MEDIAMTX_SRC}"
-    CGO_ENABLED=0 go build -o "${BINARY_PATH}" .
+    if [[ -d vendor ]]; then
+      echo "使用本地 vendor/ 离线编译"
+      CGO_ENABLED=0 go build -mod=vendor -o "${BINARY_PATH}" .
+    else
+      echo "未找到 vendor/，将按 GOPROXY 拉取依赖（国内可 GOPROXY=https://goproxy.cn,direct）"
+      CGO_ENABLED=0 go build -o "${BINARY_PATH}" .
+    fi
   )
 }
 
 case "${1:-}" in
   ""|build)
     build_mediamtx
+    ;;
+  vendor)
+    vendor_mediamtx
+    exit 0
     ;;
   -h|--help|help)
     usage
