@@ -22,7 +22,6 @@ const configLoading = ref(false)
 const configSaving = ref(false)
 const configForm = ref({
   app: {
-    prelude_seconds: 10,
     ffmpeg_bin: 'ffmpeg',
     file: 'back/config/config_back.json',
   },
@@ -40,7 +39,6 @@ const applyConfig = (data) => {
   if (!data) return
   configForm.value = {
     app: {
-      prelude_seconds: data.app?.prelude_seconds ?? 10,
       ffmpeg_bin: data.app?.ffmpeg_bin || 'ffmpeg',
       file: data.app?.file || 'back/config/config_back.json',
     },
@@ -76,7 +74,6 @@ const saveConfig = async () => {
   try {
     const res = await apiClient.put(`${apiUrl}cinema/admin/config/`, {
       app: {
-        prelude_seconds: configForm.value.app.prelude_seconds,
         ffmpeg_bin: configForm.value.app.ffmpeg_bin,
       },
       server: {
@@ -345,15 +342,6 @@ watch(
         <el-divider content-position="left">
           {{ configForm.app.file }}
         </el-divider>
-        <el-form-item label="开播倒计时秒数">
-          <el-input-number
-            v-model="configForm.app.prelude_seconds"
-            :min="0"
-            :max="120"
-            :step="1"
-          />
-          <div class="form-tip">观众端读秒时长；倒计时结束后再推原始片源</div>
-        </el-form-item>
         <el-form-item label="ffmpeg 路径">
           <el-input v-model="configForm.app.ffmpeg_bin" placeholder="ffmpeg" />
           <div class="form-tip">服务器上的 ffmpeg 可执行文件，一般填 ffmpeg</div>

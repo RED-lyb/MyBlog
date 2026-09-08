@@ -6,7 +6,6 @@ import os
 import re
 import signal
 import subprocess
-import threading
 import time
 import urllib.error
 import urllib.request
@@ -329,7 +328,6 @@ def _kill_ffmpeg_publish():
 
 def _stop_ffmpeg_publish():
     cinema_log('stop ffmpeg publish')
-    _cancel_scheduled_push()
     _kill_ffmpeg_publish()
     _clear_pid_file(STREAM_PID_FILE)
     state = _read_stream_state()
@@ -364,21 +362,6 @@ def _mediamtx_path_online(mtx, timeout=6.0):
         time.sleep(0.15)
     cinema_log(f'mediamtx path online timeout after {timeout}s')
     return False, None
-
-
-_push_schedule_generation = 0
-_push_schedule_lock = threading.Lock()
-
-
-def _cancel_scheduled_push():
-    global _push_schedule_generation
-    with _push_schedule_lock:
-        _push_schedule_generation += 1
-        return _push_schedule_generation
-
-
-def _now_ms():
-    return int(time.time() * 1000)
 
 
 def _ffprobe_bin(ffmpeg_bin):
@@ -421,7 +404,7 @@ def _video_encode_args(ffmpeg_bin, cinema_path):
 
 
 def _build_ffmpeg_cmd(mtx, cinema_path):
-    """倒计时结束后以 1x 推原始片源；H.264 直拷，音频转 Opus。"""
+    """立即以 1x 推原始片源；H.264 直拷，音频转 Opus。"""
     return [
         mtx['ffmpeg_bin'],
         '-nostdin',
@@ -469,35 +452,7 @@ def _launch_ffmpeg_push(mtx, cinema_path):
     )
 
     STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
-    state = _read_stream_state()
-    state['pid'] = proc.pid
-    state['push_started_at'] = datetime.now().isoformat(timespec='seconds')
-    _write_stream_state(state)
     return proc.pid, path_ready
-
-
-def _schedule_ffmpeg_push(mtx, cinema_path, prelude_seconds):
-    generation = _cancel_scheduled_push()
-    delay = max(0, int(prelude_seconds))
-
-    def worker():
-        if delay > 0:
-            cinema_log(f'prelude wait {delay}s before push: {cinema_path.name}')
-            time.sleep(delay)
-        with _push_schedule_lock:
-            if generation != _push_schedule_generation:
-                return
-        state = _read_stream_state()
-        if not state.get('running'):
-            return
-        if state.get('cinema_filename') != cinema_path.name:
-            return
-        cinema_log(f'prelude ended, pushing source file: {cinema_path.name}')
-        pid, path_ready = _launch_ffmpeg_push(mtx, cinema_path)
-        if not pid:
-            _mark_stream_stopped()
-
-    threading.Thread(target=worker, daemon=True, name='cinema-push').start()
 
 
 def _mediamtx_binary_path():
@@ -577,29 +532,15 @@ def _runtime_ready():
 
 
 def _stream_payload(state, pid, session_running, pushing, mtx):
-    prelude_seconds = mtx.get('prelude_seconds', 10)
-    started_at_ms = state.get('started_at_ms')
-    prelude_ends_at_ms = state.get('prelude_ends_at_ms')
-    if started_at_ms is not None:
-        started_at_ms = int(started_at_ms)
-        if prelude_ends_at_ms is None:
-            prelude_ends_at_ms = started_at_ms + int(prelude_seconds) * 1000
-        else:
-            prelude_ends_at_ms = int(prelude_ends_at_ms)
-    payload = {
+    return {
         'running': session_running,
         'pushing': pushing,
         'pid': pid if pushing else None,
         'path_name': mtx['path_name'],
         'cinema_filename': state.get('cinema_filename'),
         'started_at': state.get('started_at'),
-        'started_at_ms': started_at_ms,
-        'prelude_ends_at_ms': prelude_ends_at_ms,
-        'server_now_ms': _now_ms(),
-        'prelude_seconds': prelude_seconds,
         'playback': build_playback_payload(mtx),
     }
-    return payload
 
 
 def _get_stream_status():
@@ -710,36 +651,31 @@ def admin_start_stream(request):
     _stop_ffmpeg_publish()
     cinema_log(f'--- start stream: {cinema_path.name} ---')
 
-    prelude_seconds = mtx.get('prelude_seconds', 10)
-    now_ms = _now_ms()
+    pid, path_ready = _launch_ffmpeg_push(mtx, cinema_path)
+    if not pid:
+        _mark_stream_stopped()
+        return _error('ffmpeg 推流启动失败，请查看 log/back.log', 500)
+
     state = {
         'running': True,
-        'pid': None,
+        'pid': pid,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
         'started_at': datetime.now().isoformat(timespec='seconds'),
-        'started_at_ms': now_ms,
-        'prelude_ends_at_ms': now_ms + prelude_seconds * 1000,
+        'push_started_at': datetime.now().isoformat(timespec='seconds'),
     }
     _write_stream_state(state)
-    _schedule_ffmpeg_push(mtx, cinema_path, prelude_seconds)
-    cinema_log(
-        f'session started, ffmpeg push scheduled in {prelude_seconds}s: '
-        f'{cinema_path.name}'
-    )
+    cinema_log(f'session started, ffmpeg pid={pid} path_ready={path_ready}')
 
     return _success({
         'running': True,
-        'pushing': False,
+        'pushing': True,
+        'pid': pid,
         'mediamtx_pid': mediamtx_pid,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
         'playback': build_playback_payload(mtx),
-        'prelude_seconds': prelude_seconds,
         'started_at': state['started_at'],
-        'started_at_ms': now_ms,
-        'prelude_ends_at_ms': state['prelude_ends_at_ms'],
-        'server_now_ms': now_ms,
         'log_file': str(BLOG_LOG_FILE),
     }, '推流已开始')
 

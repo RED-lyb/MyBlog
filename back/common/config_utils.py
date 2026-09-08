@@ -43,7 +43,6 @@ def load_config():
             'refresh_token_expire_days': 30  # Refresh Token 30天
         },
         'mediamtx': {
-            'prelude_seconds': 10,
             'ffmpeg_bin': 'ffmpeg',
         },
     }

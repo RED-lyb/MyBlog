@@ -149,7 +149,6 @@ def save_cinema_yml(server):
 def load_app_mediamtx():
     cfg = load_config().get('mediamtx') or {}
     return {
-        'prelude_seconds': max(0, int(cfg.get('prelude_seconds', 10))),
         'ffmpeg_bin': (cfg.get('ffmpeg_bin') or 'ffmpeg').strip() or 'ffmpeg',
     }
 
@@ -163,7 +162,6 @@ def save_app_mediamtx(app):
     else:
         data = {}
     data['mediamtx'] = {
-        'prelude_seconds': max(0, int(app['prelude_seconds'])),
         'ffmpeg_bin': (app.get('ffmpeg_bin') or 'ffmpeg').strip() or 'ffmpeg',
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -182,7 +180,6 @@ def get_mediamtx_settings():
     return {
         'path_name': PATH_NAME,
         'rtsp_publish_url': f'rtsp://{_connect_host(rtsp_host)}:{rtsp_port}/{PATH_NAME}',
-        'prelude_seconds': app['prelude_seconds'],
         'ffmpeg_bin': app['ffmpeg_bin'],
         'api_url': f'http://{_connect_host(api_host)}:{api_port}',
         'webrtc_port': webrtc_port,
@@ -220,12 +217,6 @@ def save_admin_config(payload):
     current_server = parse_server_settings()
     current_app = load_app_mediamtx()
 
-    prelude_seconds = app_in.get('prelude_seconds', current_app['prelude_seconds'])
-    try:
-        prelude_seconds = max(0, min(int(prelude_seconds), 120))
-    except (TypeError, ValueError) as exc:
-        raise ValueError('倒计时秒数必须是 0–120 的整数') from exc
-
     ffmpeg_bin = (app_in.get('ffmpeg_bin') or current_app['ffmpeg_bin']).strip() or 'ffmpeg'
     log_level = str(server_in.get('log_level') or current_server['log_level']).strip() or 'info'
     if log_level not in ('error', 'warn', 'info', 'debug'):
@@ -246,7 +237,6 @@ def save_admin_config(payload):
     )
 
     app = {
-        'prelude_seconds': prelude_seconds,
         'ffmpeg_bin': ffmpeg_bin,
     }
     server = {
