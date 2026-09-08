@@ -6,6 +6,7 @@ import os
 import re
 import signal
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -296,11 +297,13 @@ def _reconcile_ffmpeg_state():
     if pid and _is_process_running(pid):
         return pid, True
 
+    had_pid = pid is not None
     if pid:
         cinema_log(f'ffmpeg pid={pid} exited, stream ended')
         _reap_process(pid)
     _clear_pid_file(STREAM_PID_FILE)
-    _mark_stream_stopped()
+    if had_pid:
+        _mark_stream_stopped()
     return None, False
 
 
@@ -326,9 +329,16 @@ def _kill_ffmpeg_publish():
 
 def _stop_ffmpeg_publish():
     cinema_log('stop ffmpeg publish')
+    _cancel_scheduled_push()
     _kill_ffmpeg_publish()
     _clear_pid_file(STREAM_PID_FILE)
-    _mark_stream_stopped()
+    state = _read_stream_state()
+    if state.get('running'):
+        state['running'] = False
+        state['stopped_at'] = datetime.now().isoformat(timespec='seconds')
+        _write_stream_state(state)
+    else:
+        _mark_stream_stopped()
 
 
 def _mediamtx_path_online(mtx, timeout=6.0):
@@ -356,12 +366,82 @@ def _mediamtx_path_online(mtx, timeout=6.0):
     return False, None
 
 
-def _probe_video_size(cinema_path):
+_push_schedule_generation = 0
+_push_schedule_lock = threading.Lock()
+
+
+def _cancel_scheduled_push():
+    global _push_schedule_generation
+    with _push_schedule_lock:
+        _push_schedule_generation += 1
+        return _push_schedule_generation
+
+
+def _now_ms():
+    return int(time.time() * 1000)
+
+
+def _ffprobe_bin(ffmpeg_bin):
+    if ffmpeg_bin.endswith('ffmpeg'):
+        candidate = f'{ffmpeg_bin[:-6]}ffprobe'
+        if os.path.isfile(candidate):
+            return candidate
+    return 'ffprobe'
+
+
+def _even_dim(value, fallback):
+    try:
+        num = int(value)
+    except (TypeError, ValueError):
+        num = fallback
+    if num <= 1:
+        num = fallback
+    if num % 2:
+        num += 1
+    return num
+
+
+def _parse_fps(raw, default=30.0):
+    text = str(raw or '').strip()
+    if not text or text in ('0/0', 'N/A'):
+        return default
+    try:
+        if '/' in text:
+            num, den = text.split('/', 1)
+            den_f = float(den)
+            if den_f == 0:
+                return default
+            value = float(num) / den_f
+        else:
+            value = float(text)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return default
+    if value < 8 or value > 60:
+        return default
+    return value
+
+
+def _lavfi_rate(fps):
+    rounded = round(fps)
+    if abs(fps - rounded) < 0.05:
+        return str(int(rounded))
+    return f'{fps:.3f}'
+
+
+def _probe_media(cinema_path, ffmpeg_bin):
+    info = {
+        'width': 1280,
+        'height': 720,
+        'fps': 30.0,
+        'has_audio': False,
+    }
     try:
         result = subprocess.run(
             [
-                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
-                '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x',
+                _ffprobe_bin(ffmpeg_bin),
+                '-v', 'error',
+                '-print_format', 'json',
+                '-show_streams',
                 str(cinema_path),
             ],
             capture_output=True,
@@ -369,70 +449,179 @@ def _probe_video_size(cinema_path):
             timeout=10,
             check=True,
         )
-        w, h = result.stdout.strip().split('x')
-        return max(int(w), 2), max(int(h), 2)
-    except Exception:
-        return 1280, 720
+        payload = json.loads(result.stdout or '{}')
+    except Exception as exc:
+        cinema_log(f'ffprobe failed, using 1280x720@30: {exc}')
+        return info
+
+    video = None
+    for stream in payload.get('streams') or []:
+        if stream.get('codec_type') == 'video' and video is None:
+            video = stream
+        elif stream.get('codec_type') == 'audio':
+            info['has_audio'] = True
+
+    if video:
+        info['width'] = _even_dim(video.get('width'), 1280)
+        info['height'] = _even_dim(video.get('height'), 720)
+        info['fps'] = _parse_fps(
+            video.get('avg_frame_rate') or video.get('r_frame_rate'),
+            30.0,
+        )
+    return info
 
 
-def _combined_clip_path(mtx, cinema_path, w, h):
-    prelude = int(mtx.get('prelude_seconds', 10))
-    return STREAM_RUNTIME_DIR / f'combined_{cinema_path.stem}_{w}x{h}_p{prelude}.mp4'
-
-
-def _prepare_combined_clip(mtx, cinema_path, w, h):
-    """
-    离线合成黑场+正片（filter concat 可快速完成且时间戳连续）。
-    再用单一 -re 输入实时推流，避免 concat demuxer 在直播中的音频 DTS 断裂。
-    """
-    out = _combined_clip_path(mtx, cinema_path, w, h)
-    if out.is_file() and out.stat().st_mtime >= cinema_path.stat().st_mtime:
-        return out
-
-    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-    prelude_s = str(int(mtx.get('prelude_seconds', 10)))
-    size = f'{w}x{h}'
-    filter_complex = (
-        f'[0:v]format=yuv420p,setsar=1[bv];'
-        f'[1:a]atrim=0:{prelude_s},asetpts=PTS-STARTPTS[ba];'
-        f'[2:v]fps=30,scale={w}:{h}:force_original_aspect_ratio=decrease,'
-        f'pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,setsar=1,setpts=PTS-STARTPTS[mv];'
-        f'[2:a]aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS[ma];'
-        f'[bv][ba][mv][ma]concat=n=2:v=1:a=1[outv][outa]'
-    )
-    cmd = [
-        mtx['ffmpeg_bin'],
-        '-y', '-nostdin', '-hide_banner', '-loglevel', 'error',
-        '-f', 'lavfi', '-i', f'color=c=black:s={size}:r=30:d={prelude_s}',
-        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
-        '-i', str(cinema_path.resolve()),
-        '-filter_complex', filter_complex,
-        '-map', '[outv]', '-map', '[outa]',
-        '-c:v', 'libx264', '-preset', 'veryfast', '-g', '30', '-bf', '0',
-        '-c:a', 'aac', '-ar', '48000', '-ac', '2',
-        str(out.resolve()),
-    ]
-    subprocess.run(cmd, check=True, timeout=600)
-    return out
-
-
-def _build_ffmpeg_cmd(mtx, combined_path):
-    """从已合成的完整片源以 1x 实时速度推流。"""
+def _x264_encode_args(fps):
+    gop = max(12, min(60, int(round(fps))))
     return [
+        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+        '-profile:v', 'baseline', '-pix_fmt', 'yuv420p',
+        '-g', str(gop), '-keyint_min', str(gop), '-sc_threshold', '0', '-bf', '0',
+        '-force_key_frames', 'expr:gte(t,n_forced*1)',
+    ]
+
+
+def _opus_encode_args():
+    return [
+        '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
+        '-application', 'lowdelay', '-b:a', '96k',
+    ]
+
+
+def _build_ffmpeg_cmd(mtx, cinema_path, media_info, prelude_seconds):
+    """黑场（可选）+ 正片同一进程推流；视频始终转码以保证关键帧。"""
+    delay = max(0, int(prelude_seconds))
+    width = media_info['width']
+    height = media_info['height']
+    fps = media_info['fps']
+    rate = _lavfi_rate(fps)
+    source = str(cinema_path.resolve())
+    head = [
         mtx['ffmpeg_bin'],
         '-nostdin',
         '-hide_banner',
         '-loglevel', 'info',
-        '-re',
-        '-i', str(combined_path.resolve()),
-        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
-        '-force_key_frames', 'expr:gte(t,n_forced*1)',
-        '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
-        '-application', 'lowdelay', '-b:a', '96k',
+    ]
+    tail = [
+        *_x264_encode_args(fps),
+        *_opus_encode_args(),
         '-f', 'rtsp', '-rtsp_transport', 'tcp',
         mtx['rtsp_publish_url'],
     ]
+
+    if delay <= 0:
+        cmd = head + ['-re', '-i', source]
+        if not media_info['has_audio']:
+            cmd += [
+                '-f', 'lavfi', '-i',
+                'anullsrc=channel_layout=stereo:sample_rate=48000',
+                '-map', '0:v:0', '-map', '1:a:0', '-shortest',
+            ]
+        return cmd + tail
+
+    color = f'color=c=black:s={width}x{height}:r={rate}:d={delay}'
+    silence = f'anullsrc=channel_layout=stereo:sample_rate=48000:d={delay}'
+    scale = (
+        f'[2:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+        f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={rate},format=yuv420p,setsar=1[mv];'
+    )
+    if media_info['has_audio']:
+        filter_complex = (
+            scale
+            + '[2:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[ma];'
+            + '[0:v][1:a][mv][ma]concat=n=2:v=1:a=1[v][a];'
+            + '[v]realtime[vout];[a]arealtime[aout]'
+        )
+        maps = ['-map', '[vout]', '-map', '[aout]']
+        return head + [
+            '-f', 'lavfi', '-i', color,
+            '-f', 'lavfi', '-i', silence,
+            '-i', source,
+            '-filter_complex', filter_complex,
+            *maps,
+            *tail,
+        ]
+
+    filter_complex = (
+        f'[1:v]scale={width}:{height}:force_original_aspect_ratio=decrease,'
+        f'pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={rate},format=yuv420p,setsar=1[mv];'
+        '[0:v][mv]concat=n=2:v=1:a=0[v];'
+        '[v]realtime[vout]'
+    )
+    return head + [
+        '-f', 'lavfi', '-i', color,
+        '-i', source,
+        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+        '-filter_complex', filter_complex,
+        '-map', '[vout]', '-map', '2:a:0', '-shortest',
+        *tail,
+    ]
+
+
+def _launch_ffmpeg_push(mtx, cinema_path, prelude_seconds):
+    media_info = _probe_media(cinema_path, mtx['ffmpeg_bin'])
+    ffmpeg_cmd = _build_ffmpeg_cmd(mtx, cinema_path, media_info, prelude_seconds)
+    cinema_log(
+        f'ffmpeg cmd ({media_info["width"]}x{media_info["height"]}@{media_info["fps"]:.3f} '
+        f'audio={media_info["has_audio"]} prelude={prelude_seconds}): '
+        + ' '.join(ffmpeg_cmd)
+    )
+
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    log_file = open(BLOG_LOG_FILE, 'a', encoding='utf-8')
+    log_file.write(f'\n[{datetime.now().isoformat(timespec="seconds")}] [ffmpeg] process start\n')
+    try:
+        proc = subprocess.Popen(
+            ffmpeg_cmd,
+            cwd=str(STREAM_RUNTIME_DIR),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    finally:
+        log_file.close()
+
+    if proc.poll() is not None:
+        cinema_log('ffmpeg exited immediately after start', tag='ffmpeg')
+        return None, False
+
+    t0 = time.time()
+    path_ready, _path_data = _mediamtx_path_online(mtx)
+    cinema_log(
+        f'ffmpeg pid={proc.pid} path_ready={path_ready} '
+        f'wait_ms={int((time.time() - t0) * 1000)}'
+    )
+
+    STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
+    state = _read_stream_state()
+    state['pid'] = proc.pid
+    state['push_started_at'] = datetime.now().isoformat(timespec='seconds')
+    _write_stream_state(state)
+    return proc.pid, path_ready
+
+
+def _schedule_ffmpeg_push(mtx, cinema_path, prelude_seconds):
+    generation = _cancel_scheduled_push()
+
+    def worker():
+        with _push_schedule_lock:
+            if generation != _push_schedule_generation:
+                return
+        state = _read_stream_state()
+        if not state.get('running'):
+            return
+        if state.get('cinema_filename') != cinema_path.name:
+            return
+        cinema_log(
+            f'pushing prelude+source: {cinema_path.name} prelude={prelude_seconds}s'
+        )
+        pid, path_ready = _launch_ffmpeg_push(mtx, cinema_path, prelude_seconds)
+        if not pid:
+            _mark_stream_stopped()
+
+    threading.Thread(target=worker, daemon=True, name='cinema-push').start()
 
 
 def _mediamtx_binary_path():
@@ -511,45 +700,59 @@ def _runtime_ready():
     return True, ''
 
 
-def _stream_payload(state, pid, running, mtx):
+def _stream_payload(state, pid, session_running, pushing, mtx):
+    prelude_seconds = mtx.get('prelude_seconds', 10)
+    started_at_ms = state.get('started_at_ms')
+    prelude_ends_at_ms = state.get('prelude_ends_at_ms')
+    if started_at_ms is not None:
+        started_at_ms = int(started_at_ms)
+        if prelude_ends_at_ms is None:
+            prelude_ends_at_ms = started_at_ms + int(prelude_seconds) * 1000
+        else:
+            prelude_ends_at_ms = int(prelude_ends_at_ms)
     payload = {
-        'running': running,
-        'pid': pid if running else None,
+        'running': session_running,
+        'pushing': pushing,
+        'pid': pid if pushing else None,
         'path_name': mtx['path_name'],
         'cinema_filename': state.get('cinema_filename'),
         'started_at': state.get('started_at'),
-        'prelude_seconds': mtx.get('prelude_seconds', 10),
+        'started_at_ms': started_at_ms,
+        'prelude_ends_at_ms': prelude_ends_at_ms,
+        'server_now_ms': _now_ms(),
+        'prelude_seconds': prelude_seconds,
         'playback': build_playback_payload(mtx),
     }
     return payload
 
 
 def _get_stream_status():
-    pid, running = _reconcile_ffmpeg_state()
     state = _read_stream_state()
+    pid, pushing = _reconcile_ffmpeg_state()
+    session_running = bool(state.get('running'))
     mtx = get_mediamtx_settings()
-    if running:
+    if pushing:
         pid = pid or _read_pid(STREAM_PID_FILE)
-    return state, pid, running, mtx
+    return state, pid, session_running, pushing, mtx
 
 
 @require_GET
 def cinema_list(request):
     cinema_files = _scan_cinema_files()
-    state, pid, running, mtx = _get_stream_status()
+    state, pid, session_running, pushing, mtx = _get_stream_status()
     mediamtx_running, _ = _is_mediamtx_running()
     return _success({
         'cinema': cinema_files,
-        'stream': _stream_payload(state, pid, running, mtx),
+        'stream': _stream_payload(state, pid, session_running, pushing, mtx),
         'mediamtx_running': mediamtx_running,
     })
 
 
 @require_GET
 def stream_status(request):
-    state, pid, running, mtx = _get_stream_status()
+    state, pid, session_running, pushing, mtx = _get_stream_status()
     mediamtx_running, mediamtx_pid = _is_mediamtx_running()
-    payload = _stream_payload(state, pid, running, mtx)
+    payload = _stream_payload(state, pid, session_running, pushing, mtx)
     payload['mediamtx_running'] = mediamtx_running
     payload['mediamtx_pid'] = mediamtx_pid
     payload['mediamtx_ready'] = _mediamtx_binary_path() is not None
@@ -594,9 +797,9 @@ def admin_delete_cinema(request, filename):
     if not path or not path.is_file():
         return _error('影片不存在', 404)
 
-    state, _, running, _ = _get_stream_status()
+    state, _, running, _, _ = _get_stream_status()
     if state.get('cinema_filename') == path.name and running:
-        return _error('该影片正在推流中，请先停止推流')
+        return _error('该影片正在放映中，请先停止推流')
 
     path.unlink()
     return _success({'cinema': _scan_cinema_files()}, '已删除')
@@ -631,69 +834,35 @@ def admin_start_stream(request):
     _stop_ffmpeg_publish()
     cinema_log(f'--- start stream: {cinema_path.name} ---')
 
-    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    try:
-        w, h = _probe_video_size(cinema_path)
-        t_prep = time.time()
-        combined_path = _prepare_combined_clip(mtx, cinema_path, w, h)
-        cinema_log(
-            f'combined clip ready: {combined_path.name} '
-            f'prep_ms={int((time.time() - t_prep) * 1000)}'
-        )
-    except subprocess.CalledProcessError:
-        cinema_log('combined clip generation failed', tag='ffmpeg')
-        return _error('影片合成失败，请查看 log/back.log', 500)
-    except OSError as exc:
-        return _error(f'推流准备失败: {exc}', 500)
-
-    ffmpeg_cmd = _build_ffmpeg_cmd(mtx, combined_path)
-    cinema_log('ffmpeg cmd: ' + ' '.join(ffmpeg_cmd))
-
-    log_file = open(BLOG_LOG_FILE, 'a', encoding='utf-8')
-    log_file.write(f'\n[{datetime.now().isoformat(timespec="seconds")}] [ffmpeg] process start\n')
-    try:
-        proc = subprocess.Popen(
-            ffmpeg_cmd,
-            cwd=str(STREAM_RUNTIME_DIR),
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    finally:
-        log_file.close()
-
-    if proc.poll() is not None:
-        cinema_log('ffmpeg exited immediately after start', tag='ffmpeg')
-        return _error('ffmpeg 推流启动失败，请查看 log/back.log', 500)
-
-    t0 = time.time()
-    path_ready, _path_data = _mediamtx_path_online(mtx)
-    cinema_log(
-        f'ffmpeg pid={proc.pid} path_ready={path_ready} '
-        f'wait_ms={int((time.time() - t0) * 1000)}'
-    )
-
-    STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
+    prelude_seconds = mtx.get('prelude_seconds', 10)
+    now_ms = _now_ms()
     state = {
         'running': True,
-        'pid': proc.pid,
+        'pid': None,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
         'started_at': datetime.now().isoformat(timespec='seconds'),
+        'started_at_ms': now_ms,
+        'prelude_ends_at_ms': now_ms + prelude_seconds * 1000,
     }
     _write_stream_state(state)
+    _schedule_ffmpeg_push(mtx, cinema_path, prelude_seconds)
+    cinema_log(f'session started, pushing now: {cinema_path.name}')
 
     return _success({
-        'pid': proc.pid,
+        'running': True,
+        'pushing': True,
         'mediamtx_pid': mediamtx_pid,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
         'playback': build_playback_payload(mtx),
-        'path_ready': path_ready,
+        'prelude_seconds': prelude_seconds,
+        'started_at': state['started_at'],
+        'started_at_ms': now_ms,
+        'prelude_ends_at_ms': state['prelude_ends_at_ms'],
+        'server_now_ms': now_ms,
         'log_file': str(BLOG_LOG_FILE),
-    }, '推流已启动')
+    }, '推流已开始')
 
 
 @csrf_exempt
@@ -709,7 +878,7 @@ def admin_stop_stream(request):
 def admin_runtime_info(request):
     exe = _mediamtx_binary_path()
     mtx = get_mediamtx_settings()
-    _, pid, running, _ = _get_stream_status()
+    _, pid, running, pushing, mtx = _get_stream_status()
     mediamtx_running, mediamtx_pid = _is_mediamtx_running()
     return _success({
         'mediamtx_runtime_dir': str(MEDIAMTX_RUNTIME_DIR),
@@ -720,7 +889,8 @@ def admin_runtime_info(request):
         'mediamtx_pid': mediamtx_pid,
         'cinema_dir': str(CINEMA_DIR),
         'stream_running': running,
-        'ffmpeg_pid': pid if running else None,
+        'stream_pushing': pushing,
+        'ffmpeg_pid': pid if pushing else None,
         'rtsp_publish_url': mtx['rtsp_publish_url'],
         'playback': build_playback_payload(mtx),
         'log_file': str(BLOG_LOG_FILE),

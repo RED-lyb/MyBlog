@@ -186,7 +186,7 @@ const startStream = async () => {
       cinema_filename: selectedCinema.value,
     })
     if (res.data.success) {
-      ElMessage.success('推流已启动')
+      ElMessage.success(res.data.message || '放映已开始')
       await fetchAll()
     } else {
       ElMessage.error(res.data.error || '启动失败')
@@ -345,14 +345,14 @@ watch(
         <el-divider content-position="left">
           {{ configForm.app.file }}
         </el-divider>
-        <el-form-item label="开播黑场秒数">
+        <el-form-item label="开播倒计时秒数">
           <el-input-number
             v-model="configForm.app.prelude_seconds"
             :min="0"
             :max="120"
             :step="1"
           />
-          <div class="form-tip">每次开播前插入的黑场时长，下次启动推流生效</div>
+          <div class="form-tip">观众端读秒时长。此期间推带关键帧的黑场供 WebRTC 建连，结束后接正片</div>
         </el-form-item>
         <el-form-item label="ffmpeg 路径">
           <el-input v-model="configForm.app.ffmpeg_bin" placeholder="ffmpeg" />

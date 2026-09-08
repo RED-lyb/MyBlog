@@ -57,13 +57,16 @@ export class CinemaViewer {
     this._needsUnmute = false
   }
 
-  async play({ videoEl, playback }) {
+  async play({ videoEl, playback, connectTimeoutMs }) {
     await this._teardown()
     if (!videoEl || !playback) return false
 
     this.videoEl = videoEl
     prepareLiveVideo(videoEl, { muted: true })
-    return this._playWebRtc(playback.webrtc_whep_url || playback.play_url)
+    return this._playWebRtc(
+      playback.webrtc_whep_url || playback.play_url,
+      connectTimeoutMs,
+    )
   }
 
   _attachRemoteTrack(evt) {
@@ -93,9 +96,11 @@ export class CinemaViewer {
     console.info(`[cinema] ${label}: ${summary || 'no tracks'}`)
   }
 
-  _playWebRtc(whepUrl) {
+  _playWebRtc(whepUrl, connectTimeoutMs = WEBRTC_CONNECT_TIMEOUT_MS) {
     const url = resolveStreamUrl(whepUrl)
     if (!url) return Promise.resolve(false)
+
+    const timeoutMs = Math.max(WEBRTC_CONNECT_TIMEOUT_MS, connectTimeoutMs || 0)
 
     return new Promise((resolve) => {
       let settled = false
@@ -105,7 +110,7 @@ export class CinemaViewer {
           this.handlers.onError?.('连接放映流超时')
           finish(false)
         }
-      }, WEBRTC_CONNECT_TIMEOUT_MS)
+      }, timeoutMs)
 
       const finish = (ok) => {
         if (!settled) {

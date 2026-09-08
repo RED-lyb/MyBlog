@@ -224,7 +224,7 @@ def save_admin_config(payload):
     try:
         prelude_seconds = max(0, min(int(prelude_seconds), 120))
     except (TypeError, ValueError) as exc:
-        raise ValueError('黑场秒数必须是 0–120 的整数') from exc
+        raise ValueError('倒计时秒数必须是 0–120 的整数') from exc
 
     ffmpeg_bin = (app_in.get('ffmpeg_bin') or current_app['ffmpeg_bin']).strip() or 'ffmpeg'
     log_level = str(server_in.get('log_level') or current_server['log_level']).strip() or 'info'

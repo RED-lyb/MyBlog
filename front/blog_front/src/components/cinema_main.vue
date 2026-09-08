@@ -44,6 +44,7 @@ let statusPollInFlight = false
 let preludeTimer = null
 let connectGeneration = 0
 const preludeClock = ref(Date.now())
+const preludeEndsAtClient = ref(0)
 
 const syncMobileLayout = () => {
   isMobileLayout.value = window.matchMedia(MOBILE_MEDIA).matches
@@ -114,26 +115,45 @@ const showNoStreamHint = computed(() => {
 })
 
 const applyStreamPayload = (stream) => {
+  const preludeSeconds = Number(stream?.prelude_seconds)
   streamConfig.value = {
     running: !!stream?.running,
     cinema_filename: stream?.cinema_filename || null,
     playback: stream?.playback || null,
     started_at: stream?.started_at || null,
-    prelude_seconds: stream?.prelude_seconds ?? 10,
+    prelude_seconds: Number.isFinite(preludeSeconds) ? preludeSeconds : 10,
+  }
+
+  const cap = streamConfig.value.prelude_seconds
+  const nowClient = Date.now()
+  preludeClock.value = nowClient
+
+  const endsAt = Number(stream?.prelude_ends_at_ms)
+  const serverNow = Number(stream?.server_now_ms)
+  if (streamConfig.value.running && cap > 0 && Number.isFinite(endsAt) && endsAt > 0) {
+    const base = Number.isFinite(serverNow) ? serverNow : nowClient
+    preludeEndsAtClient.value = nowClient + (endsAt - base)
+  } else {
+    preludeEndsAtClient.value = 0
+  }
+
+  if (streamConfig.value.running) {
+    startPreludeTicker()
+  } else {
+    stopPreludeTicker()
   }
 }
 
-const inPrelude = computed(() => {
-  if (!streamConfig.value.running || !streamConfig.value.started_at) return false
-  const elapsed = (preludeClock.value - new Date(streamConfig.value.started_at).getTime()) / 1000
-  return elapsed < (streamConfig.value.prelude_seconds || 10)
+const preludeRemainSec = computed(() => {
+  if (!streamConfig.value.running || !preludeEndsAtClient.value) return 0
+  const cap = streamConfig.value.prelude_seconds || 0
+  if (cap <= 0) return 0
+  const remain = Math.ceil((preludeEndsAtClient.value - preludeClock.value) / 1000)
+  if (!Number.isFinite(remain)) return 0
+  return Math.min(cap, Math.max(0, remain))
 })
 
-const preludeRemainSec = computed(() => {
-  if (!inPrelude.value || !streamConfig.value.started_at) return 0
-  const elapsed = (preludeClock.value - new Date(streamConfig.value.started_at).getTime()) / 1000
-  return Math.max(0, Math.ceil((streamConfig.value.prelude_seconds || 10) - elapsed))
-})
+const inPrelude = computed(() => preludeRemainSec.value > 0)
 
 const waitVideoEl = async () => {
   for (let i = 0; i < 20; i += 1) {
@@ -183,10 +203,14 @@ const startPlayer = async () => {
   needUserGesture.value = false
   hasStream.value = false
 
+  const preludeSec = cfg.prelude_seconds || 10
+  const connectTimeoutMs = (preludeSec + 30) * 1000
+
   try {
     const ok = await viewer.play({
       videoEl: videoRef.value,
       playback: cfg.playback,
+      connectTimeoutMs,
     })
     if (gen !== connectGeneration) return
     if (!ok) {
@@ -325,10 +349,11 @@ const stopPreludeTicker = () => {
 
 const startPreludeTicker = () => {
   stopPreludeTicker()
-  if (streamConfig.value.running) {
+  preludeClock.value = Date.now()
+  if (streamConfig.value.running && preludeEndsAtClient.value) {
     preludeTimer = setInterval(() => {
       preludeClock.value = Date.now()
-    }, 500)
+    }, 200)
   }
 }
 
@@ -384,7 +409,7 @@ onUnmounted(async () => {
         </p>
       </div>
       <div class="header-actions">
-        <el-tag v-if="hasStream" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
+        <el-tag v-if="streamConfig.running" type="danger" effect="dark" class="live-tag">LIVE</el-tag>
         <el-button :icon="FullScreen" circle title="全屏" @click="toggleFullscreen" />
       </div>
     </header>
@@ -411,13 +436,17 @@ onUnmounted(async () => {
           <el-button link type="primary" @click="retryConnect">刷新状态</el-button>
         </div>
 
-        <div v-if="playerPhase === 'connecting' && !hasStream" class="overlay-mask overlay-waiting">
+        <div
+          v-if="playerPhase === 'connecting' && !hasStream && !inPrelude"
+          class="overlay-mask overlay-waiting"
+        >
           <p class="overlay-title">正在连接放映流</p>
         </div>
 
-        <div v-if="hasStream && inPrelude" class="overlay-mask overlay-prelude">
+        <div v-if="streamConfig.running && inPrelude" class="overlay-mask overlay-prelude">
           <p class="overlay-title">放映即将开始</p>
-          <p class="overlay-desc">约 {{ preludeRemainSec }} 秒后开始正片</p>
+          <p class="overlay-desc">{{ preludeRemainSec }} 秒后开始正片</p>
+          <p v-if="playerPhase === 'connecting'" class="overlay-desc">正在连接放映通道…</p>
         </div>
 
         <div v-if="needUserGesture && hasStream" class="overlay-mask overlay-sound">
