@@ -294,10 +294,10 @@ crontab -e
 * 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）。`go build` 会下载 WebRTC/RTSP 等第三方库；国内可 `export GOPROXY=https://goproxy.cn,direct`。若希望服务器不联网编译：在有网机器执行 `./deploy_mediamtx.sh vendor`，把 `back/cinema/mediamtx/vendor/` 拷到服务器同路径后再编译。
 * 应用配置在 `config_back.json` 的 `mediamtx` 节点：`prelude_seconds`（开播倒计时秒数，默认 10）、`ffmpeg_bin`
 * MediaMTX 写在 `back/cinema/mediamtx/cinema.yml`；流路径固定为 `cinema`，RTSP/API/信令固定 `127.0.0.1`。管理后台可改倒计时、ffmpeg、日志级别和公网 ICE 地址
-* 开播流程：管理后台点「启动推流」后 ffmpeg 立即推流。倒计时阶段先推带关键帧的黑场（便于 WebRTC 建连），到点后同一进程接正片；视频始终转 libx264（GOP 约 1 秒、无 B 帧），避免片源关键帧过晚导致黑屏；音频转 `libopus`
+* 开播流程：管理后台点「启动推流」→ 观众端显示读秒 → 倒计时结束后 ffmpeg 以 `-re` 推原始 MP4（H.264 则 `-c:v copy`，否则转 libx264）；音频转 `libopus`。片源若关键帧较晚，开头可能短暂无画，属 copy 推流的取舍
 * FFmpeg 需支持 `libopus`；非 H.264 片源转码时需 **带 `libx264` 的 FFmpeg**（见下文 OpenCloudOS 说明）
 * 推流与放映相关日志均写入 `log/back.log`（`[cinema]` / `[ffmpeg]` / mediamtx 进程输出），由现有后端日志轮转管理
-* 观众页通过 WebRTC(WHEP) 观看；正片不再 `-c:v copy`，以免等下一个 IDR
+* 观众页通过 WebRTC(WHEP) 观看
 
 #### FFmpeg（OpenCloudOS / RHEL 系）
 

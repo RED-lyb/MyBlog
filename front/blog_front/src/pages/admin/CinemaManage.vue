@@ -352,7 +352,7 @@ watch(
             :max="120"
             :step="1"
           />
-          <div class="form-tip">观众端读秒时长。此期间推带关键帧的黑场供 WebRTC 建连，结束后接正片</div>
+          <div class="form-tip">观众端读秒时长；倒计时结束后再推原始片源</div>
         </el-form-item>
         <el-form-item label="ffmpeg 路径">
           <el-input v-model="configForm.app.ffmpeg_bin" placeholder="ffmpeg" />
