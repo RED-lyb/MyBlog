@@ -5,6 +5,9 @@ const WEBRTC_CONNECT_TIMEOUT_MS = 20000
 function apiOrigin() {
   const raw = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/'
   const base = raw.endsWith('/') ? raw : `${raw}/`
+  if (typeof window !== 'undefined') {
+    return new URL(base, window.location.origin).origin
+  }
   return new URL(base).origin
 }
 
