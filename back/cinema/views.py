@@ -5,9 +5,12 @@ import json
 import os
 import re
 import signal
+import socket
 import subprocess
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -367,7 +370,7 @@ def _mediamtx_path_online(mtx, timeout=6.0):
 def _ffprobe_bin(ffmpeg_bin):
     if ffmpeg_bin.endswith('ffmpeg'):
         candidate = f'{ffmpeg_bin[:-6]}ffprobe'
-        if os.path.isfile(candidate):
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
     return 'ffprobe'
 
@@ -388,9 +391,29 @@ def _probe_video_codec(cinema_path, ffmpeg_bin):
             timeout=10,
             check=True,
         )
-        return result.stdout.strip().lower()
+        name = result.stdout.strip().lower()
+        if name:
+            return name
     except Exception:
-        return ''
+        pass
+
+    try:
+        result = subprocess.run(
+            [ffmpeg_bin, '-hide_banner', '-i', str(cinema_path)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        text = f'{result.stderr or ""}\n{result.stdout or ""}'
+        match = re.search(r'Video:\s*([A-Za-z0-9_]+)', text)
+        if match:
+            name = match.group(1).lower()
+            if name in ('h264', 'avc', 'avc1'):
+                return 'h264'
+            return name
+    except Exception:
+        pass
+    return ''
 
 
 def _video_encode_args(ffmpeg_bin, cinema_path):
@@ -414,10 +437,53 @@ def _build_ffmpeg_cmd(mtx, cinema_path):
         '-i', str(cinema_path.resolve()),
         *_video_encode_args(mtx['ffmpeg_bin'], cinema_path),
         '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
-        '-application', 'lowdelay', '-b:a', '96k',
+        '-application:a', 'lowdelay', '-b:a', '96k',
         '-f', 'rtsp', '-rtsp_transport', 'tcp',
         mtx['rtsp_publish_url'],
     ]
+
+
+def _tcp_ready(host, port, timeout=0.4):
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _popen_logged(cmd, cwd):
+    """把子进程输出实时写入 back.log，避免重定向到文件时全缓冲导致失败原因丢失。"""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    collected = []
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        bufsize=0,
+    )
+
+    def pump():
+        with open(BLOG_LOG_FILE, 'a', encoding='utf-8') as log_file:
+            while True:
+                chunk = proc.stdout.read(4096)
+                if not chunk:
+                    break
+                text = chunk.decode('utf-8', errors='replace')
+                collected.append(text)
+                log_file.write(text)
+                log_file.flush()
+
+    threading.Thread(target=pump, daemon=True, name='cinema-proc-log').start()
+    return proc, collected
+
+
+def _collected_text(collected, limit=1200):
+    text = ''.join(collected).strip()
+    if len(text) > limit:
+        return text[-limit:]
+    return text
 
 
 def _launch_ffmpeg_push(mtx, cinema_path):
@@ -427,22 +493,27 @@ def _launch_ffmpeg_push(mtx, cinema_path):
     STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-    log_file = open(BLOG_LOG_FILE, 'a', encoding='utf-8')
-    log_file.write(f'\n[{datetime.now().isoformat(timespec="seconds")}] [ffmpeg] process start\n')
+    host, port = '127.0.0.1', 8554
     try:
-        proc = subprocess.Popen(
-            ffmpeg_cmd,
-            cwd=str(STREAM_RUNTIME_DIR),
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    finally:
-        log_file.close()
+        parsed = urllib.parse.urlparse(mtx['rtsp_publish_url'])
+        if parsed.hostname:
+            host = parsed.hostname
+        if parsed.port:
+            port = parsed.port
+    except Exception:
+        pass
+    if not _tcp_ready(host, port):
+        cinema_log(f'RTSP {host}:{port} 未监听，ffmpeg 无法推流')
+        return None, False, f'MediaMTX RTSP 未就绪（{host}:{port}）'
+
+    cinema_log('ffmpeg process start', tag='ffmpeg')
+    proc, collected = _popen_logged(ffmpeg_cmd, STREAM_RUNTIME_DIR)
+    time.sleep(0.35)
 
     if proc.poll() is not None:
-        cinema_log('ffmpeg exited immediately after start', tag='ffmpeg')
-        return None, False
+        detail = _collected_text(collected) or 'ffmpeg 已退出但没有输出，请查看 log/back.log'
+        cinema_log(f'ffmpeg exited immediately: {detail}', tag='ffmpeg')
+        return None, False, detail
 
     t0 = time.time()
     path_ready, _path_data = _mediamtx_path_online(mtx)
@@ -452,7 +523,7 @@ def _launch_ffmpeg_push(mtx, cinema_path):
     )
 
     STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
-    return proc.pid, path_ready
+    return proc.pid, path_ready, ''
 
 
 def _mediamtx_binary_path():
@@ -651,9 +722,12 @@ def admin_start_stream(request):
     _stop_ffmpeg_publish()
     cinema_log(f'--- start stream: {cinema_path.name} ---')
 
-    pid, path_ready = _launch_ffmpeg_push(mtx, cinema_path)
+    pid, path_ready, ffmpeg_err = _launch_ffmpeg_push(mtx, cinema_path)
     if not pid:
         _mark_stream_stopped()
+        detail = (ffmpeg_err or '').strip()
+        if detail:
+            return _error(f'ffmpeg 推流启动失败: {detail}', 500)
         return _error('ffmpeg 推流启动失败，请查看 log/back.log', 500)
 
     state = {
