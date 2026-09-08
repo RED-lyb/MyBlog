@@ -90,7 +90,7 @@ build_mediamtx() {
       echo "使用本地 vendor/ 离线编译"
       CGO_ENABLED=0 go build -mod=vendor -o "${BINARY_PATH}" .
     else
-      echo "未找到 vendor/，将按 GOPROXY 拉取依赖（国内可 GOPROXY=https://goproxy.cn,direct）"
+      echo "未找到 vendor/，将按 GOPROXY 拉取依赖"
       CGO_ENABLED=0 go build -o "${BINARY_PATH}" .
     fi
   )
