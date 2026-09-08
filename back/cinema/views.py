@@ -356,69 +356,6 @@ def _mediamtx_path_online(mtx, timeout=6.0):
     return False, None
 
 
-_H264_ENCODER_CACHE = {}
-
-
-def _list_ffmpeg_video_encoders(ffmpeg_bin):
-    try:
-        result = subprocess.run(
-            [ffmpeg_bin, '-hide_banner', '-encoders'],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return set()
-    if result.returncode != 0:
-        return set()
-
-    names = set()
-    for line in result.stdout.splitlines():
-        parts = line.split()
-        if len(parts) >= 2 and parts[0].startswith('V'):
-            names.add(parts[1])
-    return names
-
-
-def _resolve_h264_encoder(ffmpeg_bin):
-    cached = _H264_ENCODER_CACHE.get(ffmpeg_bin)
-    if cached is not None:
-        return cached
-
-    encoders = _list_ffmpeg_video_encoders(ffmpeg_bin)
-    if 'libx264' in encoders:
-        choice = 'libx264'
-    elif 'libopenh264' in encoders:
-        choice = 'libopenh264'
-    else:
-        choice = ''
-
-    _H264_ENCODER_CACHE[ffmpeg_bin] = choice
-    if choice:
-        cinema_log(f'ffmpeg h264 encoder: {choice} ({ffmpeg_bin})')
-    else:
-        cinema_log(f'ffmpeg h264 encoder not found ({ffmpeg_bin})')
-    return choice
-
-
-def _video_encode_args(ffmpeg_bin, *, live=False):
-    encoder = _resolve_h264_encoder(ffmpeg_bin)
-    if encoder == 'libx264':
-        if live:
-            return [
-                '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-                '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
-                '-force_key_frames', 'expr:gte(t,n_forced*1)',
-            ]
-        return ['-c:v', 'libx264', '-preset', 'veryfast', '-g', '30', '-bf', '0']
-    if encoder == 'libopenh264':
-        return ['-c:v', 'libopenh264', '-b:v', '2500k', '-g', '30']
-    raise RuntimeError(
-        f'未找到 H.264 编码器（需要 libx264 或 libopenh264），ffmpeg={ffmpeg_bin}'
-    )
-
-
 def _probe_video_size(cinema_path):
     try:
         result = subprocess.run(
@@ -471,7 +408,7 @@ def _prepare_combined_clip(mtx, cinema_path, w, h):
         '-i', str(cinema_path.resolve()),
         '-filter_complex', filter_complex,
         '-map', '[outv]', '-map', '[outa]',
-        *_video_encode_args(mtx['ffmpeg_bin']),
+        '-c:v', 'libx264', '-preset', 'veryfast', '-g', '30', '-bf', '0',
         '-c:a', 'aac', '-ar', '48000', '-ac', '2',
         str(out.resolve()),
     ]
@@ -488,7 +425,9 @@ def _build_ffmpeg_cmd(mtx, combined_path):
         '-loglevel', 'info',
         '-re',
         '-i', str(combined_path.resolve()),
-        *_video_encode_args(mtx['ffmpeg_bin'], live=True),
+        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
+        '-force_key_frames', 'expr:gte(t,n_forced*1)',
         '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
         '-application', 'lowdelay', '-b:a', '96k',
         '-f', 'rtsp', '-rtsp_transport', 'tcp',
@@ -703,9 +642,6 @@ def admin_start_stream(request):
             f'combined clip ready: {combined_path.name} '
             f'prep_ms={int((time.time() - t_prep) * 1000)}'
         )
-    except RuntimeError as exc:
-        cinema_log(str(exc), tag='ffmpeg')
-        return _error(str(exc), 500)
     except subprocess.CalledProcessError:
         cinema_log('combined clip generation failed', tag='ffmpeg')
         return _error('影片合成失败，请查看 log/back.log', 500)

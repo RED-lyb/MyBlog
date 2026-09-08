@@ -294,14 +294,32 @@ crontab -e
 * 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）。`go build` 会下载 WebRTC/RTSP 等第三方库；国内可 `export GOPROXY=https://goproxy.cn,direct`。若希望服务器不联网编译：在有网机器执行 `./deploy_mediamtx.sh vendor`，把 `back/cinema/mediamtx/vendor/` 拷到服务器同路径后再编译。
 * 应用配置在 `config_back.json` 的 `mediamtx` 节点：`prelude_seconds`（开播前黑场秒数，默认 10）、`ffmpeg_bin`
 * MediaMTX 写在 `back/cinema/mediamtx/cinema.yml`；流路径固定为 `cinema`，RTSP/API/信令固定 `127.0.0.1`。管理后台可改黑场、ffmpeg、日志级别和公网 ICE 地址
-* 依赖系统已安装 `ffmpeg`（需支持 `libopus`）；MP4 视频建议 H.264，音频由 ffmpeg 转为 Opus
+* 推流依赖 **带 `libx264` 的 FFmpeg**（合成黑场+正片、RTSP 推流均使用 `-c:v libx264`）；另需支持 `libopus`（推流音频）。MP4 片源音频由 ffmpeg 转为 AAC/Opus
 * 推流与放映相关日志均写入 `log/back.log`（`[cinema]` / `[ffmpeg]` / mediamtx 进程输出），由现有后端日志轮转管理
 * 管理后台启动推流后，观众页通过 WebRTC(WHEP) 观看
 
-```bash
-# 安装 ffmpeg（OpenCloudOS / RHEL 系）
-dnf install -y ffmpeg
+#### FFmpeg（OpenCloudOS / RHEL 系）
 
+OpenCloudOS 等发行版自带的 `dnf install ffmpeg` **通常不含 `libx264`**（仅有 `libopenh264` 等，且实测常无法用于推流）。需单独安装 GPL 版 FFmpeg，并在管理后台或 `config_back.json` 中设置 `ffmpeg_bin` 指向该二进制。
+
+```bash
+# 1. 下载带 libx264 的 FFmpeg（BtbN GPL 构建，路径可按需调整）
+mkdir -p /opt/ffmpeg-gpl && cd /opt/ffmpeg-gpl
+curl -L -o ffmpeg-gpl.tar.xz \
+  'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz'
+tar xf ffmpeg-gpl.tar.xz
+# 解压后目录名随版本变化，例如 ffmpeg-master-latest-linux64-gpl
+
+# 2. 确认 libx264 可用
+/opt/ffmpeg-gpl/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg -encoders 2>/dev/null | grep libx264
+
+# 3. 在 config_back.json 的 mediamtx.ffmpeg_bin 或管理后台填写，例如：
+#    /opt/ffmpeg-gpl/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg
+```
+
+若仍报 `Unknown encoder 'libx264'`，说明 uWSGI 实际使用的 `ffmpeg_bin` 仍指向系统 `/usr/bin/ffmpeg`，请改配置后重启 uWSGI。
+
+```bash
 # 安装 Go 1.26+ 后编译 mediamtx
 # 国内镜像（可选）：export GOPROXY=https://goproxy.cn,direct
 cd /webproject/my-blog/back/cinema/scripts
