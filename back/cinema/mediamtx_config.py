@@ -11,6 +11,7 @@ from common.config_utils import get_config_path, load_config
 BASE_DIR = Path(settings.BASE_DIR)
 BLOG_ROOT = BASE_DIR.parent
 CINEMA_DIR = BASE_DIR / 'api' / 'static' / 'cinema'
+CINEMA_READY_DIR = CINEMA_DIR / 'ready'
 MEDIAMTX_DIR = BASE_DIR / 'cinema' / 'mediamtx'
 MEDIAMTX_CONFIG_FILE = MEDIAMTX_DIR / 'cinema.yml'
 MEDIAMTX_RUNTIME_DIR = BASE_DIR / 'cinema' / 'mediamtx_runtime'
@@ -19,6 +20,13 @@ MEDIAMTX_PID_FILE = MEDIAMTX_RUNTIME_DIR / 'mediamtx.pid'
 STREAM_RUNTIME_DIR = BASE_DIR / 'cinema' / 'stream_runtime'
 STREAM_PID_FILE = STREAM_RUNTIME_DIR / 'ffmpeg.pid'
 STREAM_STATE_FILE = STREAM_RUNTIME_DIR / 'stream_state.json'
+TRANSCODE_PID_FILE = STREAM_RUNTIME_DIR / 'transcode.pid'
+TRANSCODE_STATE_FILE = STREAM_RUNTIME_DIR / 'transcode_state.json'
+TRANSCODE_PROGRESS_FILE = STREAM_RUNTIME_DIR / 'transcode.progress'
+TRANSCODE_LEAD_SECONDS = 10
+TRANSCODE_WIDTH = 1920
+TRANSCODE_HEIGHT = 1080
+TRANSCODE_FPS = 30
 LOG_DIR = BLOG_ROOT / 'log'
 BLOG_LOG_FILE = LOG_DIR / 'back.log'
 

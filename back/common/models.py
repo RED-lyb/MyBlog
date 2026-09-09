@@ -209,6 +209,7 @@ class Feedback(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_comment='问题提出时间，默认服务器系统时间')
     is_resolved = models.CharField(max_length=10, choices=RESOLVED_STATUS_CHOICES, default='未解决', db_comment='解决状态：未解决、已解决、未采纳')
     resolved_at = models.DateTimeField(null=True, blank=True, db_comment='解决时间，未解决时为NULL')
+    author_reply = models.TextField(null=True, blank=True, db_comment='作者回复内容')
     
     class Meta:
         managed = False
@@ -305,7 +306,7 @@ class LoveNestConfig(models.Model):
 class LoveNestTravelCity(models.Model):
     """爱情小窝旅行城市表"""
     id = models.AutoField(primary_key=True, db_comment='主键，自增')
-    adcode = models.CharField(max_length=12, db_comment='市级行政区划代码')
+    adcode = models.CharField(unique=True, max_length=12, db_comment='市级行政区划代码')
     province_adcode = models.CharField(max_length=12, db_comment='所属省级 adcode')
     city_name = models.CharField(max_length=100, db_comment='城市名称')
     note = models.TextField(blank=True, null=True, db_comment='旅行感言/备注')

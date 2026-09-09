@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import apiClient from '../../lib/api.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Upload, VideoPlay, VideoPause, Delete, Refresh, Check } from '@element-plus/icons-vue'
+import { Upload, VideoPlay, VideoPause, Delete, Refresh, Check, Film } from '@element-plus/icons-vue'
 
 const apiUrl = import.meta.env.VITE_API_URL || ''
 
@@ -18,6 +18,23 @@ const runtime = ref({
 const selectedCinema = ref('')
 const uploading = ref(false)
 const streamLoading = ref(false)
+const transcodeLoading = ref(false)
+const transcodeStartedHere = ref(false)
+const transcode = ref({
+  status: 'idle',
+  filename: null,
+  percent: 0,
+  error: '',
+})
+const mediaInfo = ref({
+  duration_sec: 0,
+  transcoded: false,
+  width: 0,
+  height: 0,
+})
+const mediaInfoLoading = ref(false)
+const startSec = ref(0)
+const startClock = ref('00:00:00')
 const configLoading = ref(false)
 const configSaving = ref(false)
 const configForm = ref({
@@ -97,8 +114,10 @@ const saveConfig = async () => {
   }
 }
 
-const fetchAll = async () => {
-  loading.value = true
+const fetchAll = async (silent = false) => {
+  if (fetchAll._inflight && silent) return
+  fetchAll._inflight = true
+  if (!silent) loading.value = true
   try {
     const [listRes, runtimeRes] = await Promise.all([
       apiClient.get(`${apiUrl}cinema/admin/list/`),
@@ -108,17 +127,22 @@ const fetchAll = async () => {
       const data = listRes.data.data || {}
       cinemaList.value = data.cinema || []
       stream.value = data.stream || {}
+      transcode.value = data.transcode || transcode.value
       if (!selectedCinema.value && cinemaList.value.length) {
         selectedCinema.value = cinemaList.value[0].filename
       }
     }
     if (runtimeRes.data.success) {
       runtime.value = runtimeRes.data.data || {}
+      if (runtimeRes.data.data?.transcode) {
+        transcode.value = runtimeRes.data.data.transcode
+      }
     }
   } catch {
-    ElMessage.error('加载影院数据失败')
+    if (!silent) ElMessage.error('加载影院数据失败')
   } finally {
-    loading.value = false
+    fetchAll._inflight = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -148,13 +172,20 @@ const handleUpload = async ({ file }) => {
 
 const handleDelete = async (row) => {
   try {
-    await ElMessageBox.confirm(`确定删除「${row.filename}」？`, '删除影片', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确定删除「${row.filename}」？将同时删除原片和转码文件。`,
+      '删除影片',
+      { type: 'warning' }
+    )
     const res = await apiClient.post(
       `${apiUrl}cinema/admin/${encodeURIComponent(row.filename)}/delete/`
     )
     if (res.data.success) {
       ElMessage.success('已删除')
       cinemaList.value = res.data.data?.cinema || []
+      if (res.data.data?.transcode) {
+        transcode.value = res.data.data.transcode
+      }
       if (selectedCinema.value === row.filename) {
         selectedCinema.value = cinemaList.value[0]?.filename || ''
       }
@@ -168,9 +199,154 @@ const handleDelete = async (row) => {
   }
 }
 
+const selectedRow = computed(
+  () => cinemaList.value.find((item) => item.filename === selectedCinema.value) || null
+)
+const transcodeRunning = computed(() => transcode.value.status === 'running')
+const durationSec = computed(() => Math.max(0, Math.floor(mediaInfo.value.duration_sec || 0)))
+const maxStartSec = computed(() => Math.max(0, durationSec.value > 0 ? durationSec.value - 1 : 0))
+
+const formatClock = (sec) => {
+  const total = Math.max(0, Math.floor(Number(sec) || 0))
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+const parseClock = (text) => {
+  const raw = String(text || '').trim()
+  if (!raw) return 0
+  if (raw.includes(':')) {
+    const parts = raw.split(':').map((p) => Number(p))
+    if (parts.some((n) => Number.isNaN(n))) return null
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    if (parts.length === 2) return parts[0] * 60 + parts[1]
+    return null
+  }
+  const n = Number(raw)
+  return Number.isNaN(n) ? null : n
+}
+
+const clampStart = (sec) => {
+  const value = Math.floor(Number(sec) || 0)
+  if (value < 0) return 0
+  if (maxStartSec.value > 0 && value > maxStartSec.value) return maxStartSec.value
+  return value
+}
+
+const applyStartSec = (sec) => {
+  startSec.value = clampStart(sec)
+  startClock.value = formatClock(startSec.value)
+}
+
+const onStartClockChange = () => {
+  const parsed = parseClock(startClock.value)
+  if (parsed === null) {
+    startClock.value = formatClock(startSec.value)
+    ElMessage.warning('时间格式为 hh:mm:ss')
+    return
+  }
+  applyStartSec(parsed)
+}
+
+const fetchMediaInfo = async (filename) => {
+  if (!filename) {
+    mediaInfo.value = { duration_sec: 0, transcoded: false, width: 0, height: 0 }
+    applyStartSec(0)
+    return
+  }
+  mediaInfoLoading.value = true
+  try {
+    const res = await apiClient.get(
+      `${apiUrl}cinema/admin/${encodeURIComponent(filename)}/info/`
+    )
+    if (res.data.success) {
+      mediaInfo.value = res.data.data || mediaInfo.value
+      applyStartSec(startSec.value)
+    } else {
+      ElMessage.error(res.data.error || '读取影片时长失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.error || '读取影片时长失败')
+  } finally {
+    mediaInfoLoading.value = false
+  }
+}
+
+const transcodeTag = (row) => {
+  if (row.transcode_status === 'running') {
+    return { type: 'warning', text: `转码中 ${row.transcode_percent || 0}%` }
+  }
+  if (row.transcoded) {
+    return { type: 'success', text: '已转码' }
+  }
+  if (row.transcode_status === 'failed') {
+    return { type: 'danger', text: '转码失败' }
+  }
+  return { type: 'info', text: '未转码' }
+}
+
+const startTranscode = async () => {
+  if (!selectedCinema.value) {
+    ElMessage.warning('请先选择要转码的影片')
+    return
+  }
+  if (stream.value.running) {
+    ElMessage.warning('请先停止推流再转码')
+    return
+  }
+  if (transcodeRunning.value) {
+    ElMessage.warning('已有转码任务进行中')
+    return
+  }
+  if (selectedRow.value?.transcoded) {
+    try {
+      await ElMessageBox.confirm(
+        '已有转码文件，确定重新转码？完成后仍是 1080p30，片头 10 秒黑屏。',
+        '重新转码',
+        { type: 'warning' }
+      )
+    } catch {
+      return
+    }
+  }
+  transcodeLoading.value = true
+  try {
+    const res = await apiClient.post(`${apiUrl}cinema/admin/transcode/start/`, {
+      cinema_filename: selectedCinema.value,
+    })
+    if (res.data.success) {
+      ElMessage.success(res.data.message || '已开始转码')
+      transcodeStartedHere.value = true
+      if (res.data.data?.cinema) {
+        cinemaList.value = res.data.data.cinema
+      }
+      if (res.data.data?.transcode) {
+        transcode.value = res.data.data.transcode
+      }
+      startPollingIfNeeded()
+    } else {
+      ElMessage.error(res.data.error || '转码启动失败')
+    }
+  } catch (e) {
+    ElMessage.error(e.response?.data?.error || '转码启动失败')
+  } finally {
+    transcodeLoading.value = false
+  }
+}
+
 const startStream = async () => {
   if (!selectedCinema.value) {
     ElMessage.warning('请先选择要推流的影片')
+    return
+  }
+  if (!selectedRow.value?.transcoded) {
+    ElMessage.warning('该影片尚未转码，请先转码后再播放')
+    return
+  }
+  if (transcodeRunning.value) {
+    ElMessage.warning('正在转码，请等待完成后再播放')
     return
   }
   if (!runtime.value.mediamtx_binary_exists) {
@@ -181,6 +357,7 @@ const startStream = async () => {
   try {
     const res = await apiClient.post(`${apiUrl}cinema/admin/stream/start/`, {
       cinema_filename: selectedCinema.value,
+      start_sec: startSec.value || 0,
     })
     if (res.data.success) {
       ElMessage.success(res.data.message || '放映已开始')
@@ -221,26 +398,48 @@ const stopPolling = () => {
   }
 }
 
-const startPollingIfStreaming = () => {
+const startPollingIfNeeded = () => {
   stopPolling()
-  if (stream.value.running) {
-    pollTimer = setInterval(fetchAll, 5000)
+  if (stream.value.running || transcodeRunning.value) {
+    pollTimer = setInterval(() => fetchAll(true), transcodeRunning.value ? 2000 : 5000)
   }
 }
 
 onMounted(async () => {
   await Promise.all([fetchAll(), fetchConfig()])
-  startPollingIfStreaming()
+  startPollingIfNeeded()
 })
 
 onUnmounted(() => {
   stopPolling()
 })
 
+watch([() => stream.value.running, transcodeRunning], () => {
+  startPollingIfNeeded()
+})
+
 watch(
-  () => stream.value.running,
-  () => {
-    startPollingIfStreaming()
+  () => selectedCinema.value,
+  (name) => {
+    applyStartSec(0)
+    fetchMediaInfo(name)
+  }
+)
+
+watch(
+  () => [transcode.value.status, transcode.value.filename, transcode.value.error],
+  ([status]) => {
+    if (!transcodeStartedHere.value) return
+    if (status === 'done') {
+      transcodeStartedHere.value = false
+      ElMessage.success(`「${transcode.value.filename || '影片'}」转码完成`)
+      if (transcode.value.filename === selectedCinema.value) {
+        fetchMediaInfo(selectedCinema.value)
+      }
+    } else if (status === 'failed') {
+      transcodeStartedHere.value = false
+      ElMessage.error(transcode.value.error || '转码失败')
+    }
   }
 )
 </script>
@@ -292,12 +491,26 @@ watch(
             <el-option
               v-for="item in cinemaList"
               :key="item.filename"
-              :label="`${item.title} (${item.size_mb}MB)`"
+              :label="`${item.title} (${item.size_mb}MB)${item.transcoded ? ' · 已转码' : ' · 未转码'}`"
               :value="item.filename"
             />
           </el-select>
         </el-form-item>
         <el-form-item>
+          <el-button
+            type="warning"
+            plain
+            :loading="transcodeLoading || transcodeRunning"
+            :disabled="stream.running || !selectedCinema"
+            @click="startTranscode"
+          >
+            <el-icon><Film /></el-icon>
+            {{
+              transcodeRunning && transcode.filename === selectedCinema
+                ? `转码中 ${transcode.percent || 0}%`
+                : '转码'
+            }}
+          </el-button>
           <el-button
             type="primary"
             :loading="streamLoading"
@@ -318,9 +531,40 @@ watch(
             停止推流
           </el-button>
         </el-form-item>
+        <el-form-item label="开播位置" class="start-form-item">
+          <div class="start-picker" v-loading="mediaInfoLoading">
+            <el-slider
+              :model-value="startSec"
+              :min="0"
+              :max="maxStartSec || 0"
+              :step="1"
+              :disabled="!durationSec || stream.running"
+              :format-tooltip="formatClock"
+              @update:model-value="applyStartSec"
+            />
+            <el-input
+              v-model="startClock"
+              class="start-clock"
+              placeholder="00:00:00"
+              :disabled="!durationSec || stream.running"
+              @change="onStartClockChange"
+            />
+            <span class="start-duration">
+              {{ formatClock(startSec) }} / {{ formatClock(durationSec) }}
+            </span>
+          </div>
+        </el-form-item>
       </el-form>
       <p v-if="stream.running" class="status-line">
-        推流中 · 片源 {{ stream.cinema_filename }} · 路径 {{ stream.path_name || 'cinema' }}
+        推流中 · 片源 {{ stream.cinema_filename }}
+        <span v-if="stream.start_sec"> · 从 {{ formatClock(stream.start_sec) }} 起</span>
+        · 路径 {{ stream.path_name || 'cinema' }}
+      </p>
+      <p v-else-if="transcodeRunning" class="status-line transcode-line">
+        正在转码 {{ transcode.filename }} · {{ transcode.percent || 0 }}%
+      </p>
+      <p class="hint">
+        推流只播放转码后的 1080p30 文件（片头 10 秒黑屏）。未转码无法开播。开播位置默认片头，可拖到任意时间续播。
       </p>
       <p v-if="runtime.playback?.play_url" class="hint">
         播放地址：{{ runtime.playback.play_url }}
@@ -393,6 +637,13 @@ watch(
       <el-table-column prop="filename" label="文件名" min-width="200" show-overflow-tooltip />
       <el-table-column prop="size_mb" label="大小(MB)" width="100" align="center" />
       <el-table-column prop="modified_at" label="修改时间" width="180" />
+      <el-table-column label="转码" width="130" align="center">
+        <template #default="{ row }">
+          <el-tag :type="transcodeTag(row).type" size="small">
+            {{ transcodeTag(row).text }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="100" align="center">
         <template #default="{ row }">
           <el-tag v-if="stream.running && stream.cinema_filename === row.filename" type="danger">
@@ -445,6 +696,42 @@ watch(
   margin: 12px 0 0;
   font-size: 14px;
   color: var(--el-color-success);
+}
+.stream-form {
+  width: 100%;
+}
+.start-form-item {
+  display: flex;
+  width: 100%;
+  flex-basis: 100%;
+  margin-right: 0;
+}
+.start-form-item :deep(.el-form-item__content) {
+  flex: 1;
+  max-width: 720px;
+}
+.start-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 32px;
+}
+.start-picker .el-slider {
+  flex: 1;
+}
+.start-clock {
+  width: 110px;
+  flex-shrink: 0;
+}
+.start-duration {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.status-line.transcode-line {
+  color: var(--el-color-warning);
 }
 .card-header {
   display: flex;

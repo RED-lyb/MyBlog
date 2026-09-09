@@ -24,6 +24,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from history.views import admin_required
 
+from . import transcode as cinema_transcode
 from .cinema_log import cinema_log
 from .mediamtx_config import (
     ALLOWED_CINEMA_VIDEO_EXT,
@@ -38,6 +39,9 @@ from .mediamtx_config import (
     STREAM_PID_FILE,
     STREAM_STATE_FILE,
     STREAM_RUNTIME_DIR,
+    TRANSCODE_LEAD_SECONDS,
+    TRANSCODE_PID_FILE,
+    TRANSCODE_PROGRESS_FILE,
     build_admin_config_payload,
     build_playback_payload,
     get_mediamtx_settings,
@@ -191,21 +195,34 @@ def _cinema_file_path(filename):
 
 def _scan_cinema_files():
     CINEMA_DIR.mkdir(parents=True, exist_ok=True)
+    transcode_job = _get_transcode_status()
     items = []
     for path in sorted(CINEMA_DIR.iterdir()):
         if not path.is_file():
             continue
         if path.suffix.lower() not in ALLOWED_CINEMA_VIDEO_EXT:
             continue
+        if path.name.endswith('.tmp') or path.name.endswith('.transcoding.mp4'):
+            continue
         stat = path.stat()
-        items.append({
+        item = {
             'filename': path.name,
             'title': path.stem,
             'size_bytes': stat.st_size,
             'size_mb': round(stat.st_size / (1024 * 1024), 2),
             'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat(timespec='seconds'),
             'static_url': f'{settings.STATIC_URL}cinema/{path.name}',
-        })
+            **cinema_transcode.scan_extra(path.name),
+        }
+        if transcode_job.get('filename') == path.name:
+            item['transcode_status'] = transcode_job.get('status')
+            item['transcode_percent'] = transcode_job.get('percent')
+            item['transcode_error'] = transcode_job.get('error') or ''
+        else:
+            item['transcode_status'] = 'done' if item['transcoded'] else 'idle'
+            item['transcode_percent'] = 100 if item['transcoded'] else 0
+            item['transcode_error'] = ''
+        items.append(item)
     return items
 
 
@@ -223,6 +240,117 @@ def _write_stream_state(state):
     STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     with open(STREAM_STATE_FILE, 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def _clear_transcode_progress():
+    try:
+        if TRANSCODE_PROGRESS_FILE.is_file():
+            TRANSCODE_PROGRESS_FILE.unlink()
+    except OSError:
+        pass
+
+
+def _transcode_running_pid():
+    pid = _read_pid(TRANSCODE_PID_FILE)
+    if pid and _is_process_running(pid):
+        return pid
+    return None
+
+
+def _kill_transcode(filename=None):
+    pid = _read_pid(TRANSCODE_PID_FILE)
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+        _reap_process(pid)
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+        _reap_process(pid)
+    _clear_pid_file(TRANSCODE_PID_FILE)
+    if filename:
+        tmp = cinema_transcode.tmp_path(filename)
+        if tmp.is_file():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+    cinema_log('transcode process stopped', tag='transcode')
+
+
+def _finalize_transcode(filename, rc, error=''):
+    tmp = cinema_transcode.tmp_path(filename)
+    _clear_pid_file(TRANSCODE_PID_FILE)
+    if rc == 0:
+        try:
+            if tmp.is_file() and tmp.stat().st_size > 0:
+                os.replace(tmp, cinema_transcode.ready_path(filename))
+            if cinema_transcode.is_ready(filename):
+                cinema_transcode.mark_done(filename)
+                cinema_log(f'transcode done: {filename}', tag='transcode')
+                return True
+        except OSError as exc:
+            if cinema_transcode.is_ready(filename):
+                cinema_transcode.mark_done(filename)
+                cinema_log(f'transcode done: {filename}', tag='transcode')
+                return True
+            cinema_transcode.mark_failed(filename, f'写入转码文件失败: {exc}')
+            cinema_log(f'transcode replace failed: {exc}', tag='transcode')
+            return False
+    if tmp.is_file():
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+    cinema_transcode.mark_failed(filename, error or '转码进程异常退出')
+    cinema_log(f'transcode failed: {filename} rc={rc} {error}', tag='transcode')
+    return False
+
+
+def _watch_transcode(proc, pump_thread, filename, collected):
+    def run():
+        try:
+            rc = proc.wait()
+            pump_thread.join(timeout=2.0)
+        except Exception as exc:
+            cinema_log(f'transcode wait error: {exc}', tag='transcode')
+            rc = -1
+        detail = _collected_text(collected, limit=800)
+        _finalize_transcode(filename, rc, detail)
+
+    threading.Thread(target=run, daemon=True, name='cinema-transcode-wait').start()
+
+
+def _get_transcode_status():
+    state = cinema_transcode.read_state()
+    if state.get('status') != 'running':
+        filename = state.get('filename')
+        if filename and cinema_transcode.is_ready(filename) and state.get('status') != 'failed':
+            if state.get('status') != 'done':
+                cinema_transcode.mark_done(filename)
+                state = cinema_transcode.read_state()
+        return cinema_transcode.public_state(state)
+
+    filename = state.get('filename')
+    pid = _transcode_running_pid()
+    if pid:
+        return cinema_transcode.public_state(state)
+
+    if filename:
+        tmp = cinema_transcode.tmp_path(filename)
+        if cinema_transcode.progress_ended() and tmp.is_file():
+            _finalize_transcode(filename, 0)
+        elif cinema_transcode.is_ready(filename):
+            cinema_transcode.mark_done(filename)
+        else:
+            _finalize_transcode(filename, 1, '转码中断')
+    else:
+        _clear_pid_file(TRANSCODE_PID_FILE)
+        cinema_transcode.mark_failed('', '转码中断')
+    return cinema_transcode.public_state()
 
 
 def _read_pid(pid_file):
@@ -368,11 +496,6 @@ def _mediamtx_path_online(mtx, timeout=6.0):
     return False, None
 
 
-_H264_CODEC_NAMES = {'h264', 'avc', 'avc1', 'avc3'}
-# WebRTC 过网后再直拷，码率再高也容易丢包导致画面卡住
-_H264_COPY_MAX_BITRATE = 4_000_000
-
-
 def _ffprobe_bin(ffmpeg_bin):
     if ffmpeg_bin.endswith('ffmpeg'):
         candidate = f'{ffmpeg_bin[:-6]}ffprobe'
@@ -381,174 +504,100 @@ def _ffprobe_bin(ffmpeg_bin):
     return 'ffprobe'
 
 
-def _normalize_video_codec(name):
-    text = (name or '').strip().lower().split(',')[0].strip()
-    if text in _H264_CODEC_NAMES:
-        return 'h264'
-    return text
-
-
-def _probe_video_codec(cinema_path, ffmpeg_bin):
-    try:
-        result = subprocess.run(
-            [
-                _ffprobe_bin(ffmpeg_bin),
-                '-v', 'error',
-                '-select_streams', 'v:0',
-                '-show_entries', 'stream=codec_name',
-                '-of', 'csv=p=0',
-                str(cinema_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=True,
-        )
-        name = _normalize_video_codec(result.stdout)
-        if name:
-            return name
-    except Exception:
-        pass
-
-    try:
-        result = subprocess.run(
-            [ffmpeg_bin, '-hide_banner', '-i', str(cinema_path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        text = f'{result.stderr or ""}\n{result.stdout or ""}'
-        match = re.search(r'Video:\s*([A-Za-z0-9_]+)', text)
-        if match:
-            return _normalize_video_codec(match.group(1))
-    except Exception:
-        pass
-    return ''
-
-
-def _probe_video_info(cinema_path, ffmpeg_bin):
+def _probe_media_info(cinema_path, ffmpeg_bin):
     info = {
-        'codec': '',
-        'profile': '',
-        'bit_rate': 0,
+        'has_audio': False,
+        'duration': 0.0,
         'width': 0,
         'height': 0,
-        'has_b_frames': 0,
-        'fps': 0.0,
     }
     try:
         result = subprocess.run(
             [
                 _ffprobe_bin(ffmpeg_bin),
                 '-v', 'error',
-                '-select_streams', 'v:0',
-                '-show_entries',
-                'stream=codec_name,profile,bit_rate,width,height,has_b_frames,avg_frame_rate,r_frame_rate'
-                ':format=bit_rate,duration',
+                '-show_entries', 'stream=codec_type,width,height:format=duration',
                 '-of', 'json',
                 str(cinema_path),
             ],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=15,
             check=True,
         )
         data = json.loads(result.stdout or '{}')
-        stream = (data.get('streams') or [{}])[0]
         fmt = data.get('format') or {}
-        info['codec'] = _normalize_video_codec(stream.get('codec_name'))
-        info['profile'] = str(stream.get('profile') or '')
-        info['width'] = int(stream.get('width') or 0)
-        info['height'] = int(stream.get('height') or 0)
-        info['has_b_frames'] = int(stream.get('has_b_frames') or 0)
-        info['bit_rate'] = int(stream.get('bit_rate') or 0)
-        if info['bit_rate'] <= 0:
-            info['bit_rate'] = int(fmt.get('bit_rate') or 0)
-        rate = str(stream.get('avg_frame_rate') or stream.get('r_frame_rate') or '')
-        if '/' in rate:
-            num, den = rate.split('/', 1)
-            if float(den):
-                info['fps'] = float(num) / float(den)
-        elif rate:
-            info['fps'] = float(rate)
-    except Exception:
-        info['codec'] = _probe_video_codec(cinema_path, ffmpeg_bin)
+        info['duration'] = float(fmt.get('duration') or 0)
+        for stream in data.get('streams') or []:
+            if stream.get('codec_type') == 'audio':
+                info['has_audio'] = True
+            if stream.get('codec_type') == 'video':
+                info['width'] = int(stream.get('width') or 0)
+                info['height'] = int(stream.get('height') or 0)
+    except Exception as exc:
+        cinema_log(f'ffprobe failed: {exc}', tag='transcode')
     return info
 
 
-def _can_copy_h264(info):
-    if info.get('codec') != 'h264':
-        return False
-    profile = (info.get('profile') or '').lower()
-    if any(token in profile for token in ('10', '4:2:2', '4:4:4')):
-        return False
-    if int(info.get('has_b_frames') or 0) > 0:
-        return False
-    if int(info.get('bit_rate') or 0) > _H264_COPY_MAX_BITRATE:
-        return False
-    return True
+def _parse_start_sec(raw, duration_sec=0):
+    if raw is None or raw == '':
+        return 0.0
+    if isinstance(raw, (int, float)):
+        sec = float(raw)
+    else:
+        text = str(raw).strip()
+        if ':' in text:
+            parts = text.split(':')
+            try:
+                nums = [float(p) for p in parts]
+            except ValueError as exc:
+                raise ValueError('开始时间格式无效') from exc
+            if len(nums) == 3:
+                sec = nums[0] * 3600 + nums[1] * 60 + nums[2]
+            elif len(nums) == 2:
+                sec = nums[0] * 60 + nums[1]
+            else:
+                raise ValueError('开始时间格式无效')
+        else:
+            try:
+                sec = float(text)
+            except ValueError as exc:
+                raise ValueError('开始时间格式无效') from exc
+    if sec < 0:
+        raise ValueError('开始时间不能为负数')
+    duration = float(duration_sec or 0)
+    if duration > 0 and sec >= duration:
+        raise ValueError('开始时间不能超过或等于影片时长')
+    return sec
 
 
-def _transcode_video_args():
-    # 输出固定 1920x1080@30；源分辨率越接近，解码越轻，编码量差不多
-    return [
-        '-map', '0:v:0',
-        '-map', '0:a:0?',
-        '-vf', (
-            'fps=30,'
-            'scale=1920:1080:force_original_aspect_ratio=decrease,'
-            'pad=1920:1080:(ow-iw)/2:(oh-ih)/2,'
-            'format=yuv420p'
-        ),
-        '-r', '30',
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-tune', 'zerolatency',
-        '-profile:v', 'baseline',
-        '-level', '4.0',
-        '-pix_fmt', 'yuv420p',
-        '-g', '30',
-        '-keyint_min', '30',
-        '-sc_threshold', '0',
-        '-bf', '0',
-        '-force_key_frames', 'expr:gte(t,n_forced*1)',
-        '-b:v', '3000k',
-        '-maxrate', '3000k',
-        '-bufsize', '6000k',
-    ]
+def _format_clock(sec):
+    total = max(0, int(round(float(sec or 0))))
+    hours, rem = divmod(total, 3600)
+    minutes, seconds = divmod(rem, 60)
+    return f'{hours:02d}:{minutes:02d}:{seconds:02d}'
 
 
-def _build_ffmpeg_cmd(mtx, cinema_path):
-    """立即以 1x 推流。适合 WebRTC 的 H.264 直拷，否则压成 1080p30。"""
-    info = _probe_video_info(cinema_path, mtx['ffmpeg_bin'])
+def _build_ffmpeg_cmd(mtx, cinema_path, start_sec=0):
+    """推已转码片源：视频直拷，音频转 opus。"""
+    start_sec = float(start_sec or 0)
+    cinema_log(
+        f'push ready file {cinema_path.name} copy+opus '
+        f'start={_format_clock(start_sec)}'
+    )
     cmd = [
         mtx['ffmpeg_bin'],
         '-nostdin',
         '-hide_banner',
         '-loglevel', 'info',
     ]
-    if _can_copy_h264(info):
-        cinema_log(
-            f'video codec=h264 profile={info.get("profile") or "?"} '
-            f'{info.get("width")}x{info.get("height")} br={info.get("bit_rate") or 0} '
-            f'bframes={info.get("has_b_frames") or 0}, -c:v copy'
-        )
-        cmd.extend(['-re', '-i', str(cinema_path.resolve())])
-        cmd.extend(['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb'])
-    else:
-        cinema_log(
-            f'video codec={info.get("codec") or "unknown"} '
-            f'profile={info.get("profile") or "?"} '
-            f'{info.get("width")}x{info.get("height")}@{info.get("fps") or 0:.0f} '
-            f'br={info.get("bit_rate") or 0}, transcode 1920x1080@30'
-        )
-        cmd.extend([
-            '-skip_loop_filter', '32',
-            '-re',
-            '-i', str(cinema_path.resolve()),
-            *_transcode_video_args(),
-        ])
+    if start_sec > 0:
+        cmd.extend(['-ss', f'{start_sec:.3f}'])
     cmd.extend([
+        '-re',
+        '-i', str(cinema_path.resolve()),
+        '-c:v', 'copy',
+        '-bsf:v', 'h264_mp4toannexb',
         '-c:a', 'libopus',
         '-application', 'lowdelay',
         '-ar', '48000',
@@ -602,10 +651,14 @@ def _ffmpeg_bin_problem(ffmpeg_bin):
     return ''
 
 
-def _popen_logged(cmd, cwd):
+def _popen_logged(cmd, cwd, env=None, preexec_fn=None):
     """把子进程输出实时写入 back.log。"""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     collected = []
+    popen_env = None
+    if env:
+        popen_env = os.environ.copy()
+        popen_env.update(env)
     proc = subprocess.Popen(
         cmd,
         cwd=str(cwd),
@@ -613,6 +666,8 @@ def _popen_logged(cmd, cwd):
         stderr=subprocess.STDOUT,
         start_new_session=True,
         bufsize=0,
+        env=popen_env,
+        preexec_fn=preexec_fn,
     )
 
     def pump():
@@ -645,13 +700,13 @@ def _ffmpeg_fail_detail(collected, ffmpeg_bin):
     return text or 'ffmpeg 已退出但没有输出，请查看 log/back.log'
 
 
-def _launch_ffmpeg_push(mtx, cinema_path):
+def _launch_ffmpeg_push(mtx, cinema_path, start_sec=0):
     missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
     if missing:
         cinema_log(missing, tag='ffmpeg')
         return None, False, missing
 
-    ffmpeg_cmd = _build_ffmpeg_cmd(mtx, cinema_path)
+    ffmpeg_cmd = _build_ffmpeg_cmd(mtx, cinema_path, start_sec=start_sec)
     cinema_log('ffmpeg cmd: ' + ' '.join(ffmpeg_cmd))
 
     STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
@@ -699,6 +754,82 @@ def _launch_ffmpeg_push(mtx, cinema_path):
 
     STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
     return proc.pid, path_ready, ''
+
+
+def _launch_transcode(mtx, cinema_path):
+    missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
+    if missing:
+        cinema_log(missing, tag='transcode')
+        return None, missing
+
+    job = _get_transcode_status()
+    if job.get('status') == 'running':
+        current = job.get('filename') or ''
+        return None, f'正在转码「{current}」，请等待完成后再试'
+
+    info = _probe_media_info(cinema_path, mtx['ffmpeg_bin'])
+    duration = float(info.get('duration') or 0) + TRANSCODE_LEAD_SECONDS
+    dst_tmp = cinema_transcode.tmp_path(cinema_path.name)
+    if dst_tmp.is_file():
+        try:
+            dst_tmp.unlink()
+        except OSError:
+            pass
+    _clear_transcode_progress()
+
+    cmd = cinema_transcode.build_cmd(
+        mtx['ffmpeg_bin'],
+        cinema_path,
+        dst_tmp,
+        bool(info.get('has_audio')),
+    )
+    cinema_log(
+        f'transcode {cinema_path.name} {info.get("width")}x{info.get("height")} '
+        f'audio={info.get("has_audio")} duration={duration:.1f}s cpu=threads=1 nice=10',
+        tag='transcode',
+    )
+    cinema_log('transcode cmd: ' + ' '.join(cmd), tag='transcode')
+
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _nice_transcode():
+        try:
+            os.nice(10)
+        except OSError:
+            pass
+
+    try:
+        proc, collected, pump_thread = _popen_logged(
+            cmd,
+            STREAM_RUNTIME_DIR,
+            env={'OMP_NUM_THREADS': '1'},
+            preexec_fn=_nice_transcode,
+        )
+    except OSError as exc:
+        if _is_ffmpeg_missing_error(exc):
+            detail = _ffmpeg_missing_message(mtx['ffmpeg_bin'], exc)
+            cinema_log(detail, tag='transcode')
+            return None, detail
+        raise
+
+    deadline = time.time() + 1.5
+    while time.time() < deadline and proc.poll() is None:
+        time.sleep(0.05)
+
+    if proc.poll() is not None:
+        pump_thread.join(timeout=1.0)
+        detail = _ffmpeg_fail_detail(collected, mtx['ffmpeg_bin'])
+        cinema_transcode.mark_failed(cinema_path.name, detail)
+        cinema_log(f'transcode exited immediately: {detail}', tag='transcode')
+        return None, detail
+
+    STREAM_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    TRANSCODE_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
+    cinema_transcode.mark_running(cinema_path.name, duration, proc.pid)
+    _watch_transcode(proc, pump_thread, cinema_path.name, collected)
+    cinema_log(f'transcode pid={proc.pid} {cinema_path.name}', tag='transcode')
+    return proc.pid, ''
 
 
 def _mediamtx_binary_path():
@@ -788,6 +919,7 @@ def _stream_payload(state, pid, session_running, pushing, mtx):
         'pid': pid if pushing else None,
         'path_name': mtx['path_name'],
         'cinema_filename': state.get('cinema_filename'),
+        'start_sec': state.get('start_sec') or 0,
         'started_at': state.get('started_at'),
         'playback': build_playback_payload(mtx),
     }
@@ -811,6 +943,7 @@ def cinema_list(request):
     return _success({
         'cinema': cinema_files,
         'stream': _stream_payload(state, pid, session_running, pushing, mtx),
+        'transcode': _get_transcode_status(),
         'mediamtx_running': mediamtx_running,
     })
 
@@ -849,10 +982,16 @@ def admin_upload_cinema(request):
         return _error('文件过大')
 
     dest = CINEMA_DIR / safe
+    job = _get_transcode_status()
+    if job.get('status') == 'running' and job.get('filename') == safe:
+        _kill_transcode(safe)
+        cinema_transcode.mark_failed(safe, '已取消（重新上传）')
+
     with open(dest, 'wb') as out:
         for chunk in upload.chunks():
             out.write(chunk)
 
+    cinema_transcode.unlink_outputs(safe)
     return _success({'filename': safe, 'cinema': _scan_cinema_files()}, '上传成功')
 
 
@@ -868,8 +1007,49 @@ def admin_delete_cinema(request, filename):
     if state.get('cinema_filename') == path.name and running:
         return _error('该影片正在放映中，请先停止推流')
 
+    job = _get_transcode_status()
+    if job.get('status') == 'running' and job.get('filename') == path.name:
+        _kill_transcode(path.name)
+        cinema_transcode.mark_failed(path.name, '已取消（影片删除）')
+
     path.unlink()
-    return _success({'cinema': _scan_cinema_files()}, '已删除')
+    cinema_transcode.unlink_outputs(path.name)
+    return _success({'cinema': _scan_cinema_files(), 'transcode': _get_transcode_status()}, '已删除')
+
+
+@require_GET
+@admin_required
+def admin_cinema_info(request, filename):
+    cinema_path = _cinema_file_path(filename)
+    if not cinema_path or not cinema_path.is_file():
+        return _error('影片不存在', 404)
+
+    mtx = get_mediamtx_settings()
+    missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
+    if missing:
+        return _error(missing)
+
+    source = _probe_media_info(cinema_path, mtx['ffmpeg_bin'])
+    transcoded = cinema_transcode.is_ready(cinema_path.name)
+    duration_sec = float(source.get('duration') or 0)
+    if transcoded:
+        ready_info = _probe_media_info(
+            cinema_transcode.ready_path(cinema_path.name), mtx['ffmpeg_bin'],
+        )
+        duration_sec = float(ready_info.get('duration') or duration_sec)
+    elif duration_sec > 0:
+        duration_sec += TRANSCODE_LEAD_SECONDS
+
+    return _success({
+        'filename': cinema_path.name,
+        'transcoded': transcoded,
+        'duration_sec': round(duration_sec, 3),
+        'source_duration_sec': round(float(source.get('duration') or 0), 3),
+        'width': source.get('width') or 0,
+        'height': source.get('height') or 0,
+        'has_audio': bool(source.get('has_audio')),
+        'lead_seconds': TRANSCODE_LEAD_SECONDS,
+    })
 
 
 @csrf_exempt
@@ -893,15 +1073,38 @@ def admin_start_stream(request):
     if not cinema_path or not cinema_path.is_file():
         return _error('影片文件不存在', 404)
 
+    job = _get_transcode_status()
+    if job.get('status') == 'running':
+        return _error('正在转码，请等待完成后再播放')
+
+    ready_path = cinema_transcode.ready_path(cinema_path.name)
+    if not cinema_transcode.is_ready(cinema_path.name):
+        return _error('该影片尚未转码，请先转码后再播放')
+
     mtx = get_mediamtx_settings()
+    ready_info = _probe_media_info(ready_path, mtx['ffmpeg_bin'])
+    duration_sec = float(ready_info.get('duration') or 0)
+    try:
+        start_sec = _parse_start_sec(
+            body.get('start_sec', body.get('start_time')),
+            duration_sec,
+        )
+    except ValueError as exc:
+        return _error(str(exc))
+
     started, mediamtx_pid, start_err = _start_mediamtx()
     if not started:
         return _error(start_err or 'mediamtx 启动失败', 500)
 
     _stop_ffmpeg_publish()
-    cinema_log(f'--- start stream: {cinema_path.name} ---')
+    cinema_log(
+        f'--- start stream: {cinema_path.name} (ready) '
+        f'start={_format_clock(start_sec)} ---'
+    )
 
-    pid, path_ready, ffmpeg_err = _launch_ffmpeg_push(mtx, cinema_path)
+    pid, path_ready, ffmpeg_err = _launch_ffmpeg_push(
+        mtx, ready_path, start_sec=start_sec,
+    )
     if not pid:
         _mark_stream_stopped()
         detail = (ffmpeg_err or '').strip()
@@ -914,6 +1117,7 @@ def admin_start_stream(request):
         'pid': pid,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
+        'start_sec': start_sec,
         'started_at': datetime.now().isoformat(timespec='seconds'),
         'push_started_at': datetime.now().isoformat(timespec='seconds'),
     }
@@ -927,6 +1131,7 @@ def admin_start_stream(request):
         'mediamtx_pid': mediamtx_pid,
         'path_name': mtx['path_name'],
         'cinema_filename': cinema_path.name,
+        'start_sec': start_sec,
         'playback': build_playback_payload(mtx),
         'started_at': state['started_at'],
         'log_file': str(BLOG_LOG_FILE),
@@ -939,6 +1144,43 @@ def admin_start_stream(request):
 def admin_stop_stream(request):
     _stop_ffmpeg_publish()
     return _success({'running': False}, '推流已停止')
+
+
+@csrf_exempt
+@require_POST
+@admin_required
+def admin_start_transcode(request):
+    mtx = get_mediamtx_settings()
+    missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
+    if missing:
+        return _error(missing)
+
+    try:
+        body = json.loads(request.body.decode('utf-8') or '{}')
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        body = {}
+
+    cinema_filename = body.get('cinema_filename') or body.get('filename')
+    if not cinema_filename:
+        return _error('请指定 cinema_filename')
+
+    cinema_path = _cinema_file_path(cinema_filename)
+    if not cinema_path or not cinema_path.is_file():
+        return _error('影片文件不存在', 404)
+
+    state, _, running, _, _ = _get_stream_status()
+    if running:
+        return _error('正在推流，请先停止后再转码')
+
+    pid, err = _launch_transcode(mtx, cinema_path)
+    if not pid:
+        return _error(err or '转码启动失败', 500)
+
+    return _success({
+        'pid': pid,
+        'transcode': _get_transcode_status(),
+        'cinema': _scan_cinema_files(),
+    }, '已开始转码')
 
 
 @require_GET
@@ -961,6 +1203,7 @@ def admin_runtime_info(request):
         'ffmpeg_pid': pid if pushing else None,
         'rtsp_publish_url': mtx['rtsp_publish_url'],
         'playback': build_playback_payload(mtx),
+        'transcode': _get_transcode_status(),
         'log_file': str(BLOG_LOG_FILE),
     })
 

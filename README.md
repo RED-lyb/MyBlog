@@ -251,7 +251,7 @@ location /api/ {
 
 # 网盘直链：wget/curl 访问 /network_disk/用户ID/文件名 时直接下文件，而不是返回前端 HTML
 # 目录路径（无扩展名，如 /network_disk/4）仍走 SPA
-location ~ ^/network_disk/.+\.[A-Za-z0-9]{1,10}$ {
+location ~ "^/network_disk/.+\.[A-Za-z0-9]{1,10}$" {
         rewrite ^/network_disk/(.*)$ /api/network_disk/download/$1 break;
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
@@ -306,8 +306,9 @@ crontab -e
 * 编译 MediaMTX：`back/cinema/scripts/deploy_mediamtx.sh`（源码在 `back/cinema/mediamtx/`，嵌入资源在 `mediamtx_embed/`；需 Go 1.26+）。`go build` 会下载 WebRTC/RTSP 等第三方库；国内可 `export GOPROXY=https://goproxy.cn,direct`。若希望服务器不联网编译：在有网机器执行 `./deploy_mediamtx.sh vendor`，把 `back/cinema/mediamtx/vendor/` 拷到服务器同路径后再编译。
 * 应用配置在 `config_back.json` 的 `mediamtx` 节点：`ffmpeg_bin`
 * MediaMTX 写在 `back/cinema/mediamtx/cinema.yml`；流路径固定为 `cinema`，RTSP/API/信令固定 `127.0.0.1`。管理后台可改 ffmpeg、日志级别和公网 ICE 地址
-* 开播流程：管理后台点「启动推流」后 ffmpeg 立即以 `-re` 推原始 MP4（H.264 则 `-c:v copy`，否则转 libx264）；音频转 `libopus`。观众端检测到放映后立刻连 WebRTC 播放。片源若关键帧较晚，开头可能短暂无画
-* FFmpeg 需支持 `libopus`；非 H.264 片源转码时需 **带 `libx264` 的 FFmpeg**（见下文 OpenCloudOS 说明）
+* 开播流程：管理后台先点「转码」，将片源预处理为 **1920×1080@30**（片头加 **10 秒黑屏**，文件写在 `api/static/cinema/ready/`）。完成后再点「启动推流」。推流只播转码文件：视频 `-c:v copy`，音频转 `libopus`。未转码不能播放。删除影片时会同时删除原片和转码文件。管理页可选择开播时间点（默认片头），用于中断后续播。
+* 转码固定 **单线程 + nice 10**，避免把 2 核打满影响网站。
+* FFmpeg 需同时支持 **`libx264`（转码）** 和 **`libopus`（推流）**（见下文 OpenCloudOS 说明）
 * 推流与放映相关日志均写入 `log/back.log`（`[cinema]` / `[ffmpeg]` / mediamtx 进程输出），由现有后端日志轮转管理
 * 观众页通过 WebRTC(WHEP) 观看
 
