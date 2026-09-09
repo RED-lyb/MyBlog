@@ -1,2 +1,2 @@
 uwsgi --stop /webproject/my-blog/project-master.pid 
-uwsgi --ini uwsgi.ini 
+uwsgi --ini /webproject/my-blog/back/depend_manage/uwsgi.ini 
