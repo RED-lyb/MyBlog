@@ -434,6 +434,7 @@ def _probe_video_info(cinema_path, ffmpeg_bin):
         'width': 0,
         'height': 0,
         'has_b_frames': 0,
+        'fps': 0.0,
     }
     try:
         result = subprocess.run(
@@ -442,7 +443,8 @@ def _probe_video_info(cinema_path, ffmpeg_bin):
                 '-v', 'error',
                 '-select_streams', 'v:0',
                 '-show_entries',
-                'stream=codec_name,profile,bit_rate,width,height,has_b_frames:format=bit_rate,duration',
+                'stream=codec_name,profile,bit_rate,width,height,has_b_frames,avg_frame_rate,r_frame_rate'
+                ':format=bit_rate,duration',
                 '-of', 'json',
                 str(cinema_path),
             ],
@@ -462,6 +464,13 @@ def _probe_video_info(cinema_path, ffmpeg_bin):
         info['bit_rate'] = int(stream.get('bit_rate') or 0)
         if info['bit_rate'] <= 0:
             info['bit_rate'] = int(fmt.get('bit_rate') or 0)
+        rate = str(stream.get('avg_frame_rate') or stream.get('r_frame_rate') or '')
+        if '/' in rate:
+            num, den = rate.split('/', 1)
+            if float(den):
+                info['fps'] = float(num) / float(den)
+        elif rate:
+            info['fps'] = float(rate)
     except Exception:
         info['codec'] = _probe_video_codec(cinema_path, ffmpeg_bin)
     return info
@@ -481,53 +490,65 @@ def _can_copy_h264(info):
 
 
 def _transcode_video_args():
-    # 逗号在 filtergraph 里要转义；高度不超过 720，保证小机器也能 1x
+    # 输出固定 1920x1080@30；源分辨率越接近，解码越轻，编码量差不多
     return [
-        '-vf', r'scale=-2:min(720\,ih),format=yuv420p',
+        '-map', '0:v:0',
+        '-map', '0:a:0?',
+        '-vf', (
+            'fps=30,'
+            'scale=1920:1080:force_original_aspect_ratio=decrease,'
+            'pad=1920:1080:(ow-iw)/2:(oh-ih)/2,'
+            'format=yuv420p'
+        ),
+        '-r', '30',
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-tune', 'zerolatency',
         '-profile:v', 'baseline',
-        '-level', '3.1',
+        '-level', '4.0',
         '-pix_fmt', 'yuv420p',
         '-g', '30',
         '-keyint_min', '30',
         '-sc_threshold', '0',
         '-bf', '0',
         '-force_key_frames', 'expr:gte(t,n_forced*1)',
-        '-b:v', '1800k',
-        '-maxrate', '1800k',
-        '-bufsize', '3600k',
+        '-b:v', '3000k',
+        '-maxrate', '3000k',
+        '-bufsize', '6000k',
     ]
 
 
-def _video_encode_args(ffmpeg_bin, cinema_path):
-    info = _probe_video_info(cinema_path, ffmpeg_bin)
-    if _can_copy_h264(info):
-        cinema_log(
-            f'video codec=h264 profile={info.get("profile") or "?"} '
-            f'br={info.get("bit_rate") or 0} bframes={info.get("has_b_frames") or 0}, -c:v copy'
-        )
-        return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
-
-    cinema_log(
-        f'video codec={info.get("codec") or "unknown"} '
-        f'profile={info.get("profile") or "?"} br={info.get("bit_rate") or 0} '
-        f'bframes={info.get("has_b_frames") or 0}, -c:v libx264 720p'
-    )
-    return _transcode_video_args()
-
-
 def _build_ffmpeg_cmd(mtx, cinema_path):
-    """立即以 1x 推原始片源；H.264 直拷，音频转 Opus。"""
-    return [
+    """立即以 1x 推流。适合 WebRTC 的 H.264 直拷，否则压成 1080p30。"""
+    info = _probe_video_info(cinema_path, mtx['ffmpeg_bin'])
+    cmd = [
         mtx['ffmpeg_bin'],
         '-nostdin',
         '-hide_banner',
         '-loglevel', 'info',
-        '-re',
-        '-i', str(cinema_path.resolve()),
-        *_video_encode_args(mtx['ffmpeg_bin'], cinema_path),
+    ]
+    if _can_copy_h264(info):
+        cinema_log(
+            f'video codec=h264 profile={info.get("profile") or "?"} '
+            f'{info.get("width")}x{info.get("height")} br={info.get("bit_rate") or 0} '
+            f'bframes={info.get("has_b_frames") or 0}, -c:v copy'
+        )
+        cmd.extend(['-re', '-i', str(cinema_path.resolve())])
+        cmd.extend(['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb'])
+    else:
+        cinema_log(
+            f'video codec={info.get("codec") or "unknown"} '
+            f'profile={info.get("profile") or "?"} '
+            f'{info.get("width")}x{info.get("height")}@{info.get("fps") or 0:.0f} '
+            f'br={info.get("bit_rate") or 0}, transcode 1920x1080@30'
+        )
+        cmd.extend([
+            '-skip_loop_filter', '32',
+            '-re',
+            '-i', str(cinema_path.resolve()),
+            *_transcode_video_args(),
+        ])
+    cmd.extend([
         '-c:a', 'libopus',
         '-application', 'lowdelay',
         '-ar', '48000',
@@ -536,7 +557,8 @@ def _build_ffmpeg_cmd(mtx, cinema_path):
         '-f', 'rtsp',
         '-rtsp_transport', 'tcp',
         mtx['rtsp_publish_url'],
-    ]
+    ])
+    return cmd
 
 
 def _tcp_ready(host, port, timeout=0.4):
