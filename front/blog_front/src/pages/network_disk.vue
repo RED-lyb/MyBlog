@@ -898,7 +898,7 @@ watch([filterOnlyMine, filterUsername], () => {
               @edit-file="editFile"
             />
           </el-main>
-          <el-aside>
+          <el-aside class="disk-action-aside">
             <div class="disk-header">
               <div v-if="!isAuthenticated" class="header-tip">
                 <el-text type="info">访客模式：只能浏览和下载</el-text>
@@ -1000,6 +1000,33 @@ watch([filterOnlyMine, filterUsername], () => {
   width: 230px;
 }
 
+.disk-action-aside {
+  position: relative;
+}
+
+/* 圆形操作按钮 */
+.floating-action-buttons {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .floating-action-buttons {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    margin: 16px auto 28px;
+  }
+}
+
 .search-filter-container {
   padding: 20px;
 }
@@ -1062,18 +1089,6 @@ watch([filterOnlyMine, filterUsername], () => {
   display: flex;
   align-items: center;
   padding: 10px;
-}
-
-/* 圆形操作按钮 */
-.floating-action-buttons {
-  position: absolute;
-  bottom: 5%;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  justify-content: center;
 }
 
 .circular-btn {

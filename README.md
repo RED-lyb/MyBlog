@@ -248,6 +248,18 @@ location /api/ {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
 }
+
+# 网盘直链：wget/curl 访问 /network_disk/用户ID/文件名 时直接下文件，而不是返回前端 HTML
+# 目录路径（无扩展名，如 /network_disk/4）仍走 SPA
+location ~ ^/network_disk/.+\.[A-Za-z0-9]{1,10}$ {
+        rewrite ^/network_disk/(.*)$ /api/network_disk/download/$1 break;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+}
 ```
 * 安装nodejs
 ```bash
