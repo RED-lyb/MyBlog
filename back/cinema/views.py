@@ -368,12 +368,22 @@ def _mediamtx_path_online(mtx, timeout=6.0):
     return False, None
 
 
+_H264_CODEC_NAMES = {'h264', 'avc', 'avc1', 'avc3'}
+
+
 def _ffprobe_bin(ffmpeg_bin):
     if ffmpeg_bin.endswith('ffmpeg'):
         candidate = f'{ffmpeg_bin[:-6]}ffprobe'
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
             return candidate
     return 'ffprobe'
+
+
+def _normalize_video_codec(name):
+    text = (name or '').strip().lower().split(',')[0].strip()
+    if text in _H264_CODEC_NAMES:
+        return 'h264'
+    return text
 
 
 def _probe_video_codec(cinema_path, ffmpeg_bin):
@@ -392,7 +402,7 @@ def _probe_video_codec(cinema_path, ffmpeg_bin):
             timeout=10,
             check=True,
         )
-        name = result.stdout.strip().lower()
+        name = _normalize_video_codec(result.stdout)
         if name:
             return name
     except Exception:
@@ -408,19 +418,19 @@ def _probe_video_codec(cinema_path, ffmpeg_bin):
         text = f'{result.stderr or ""}\n{result.stdout or ""}'
         match = re.search(r'Video:\s*([A-Za-z0-9_]+)', text)
         if match:
-            name = match.group(1).lower()
-            if name in ('h264', 'avc', 'avc1'):
-                return 'h264'
-            return name
+            return _normalize_video_codec(match.group(1))
     except Exception:
         pass
     return ''
 
 
 def _video_encode_args(ffmpeg_bin, cinema_path):
-    if _probe_video_codec(cinema_path, ffmpeg_bin) == 'h264':
+    codec = _probe_video_codec(cinema_path, ffmpeg_bin)
+    if codec == 'h264':
+        cinema_log(f'video codec={codec}, -c:v copy')
         # MP4 里的 H.264 是 avcC，RTSP 需要 Annex B；新版 ffmpeg 不会自动插这个滤镜
         return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
+    cinema_log(f'video codec={codec or "unknown"}, -c:v libx264')
     return [
         '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
         '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
