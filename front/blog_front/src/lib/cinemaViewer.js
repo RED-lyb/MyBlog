@@ -211,13 +211,25 @@ export class CinemaViewer {
       this._needsUnmute = false
       this.videoEl.muted = false
       this.videoEl.volume = 1
+      this.remoteStream?.getAudioTracks().forEach((track) => {
+        track.enabled = true
+      })
       await this.videoEl.play()
       this._logTracks('after unmute')
       this.handlers.onAutoplayRecovered?.()
       return true
     } catch (err) {
       console.warn('[cinema] unmute play failed:', err)
-      return false
+      try {
+        this.videoEl.muted = false
+        this.videoEl.volume = 1
+        await this.videoEl.play()
+        this.handlers.onAutoplayRecovered?.()
+        return true
+      } catch (retryErr) {
+        console.warn('[cinema] unmute retry failed:', retryErr)
+        return false
+      }
     }
   }
 }
