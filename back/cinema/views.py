@@ -418,7 +418,8 @@ def _probe_video_codec(cinema_path, ffmpeg_bin):
 
 def _video_encode_args(ffmpeg_bin, cinema_path):
     if _probe_video_codec(cinema_path, ffmpeg_bin) == 'h264':
-        return ['-c:v', 'copy']
+        # MP4 里的 H.264 是 avcC，RTSP 需要 Annex B；新版 ffmpeg 不会自动插这个滤镜
+        return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
     return [
         '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
         '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
@@ -436,9 +437,13 @@ def _build_ffmpeg_cmd(mtx, cinema_path):
         '-re',
         '-i', str(cinema_path.resolve()),
         *_video_encode_args(mtx['ffmpeg_bin'], cinema_path),
-        '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
-        '-application:a', 'lowdelay', '-b:a', '96k',
-        '-f', 'rtsp', '-rtsp_transport', 'tcp',
+        '-c:a', 'libopus',
+        '-application', 'lowdelay',
+        '-ar', '48000',
+        '-ac', '2',
+        '-b:a', '96k',
+        '-f', 'rtsp',
+        '-rtsp_transport', 'tcp',
         mtx['rtsp_publish_url'],
     ]
 
@@ -475,8 +480,9 @@ def _popen_logged(cmd, cwd):
                 log_file.write(text)
                 log_file.flush()
 
-    threading.Thread(target=pump, daemon=True, name='cinema-proc-log').start()
-    return proc, collected
+    thread = threading.Thread(target=pump, daemon=True, name='cinema-proc-log')
+    thread.start()
+    return proc, collected, thread
 
 
 def _collected_text(collected, limit=1200):
@@ -507,13 +513,27 @@ def _launch_ffmpeg_push(mtx, cinema_path):
         return None, False, f'MediaMTX RTSP 未就绪（{host}:{port}）'
 
     cinema_log('ffmpeg process start', tag='ffmpeg')
-    proc, collected = _popen_logged(ffmpeg_cmd, STREAM_RUNTIME_DIR)
-    time.sleep(0.35)
+    proc, collected, pump_thread = _popen_logged(ffmpeg_cmd, STREAM_RUNTIME_DIR)
+
+    deadline = time.time() + 1.0
+    while time.time() < deadline and proc.poll() is None:
+        time.sleep(0.05)
 
     if proc.poll() is not None:
+        pump_thread.join(timeout=1.0)
         detail = _collected_text(collected) or 'ffmpeg 已退出但没有输出，请查看 log/back.log'
         cinema_log(f'ffmpeg exited immediately: {detail}', tag='ffmpeg')
         return None, False, detail
+
+    t0 = time.time()
+    path_ready, _path_data = _mediamtx_path_online(mtx)
+    cinema_log(
+        f'ffmpeg pid={proc.pid} path_ready={path_ready} '
+        f'wait_ms={int((time.time() - t0) * 1000)}'
+    )
+
+    STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
+    return proc.pid, path_ready, ''
 
     t0 = time.time()
     path_ready, _path_data = _mediamtx_path_online(mtx)
