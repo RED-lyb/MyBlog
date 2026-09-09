@@ -369,6 +369,8 @@ def _mediamtx_path_online(mtx, timeout=6.0):
 
 
 _H264_CODEC_NAMES = {'h264', 'avc', 'avc1', 'avc3'}
+# WebRTC 过网后再直拷，码率再高也容易丢包导致画面卡住
+_H264_COPY_MAX_BITRATE = 4_000_000
 
 
 def _ffprobe_bin(ffmpeg_bin):
@@ -424,18 +426,96 @@ def _probe_video_codec(cinema_path, ffmpeg_bin):
     return ''
 
 
-def _video_encode_args(ffmpeg_bin, cinema_path):
-    codec = _probe_video_codec(cinema_path, ffmpeg_bin)
-    if codec == 'h264':
-        cinema_log(f'video codec={codec}, -c:v copy')
-        # MP4 里的 H.264 是 avcC，RTSP 需要 Annex B；新版 ffmpeg 不会自动插这个滤镜
-        return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
-    cinema_log(f'video codec={codec or "unknown"}, -c:v libx264')
+def _probe_video_info(cinema_path, ffmpeg_bin):
+    info = {
+        'codec': '',
+        'profile': '',
+        'bit_rate': 0,
+        'width': 0,
+        'height': 0,
+        'has_b_frames': 0,
+    }
+    try:
+        result = subprocess.run(
+            [
+                _ffprobe_bin(ffmpeg_bin),
+                '-v', 'error',
+                '-select_streams', 'v:0',
+                '-show_entries',
+                'stream=codec_name,profile,bit_rate,width,height,has_b_frames:format=bit_rate,duration',
+                '-of', 'json',
+                str(cinema_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+        data = json.loads(result.stdout or '{}')
+        stream = (data.get('streams') or [{}])[0]
+        fmt = data.get('format') or {}
+        info['codec'] = _normalize_video_codec(stream.get('codec_name'))
+        info['profile'] = str(stream.get('profile') or '')
+        info['width'] = int(stream.get('width') or 0)
+        info['height'] = int(stream.get('height') or 0)
+        info['has_b_frames'] = int(stream.get('has_b_frames') or 0)
+        info['bit_rate'] = int(stream.get('bit_rate') or 0)
+        if info['bit_rate'] <= 0:
+            info['bit_rate'] = int(fmt.get('bit_rate') or 0)
+    except Exception:
+        info['codec'] = _probe_video_codec(cinema_path, ffmpeg_bin)
+    return info
+
+
+def _can_copy_h264(info):
+    if info.get('codec') != 'h264':
+        return False
+    profile = (info.get('profile') or '').lower()
+    if any(token in profile for token in ('10', '4:2:2', '4:4:4')):
+        return False
+    if int(info.get('has_b_frames') or 0) > 0:
+        return False
+    if int(info.get('bit_rate') or 0) > _H264_COPY_MAX_BITRATE:
+        return False
+    return True
+
+
+def _transcode_video_args():
+    # 逗号在 filtergraph 里要转义；高度不超过 720，保证小机器也能 1x
     return [
-        '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-bf', '0',
+        '-vf', r'scale=-2:min(720\,ih),format=yuv420p',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-tune', 'zerolatency',
+        '-profile:v', 'baseline',
+        '-level', '3.1',
+        '-pix_fmt', 'yuv420p',
+        '-g', '30',
+        '-keyint_min', '30',
+        '-sc_threshold', '0',
+        '-bf', '0',
         '-force_key_frames', 'expr:gte(t,n_forced*1)',
+        '-b:v', '1800k',
+        '-maxrate', '1800k',
+        '-bufsize', '3600k',
     ]
+
+
+def _video_encode_args(ffmpeg_bin, cinema_path):
+    info = _probe_video_info(cinema_path, ffmpeg_bin)
+    if _can_copy_h264(info):
+        cinema_log(
+            f'video codec=h264 profile={info.get("profile") or "?"} '
+            f'br={info.get("bit_rate") or 0} bframes={info.get("has_b_frames") or 0}, -c:v copy'
+        )
+        return ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb']
+
+    cinema_log(
+        f'video codec={info.get("codec") or "unknown"} '
+        f'profile={info.get("profile") or "?"} br={info.get("bit_rate") or 0} '
+        f'bframes={info.get("has_b_frames") or 0}, -c:v libx264 720p'
+    )
+    return _transcode_video_args()
 
 
 def _build_ffmpeg_cmd(mtx, cinema_path):
