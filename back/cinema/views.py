@@ -1,9 +1,11 @@
 """
 同频影院：片库目录、MediaMTX 推流进程管理
 """
+import errno
 import json
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -13,7 +15,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
-from pathlib import Path
 
 import yaml
 from django.conf import settings
@@ -456,8 +457,41 @@ def _tcp_ready(host, port, timeout=0.4):
         return False
 
 
+def _is_ffmpeg_missing_error(exc):
+    if isinstance(exc, FileNotFoundError):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, 'errno', None) == errno.ENOENT:
+        return True
+    text = str(exc)
+    return '没有那个文件或目录' in text or 'No such file or directory' in text
+
+
+def _ffmpeg_missing_message(ffmpeg_bin, exc=None):
+    path = (ffmpeg_bin or '').strip() or 'ffmpeg'
+    suffix = f'：{exc}' if exc else ''
+    return (
+        f'ffmpeg 不存在: {path}（没有那个文件或目录）{suffix}。'
+        '请在管理后台或 config_back.json 填写真实路径，'
+        '例如 /opt/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg'
+    )
+
+
+def _ffmpeg_bin_problem(ffmpeg_bin):
+    text = (ffmpeg_bin or '').strip() or 'ffmpeg'
+    if os.path.dirname(text):
+        if not os.path.isfile(text):
+            return _ffmpeg_missing_message(text)
+        if not os.access(text, os.X_OK):
+            return f'ffmpeg 不可执行: {text}'
+        return ''
+    resolved = shutil.which(text)
+    if not resolved:
+        return _ffmpeg_missing_message(text)
+    return ''
+
+
 def _popen_logged(cmd, cwd):
-    """把子进程输出实时写入 back.log，避免重定向到文件时全缓冲导致失败原因丢失。"""
+    """把子进程输出实时写入 back.log。"""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     collected = []
     proc = subprocess.Popen(
@@ -492,7 +526,19 @@ def _collected_text(collected, limit=1200):
     return text
 
 
+def _ffmpeg_fail_detail(collected, ffmpeg_bin):
+    text = _collected_text(collected)
+    if text and ('没有那个文件或目录' in text or 'No such file or directory' in text):
+        return _ffmpeg_missing_message(ffmpeg_bin)
+    return text or 'ffmpeg 已退出但没有输出，请查看 log/back.log'
+
+
 def _launch_ffmpeg_push(mtx, cinema_path):
+    missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
+    if missing:
+        cinema_log(missing, tag='ffmpeg')
+        return None, False, missing
+
     ffmpeg_cmd = _build_ffmpeg_cmd(mtx, cinema_path)
     cinema_log('ffmpeg cmd: ' + ' '.join(ffmpeg_cmd))
 
@@ -513,7 +559,14 @@ def _launch_ffmpeg_push(mtx, cinema_path):
         return None, False, f'MediaMTX RTSP 未就绪（{host}:{port}）'
 
     cinema_log('ffmpeg process start', tag='ffmpeg')
-    proc, collected, pump_thread = _popen_logged(ffmpeg_cmd, STREAM_RUNTIME_DIR)
+    try:
+        proc, collected, pump_thread = _popen_logged(ffmpeg_cmd, STREAM_RUNTIME_DIR)
+    except OSError as exc:
+        if _is_ffmpeg_missing_error(exc):
+            detail = _ffmpeg_missing_message(mtx['ffmpeg_bin'], exc)
+            cinema_log(detail, tag='ffmpeg')
+            return None, False, detail
+        raise
 
     deadline = time.time() + 1.0
     while time.time() < deadline and proc.poll() is None:
@@ -521,19 +574,9 @@ def _launch_ffmpeg_push(mtx, cinema_path):
 
     if proc.poll() is not None:
         pump_thread.join(timeout=1.0)
-        detail = _collected_text(collected) or 'ffmpeg 已退出但没有输出，请查看 log/back.log'
+        detail = _ffmpeg_fail_detail(collected, mtx['ffmpeg_bin'])
         cinema_log(f'ffmpeg exited immediately: {detail}', tag='ffmpeg')
         return None, False, detail
-
-    t0 = time.time()
-    path_ready, _path_data = _mediamtx_path_online(mtx)
-    cinema_log(
-        f'ffmpeg pid={proc.pid} path_ready={path_ready} '
-        f'wait_ms={int((time.time() - t0) * 1000)}'
-    )
-
-    STREAM_PID_FILE.write_text(str(proc.pid), encoding='utf-8')
-    return proc.pid, path_ready, ''
 
     t0 = time.time()
     path_ready, _path_data = _mediamtx_path_online(mtx)
@@ -619,6 +662,10 @@ def _start_mediamtx():
 def _runtime_ready():
     if not _mediamtx_binary_path():
         return False, '未找到 mediamtx，请运行 back/cinema/scripts/deploy_mediamtx.sh'
+    mtx = get_mediamtx_settings()
+    missing = _ffmpeg_bin_problem(mtx['ffmpeg_bin'])
+    if missing:
+        return False, missing
     return True, ''
 
 

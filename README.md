@@ -304,21 +304,25 @@ crontab -e
 OpenCloudOS 等发行版自带的 `dnf install ffmpeg` **通常不含 `libx264`**（仅有 `libopenh264` 等，且实测常无法用于推流）。需单独安装 GPL 版 FFmpeg，并在管理后台或 `config_back.json` 中设置 `ffmpeg_bin` 指向该二进制。
 
 ```bash
-# 1. 下载带 libx264 的 FFmpeg（BtbN GPL 构建，路径可按需调整）
-mkdir -p /opt/ffmpeg-gpl && cd /opt/ffmpeg-gpl
+# 1. 下载带 libx264 的 FFmpeg（BtbN GPL 构建）
+cd /opt
 curl -L -o ffmpeg-gpl.tar.xz \
   'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz'
 tar xf ffmpeg-gpl.tar.xz
-# 解压后目录名随版本变化，例如 ffmpeg-master-latest-linux64-gpl
+# 解压目录名随构建变化。用 ls 确认真实路径，常见为：
+# /opt/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg
 
-# 2. 确认 libx264 可用
-/opt/ffmpeg-gpl/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg -encoders 2>/dev/null | grep libx264
+# 2. 确认二进制存在且 libx264 可用（路径以 ls 为准，不要照抄）
+ls /opt/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg
+/opt/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg -encoders 2>/dev/null | grep libx264
 
-# 3. 在 config_back.json 的 mediamtx.ffmpeg_bin 或管理后台填写，例如：
-#    /opt/ffmpeg-gpl/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg
+# 3. 在 config_back.json 的 mediamtx.ffmpeg_bin 或管理后台填写上一步的真实路径，例如：
+#    /opt/ffmpeg-master-latest-linux64-gpl/bin/ffmpeg
 ```
 
-若仍报 `Unknown encoder 'libx264'`，说明 uWSGI 实际使用的 `ffmpeg_bin` 仍指向系统 `/usr/bin/ffmpeg`，请改配置后重启 uWSGI。
+若启动推流报「没有那个文件或目录」，说明填写的 `ffmpeg_bin` 在磁盘上不存在（解压目录可能不是文档里的示例路径）。请用 `ls` 确认 `bin/ffmpeg` 后改配置并重启 uWSGI。
+
+若仍报 `Unknown encoder 'libx264'`，说明 uWSGI 实际用到的仍是系统 `/usr/bin/ffmpeg`，请改配置后重启 uWSGI。
 
 ```bash
 # 安装 Go 1.26+ 后编译 mediamtx
