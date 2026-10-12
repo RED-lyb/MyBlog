@@ -114,7 +114,8 @@ const routes=[
     component: () => import('../pages/love_nest.vue'),
     meta: {
       title: '爱情小窝|L-BLOG',
-      hideGlobalBg: true
+      hideGlobalBg: true,
+      requiresAdmin: true
     }
   },
   {

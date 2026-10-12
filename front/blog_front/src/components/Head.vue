@@ -84,6 +84,10 @@ const handleSelect = (key, keyPath) => {
     '7': `/user_home/${authorId}`, // 关于作者（跳转到配置的作者ID主页）
   }
 
+  if (key === '65' && !isAdmin.value) {
+    return
+  }
+
   const targetPath = routeMap[key]
   if (targetPath && route.path !== targetPath) {
     router.push(targetPath)
@@ -191,7 +195,7 @@ watch(
       <el-menu-item index="4">趣味游戏</el-menu-item>
       <el-menu-item index="5">意见反馈</el-menu-item>
       <el-menu-item index="6">更新历史</el-menu-item>
-      <el-menu-item index="65">爱情小窝</el-menu-item>
+      <el-menu-item v-if="isAdmin" index="65">爱情小窝</el-menu-item>
       <el-menu-item index="7">关于作者</el-menu-item>
       <el-menu-item index="8" style="padding-left: 0px;padding-right: 0px;margin-left: 10px;margin-right: 10px">
         <theme size="2.5" />
