@@ -88,13 +88,9 @@ onBeforeUnmount(() => {
       <span class="ln-meta">{{ photos.length }} photos</span>
     </header>
 
-    <div v-if="loading" class="gallery-loading">
-      <el-skeleton :rows="4" animated />
-    </div>
+    <p v-if="!loading && !hasPhotos" class="ln-empty-hint">还没有照片</p>
 
-    <p v-else-if="!hasPhotos" class="ln-empty-hint">还没有照片</p>
-
-    <div v-else class="gallery-sections">
+    <div v-else-if="hasPhotos" class="gallery-sections">
       <section
         v-for="group in photoGroups"
         :key="group.key"
@@ -142,10 +138,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .photo-gallery {
   padding: 28px 24px 32px;
-}
-
-.gallery-loading {
-  padding: 12px 0;
 }
 
 .gallery-sections {

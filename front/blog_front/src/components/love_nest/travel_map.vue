@@ -687,11 +687,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="travel-map__stage">
-      <div v-if="loading" class="travel-map__loading">
-        <el-skeleton :rows="6" animated />
-      </div>
-
-      <div v-else-if="mapError" class="travel-map__overlay travel-map__error">
+      <div v-if="mapError" class="travel-map__overlay travel-map__error">
         <p class="ln-empty-hint">{{ mapError }}</p>
       </div>
 
@@ -736,7 +732,7 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else>
-            <p v-if="!visibleCities.length" class="ln-empty-hint">还没有旅行记录</p>
+            <p v-if="!loading && !visibleCities.length" class="ln-empty-hint">还没有旅行记录</p>
 
             <article
               v-for="city in visibleCities"
@@ -825,7 +821,6 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.travel-map__loading,
 .travel-map__overlay {
   position: fixed;
   inset: 0;

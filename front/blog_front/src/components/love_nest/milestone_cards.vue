@@ -49,13 +49,9 @@ function countdownLabel(item) {
       <span class="ln-meta">{{ milestones.length }} dates</span>
     </header>
 
-    <div v-if="loading" class="cards-loading">
-      <el-skeleton :rows="3" animated />
-    </div>
+    <p v-if="!loading && !hasMilestones" class="ln-empty-hint">还没有纪念日</p>
 
-    <p v-else-if="!hasMilestones" class="ln-empty-hint">还没有纪念日</p>
-
-    <div v-else class="cards-grid">
+    <div v-else-if="hasMilestones" class="cards-grid">
       <article
         v-for="item in milestones"
         :key="item.id"
@@ -74,10 +70,6 @@ function countdownLabel(item) {
 <style scoped>
 .milestone-cards {
   padding: 28px 24px 32px;
-}
-
-.cards-loading {
-  padding: 8px 0;
 }
 
 .cards-grid {

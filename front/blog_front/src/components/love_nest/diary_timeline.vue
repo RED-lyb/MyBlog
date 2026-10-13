@@ -210,14 +210,10 @@ onBeforeUnmount(() => {
       <span class="ln-meta">{{ diaries.length }} moments</span>
     </header>
 
-    <div v-if="loading" class="moment-rail__loading">
-      <el-skeleton :rows="4" animated />
-    </div>
-
-    <p v-else-if="!hasDiaries" class="ln-empty-hint">还没有记录</p>
+    <p v-if="!loading && !hasDiaries" class="ln-empty-hint">还没有记录</p>
 
     <div
-      v-else
+      v-else-if="hasDiaries"
       ref="scrollRef"
       class="moment-rail__scroll"
     >
@@ -288,13 +284,6 @@ onBeforeUnmount(() => {
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--ln-ink);
-}
-
-.moment-rail__loading {
-  width: min(1200px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 12px 16px;
-  box-sizing: border-box;
 }
 
 .moment-rail__scroll {
