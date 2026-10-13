@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { resolveStaticUrl } from '../../lib/loveNestApi.js'
+import { floatPhotoSource } from '../../lib/loveNestFloatScope.js'
 import {
   PROVINCE_NAMES,
   buildProvinceMapData,
@@ -645,12 +646,41 @@ function updateMobileList() {
   isMobileList.value = window.matchMedia('(max-width: 720px)').matches
 }
 
+function syncFloatPhotoSource() {
+  if (isNationalView.value || !activeProvince.value) {
+    floatPhotoSource.value = null
+    return
+  }
+
+  const provinceCode = activeProvince.value
+  const cities = props.cities.filter(
+    (city) => normalizeProvinceAdcode(city.province_adcode) === provinceCode
+  )
+
+  floatPhotoSource.value = cities.flatMap((city) =>
+    (city.photos || [])
+      .filter((photo) => photo?.url)
+      .map((photo) => ({
+        url: photo.url,
+        category: photo.category,
+      }))
+  )
+}
+
 watch(
   () => [props.cities, props.provinceStats, props.loading],
   () => {
     scheduleRenderMap()
   },
   { deep: true, flush: 'post' }
+)
+
+watch(
+  () => [isNationalView.value, activeProvince.value, props.cities],
+  () => {
+    syncFloatPhotoSource()
+  },
+  { deep: true, immediate: true }
 )
 
 onMounted(async () => {
@@ -671,6 +701,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  floatPhotoSource.value = null
   clearTimeout(geoRoamTimer)
   chartRef.value?.parentElement?.removeEventListener('wheel', preventPageScroll)
   chartRef.value?.parentElement?.removeEventListener('mousemove', updateLastPointer)

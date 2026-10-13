@@ -1,6 +1,7 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { fetchLoveNestDecorPhotos, resolveStaticUrl } from '../../lib/loveNestApi.js'
+import { floatPhotoSource } from '../../lib/loveNestFloatScope.js'
 
 const MAX_FLOATERS = 8
 const EASING_POOL = [
@@ -14,8 +15,13 @@ const EASING_POOL = [
 const sceneRef = ref(null)
 const sceneSize = ref({ width: 0, height: 0 })
 const activeItems = ref([])
-const assetPool = ref([])
+const allAssets = ref([])
 const timers = new Set()
+
+const assetPool = computed(() => {
+  if (floatPhotoSource.value === null) return allAssets.value
+  return buildAssetPool(floatPhotoSource.value)
+})
 
 function randomBetween(min, max) {
   return min + Math.random() * (max - min)
@@ -75,10 +81,10 @@ async function loadAssetPool() {
   try {
     const response = await fetchLoveNestDecorPhotos()
     if (response.data.success) {
-      assetPool.value = buildAssetPool(response.data.data?.photos || [])
+      allAssets.value = buildAssetPool(response.data.data?.photos || [])
     }
   } catch (error) {
-    assetPool.value = []
+    allAssets.value = []
   }
 }
 
@@ -187,6 +193,19 @@ function startFloaters() {
     trackTimeout(() => spawnFloater(), i * randomBetween(300, 1100))
   }
 }
+
+function restartFloaters() {
+  timers.forEach((timer) => window.clearTimeout(timer))
+  timers.clear()
+  activeItems.value = []
+  if (assetPool.value.length) {
+    startFloaters()
+  }
+}
+
+watch(floatPhotoSource, () => {
+  restartFloaters()
+})
 
 onMounted(async () => {
   await loadAssetPool()
