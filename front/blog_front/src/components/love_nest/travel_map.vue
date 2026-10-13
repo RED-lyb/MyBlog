@@ -394,9 +394,9 @@ function buildMapOption(mapName, mapData, isNational, roamEnabled = true, option
       left: 'center',
       bottom: 12,
       inRange: {
-        color: ['#e8ddd4', '#ff4d6a', '#ff8a1e', '#f5c518', '#3cbe6a', '#2eb5d6', '#4c78e8', '#8b5cf6'],
+        color: ['#e8ddd4', '#8b5cf6', '#4c78e8', '#2eb5d6', '#3cbe6a', '#f5c518', '#ff8a1e', '#ff4d6a'],
       },
-      text: isNational ? ['高', '低'] : ['多', '少'],
+      text: isNational ? ['多', '少'] : ['去', '未去'],
       textStyle: { color: '#7d6e72' },
     },
     series: [
