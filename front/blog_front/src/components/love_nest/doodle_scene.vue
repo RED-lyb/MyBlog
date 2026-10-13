@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
     <div class="doodle-bg">
       <img
         class="doodle-bg-photo"
-        src="/love_nest/background.jpg"
+        src="/images/background.jpg"
         alt=""
       />
     </div>
