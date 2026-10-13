@@ -393,7 +393,7 @@ function buildMapOption(mapName, mapData, isNational, roamEnabled = true, option
       left: 'center',
       bottom: 12,
       inRange: {
-        color: ['#e8ddd4', '#ddb8c0', '#8f3d4a'],
+        color: ['#e8ddd4', '#ff4d6a', '#ff8a1e', '#f5c518', '#3cbe6a', '#2eb5d6', '#4c78e8', '#8b5cf6'],
       },
       text: isNational ? ['高', '低'] : ['多', '少'],
       textStyle: { color: '#7d6e72' },
@@ -420,9 +420,21 @@ function buildMapOption(mapName, mapData, isNational, roamEnabled = true, option
         },
         emphasis: {
           itemStyle: {
-            areaColor: '#faf0d4',
-            borderColor: 'rgba(120, 100, 60, 0.45)',
-            borderWidth: 0.8,
+            areaColor: '#e8eaed',
+            borderColor: '#3d4450',
+            borderWidth: 1.1,
+          },
+          label: {
+            color: '#111',
+            fontSize: isNational ? 10 : 11,
+          },
+        },
+        select: {
+          itemStyle: {
+            areaColor: '#cfd3d8',
+            color: '#cfd3d8',
+            borderColor: '#1f242b',
+            borderWidth: 1.4,
           },
           label: {
             color: '#111',
