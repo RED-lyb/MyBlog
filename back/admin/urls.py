@@ -2,7 +2,7 @@
 管理员应用 URL 配置
 """
 from django.urls import path
-from . import views
+from . import cert_views, views
 
 urlpatterns = [
     # 统计数据
@@ -29,5 +29,11 @@ urlpatterns = [
     # 全局配置
     path('config/', views.get_config, name='admin_get_config'),
     path('config/update/', views.update_config, name='admin_update_config'),
+
+    # 证书更新：只保存 zip，安装由 depend_manage/install_nginx_cert.sh 执行
+    path('nginx-cert/', cert_views.cert_status, name='admin_cert_status'),
+    path('nginx-cert/upload/', cert_views.cert_upload, name='admin_cert_upload'),
+    path('nginx-cert/install/', cert_views.cert_install, name='admin_cert_install'),
+    path('nginx-cert/delete/', cert_views.cert_delete, name='admin_cert_delete'),
 ]
 

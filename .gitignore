@@ -58,6 +58,10 @@ back/api/static/games/game_files/.gitkeep
 back/api/static/games/game_images/*
 back/api/static/games/game_images/.gitkeep
 
+# 待安装的 Nginx 证书压缩包
+back/api/nginx_cert/inbox/*
+!back/api/nginx_cert/inbox/.gitkeep
+
 # 同频影院
 back/cinema/mediamtx_runtime/*
 !back/cinema/mediamtx_runtime/.gitkeep

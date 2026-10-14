@@ -71,6 +71,14 @@ const adminRoutes = [
     }
   },
   {
+    path: 'cert',
+    name: 'admin_cert',
+    component: () => import('../pages/admin/CertManage.vue'),
+    meta: {
+      title: '证书更新|L-BLOG管理后台'
+    }
+  },
+  {
     path: 'config',
     name: 'admin_config',
     component: () => import('../pages/admin/ConfigManage.vue'),

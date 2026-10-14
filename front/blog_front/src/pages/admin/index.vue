@@ -114,9 +114,9 @@ import {
   Trophy,
   Clock,
   ChatDotRound,
-  Film
+  Film,
+  Lock
 } from '@element-plus/icons-vue'
-import { checkLoveNestEditor } from '../../lib/loveNestApi.js'
 
 const LoveNestMenuIcon = {
   name: 'LoveNestMenuIcon',
@@ -151,24 +151,9 @@ const { config } = storeToRefs(configStore)
 
 onMounted(() => {
   configStore.loadConfig()
-  loadLoveNestAccess()
 })
 
 const sidebarCollapsed = ref(false)
-const canManageLoveNest = ref(false)
-
-async function loadLoveNestAccess() {
-  if (authStore.isAdmin) {
-    canManageLoveNest.value = true
-    return
-  }
-  try {
-    const response = await checkLoveNestEditor()
-    canManageLoveNest.value = !!response.data?.success && !!response.data?.data?.can_edit
-  } catch (error) {
-    canManageLoveNest.value = false
-  }
-}
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value
@@ -244,20 +229,21 @@ const menuItems = computed(() => {
     icon: ChatDotRound
   },
   {
+      path: '/admin/love-nest',
+      label: '爱情小窝',
+      icon: LoveNestMenuIcon,
+  },
+  {
+    path: '/admin/cert',
+    label: '证书更新',
+    icon: Lock
+  },
+  {
     path: '/admin/config',
     label: '全局配置',
     icon: Setting
   }
   ]
-
-  if (canManageLoveNest.value) {
-    items.splice(items.length - 1, 0, {
-      path: '/admin/love-nest',
-      label: '爱情小窝',
-      icon: LoveNestMenuIcon,
-    })
-  }
-
   return items
 })
 
